@@ -8,6 +8,10 @@ LXFramework 仍然是标准 Godot 工程：场景、节点、资源、动画、�
 
 当前版本不包含网络、资源下载和热更新。
 
+## 示例项目
+
+完整的飞机大战第一关示例已经发布在 [`sample` 分支](https://github.com/xiayu519/LXFramework/tree/sample)。它实际使用 Luban、Feature、UI、类型化资源、输入、音频、`NodePool<TNode>` 和统一生命周期，并验证胜利、死亡、连续重开与资源释放闭环；可运行的 Windows PC 包位于该分支的 `build/windows/`。
+
 ## Codex 优先的开发体验
 
 - **仓库即上下文**：Codex 会从根目录开始读取分层 `AGENTS.md`，自动获得架构边界、目录规则和完成标准。
