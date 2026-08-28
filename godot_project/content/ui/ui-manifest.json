@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "screens": [
+    {
+      "scope": "Framework",
+      "id": "framework_status",
+      "className": "FrameworkStatusScreen",
+      "namespace": "LX.Validation",
+      "scenePath": "res://scene/ui/framework_status.tscn",
+      "layer": "Screen",
+      "cachePolicy": "CachedSingleton",
+      "coverPolicy": "KeepVisible"
+    },
+    {
+      "scope": "Framework",
+      "id": "ui_components_showcase",
+      "className": "UIComponentsShowcase",
+      "namespace": "LX.UI.Components",
+      "scenePath": "res://scene/ui/examples/ui_components_showcase.tscn",
+      "layer": "Screen",
+      "cachePolicy": "Transient",
+      "coverPolicy": "HidePrevious",
+      "inputPolicy": "Normal",
+      "focusPolicy": "GrabFirst"
+    }
+  ]
+}

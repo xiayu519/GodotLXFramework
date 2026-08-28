@@ -1,0 +1,14 @@
+[
+  {
+    "id": "invalid_reference_fixture",
+    "categoryId": 999999,
+    "rarity": "COMMON",
+    "stats": { "attack": 0, "speed": 0.0, "weight": 0.0 },
+    "tags": [],
+    "flags": [],
+    "costs": [],
+    "serial": 0,
+    "optionalBonus": null,
+    "enabled": false
+  }
+]

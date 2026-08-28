@@ -1,0 +1,34 @@
+[
+  {
+    "id": "diagnostics",
+    "categoryId": 1,
+    "rarity": "RARE",
+    "stats": {
+      "attack": 12,
+      "speed": 1.25,
+      "weight": 3.5
+    },
+    "tags": ["runtime", "json-report"],
+    "flags": ["codex", "developer"],
+    "costs": [["cpu", 2], ["memory", 1]],
+    "serial": 922337203685477000,
+    "optionalBonus": 7,
+    "enabled": true
+  },
+  {
+    "id": "visual_loop",
+    "categoryId": 2,
+    "rarity": "EPIC",
+    "stats": {
+      "attack": 20,
+      "speed": 0.75,
+      "weight": 5.25
+    },
+    "tags": ["headless", "baseline"],
+    "flags": ["developer"],
+    "costs": [["cpu", 3]],
+    "serial": 42,
+    "optionalBonus": null,
+    "enabled": true
+  }
+]

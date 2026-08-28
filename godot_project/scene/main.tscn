@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://s543p8mkoql5"]
+
+[ext_resource type="Script" path="res://src/LXFramework/Runtime/LXHost.cs" id="1_host"]
+
+[node name="LXHost" type="Node"]
+process_mode = 3
+script = ExtResource("1_host")
+ShowFrameworkStatus = true

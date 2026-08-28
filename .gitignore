@@ -1,0 +1,36 @@
+# Godot 4+ generated state
+.godot/
+.mono/
+/android/
+
+# .NET build outputs
+**/bin/
+**/obj/
+TestResults/
+
+# LXFramework 生成的报告（生成的 C# 仍提交到版本库）
+.lx/
+.codex/work/*.md
+!.codex/work/.gitkeep
+# 旧版本本地报告，仅为迁移清理保留忽略规则
+.p[e]achwind/
+artifacts/
+
+# Local tools and copyrighted research material
+.tools/
+research/
+roms/
+*.nes
+*.fds
+*.sav
+*.srm
+
+# IDE and operating system files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.csproj.old*
+.DS_Store
+Thumbs.db

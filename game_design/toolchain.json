@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "version": "v4.10.2",
+  "commit": "332018b42be100dfc3e2bc77b7647e79851bb861",
+  "repository": "https://github.com/focus-creative-games/luban.git",
+  "assembly": "Luban.dll"
+}

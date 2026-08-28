@@ -1,0 +1,6 @@
+interface:
+  display_name: "LX Codex 工作流"
+  short_description: "维护 LXFramework 的 Codex 指令、Skill、记忆与模型评测"
+  default_prompt: "使用 $lx-codex-workflow 审查或改进 LXFramework 的 Codex 工作流。"
+policy:
+  allow_implicit_invocation: true

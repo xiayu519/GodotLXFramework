@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "scope": "Framework",
+      "id": "app_icon",
+      "resourceType": "Texture2D",
+      "path": "res://icon.svg",
+      "cachePolicy": "Cached",
+      "group": null
+    }
+  ]
+}

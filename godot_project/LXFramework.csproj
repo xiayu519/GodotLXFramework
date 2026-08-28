@@ -1,0 +1,23 @@
+<Project Sdk="Godot.NET.Sdk/4.6.3">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>LX</RootNamespace>
+    <AssemblyName>LXFramework</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="src\LXFramework.Core\**\*.cs" />
+    <Compile Remove="tools\**\*.cs" />
+    <Compile Remove="tests\**\*.cs" />
+    <Compile Remove=".tools\**\*.cs" />
+    <Compile Remove=".lx\**\*.cs" />
+    <Compile Remove="script\**\Tools\**\*.cs" />
+    <Compile Remove="script\**\obj\**\*.cs" />
+    <Compile Remove="script\**\Tests\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="src\LXFramework.Core\LXFramework.Core.csproj" />
+  </ItemGroup>
+</Project>

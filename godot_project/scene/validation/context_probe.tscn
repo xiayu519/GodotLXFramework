@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/LXFramework/Validation/ContextProbeNode.cs" id="1_probe"]
+
+[node name="ContextProbeRoot" type="Node"]
+script = ExtResource("1_probe")
+
+[node name="ContextProbeChild" type="Node" parent="."]
+script = ExtResource("1_probe")

@@ -1,0 +1,6 @@
+interface:
+  display_name: "LXFramework 开发"
+  short_description: "开发、审查和验证 LXFramework Godot C# 项目"
+  default_prompt: "使用 $lx-dev 完成这个 LXFramework 开发任务。"
+policy:
+  allow_implicit_invocation: true

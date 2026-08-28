@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<module name="design">
+  <enum name="Rarity" comment="Config entry rarity">
+    <var name="NONE" value="0" comment="No rarity assigned" />
+    <var name="COMMON" value="1" comment="Common entry" />
+    <var name="RARE" value="2" comment="Rare entry" />
+    <var name="EPIC" value="3" comment="Epic entry" />
+  </enum>
+  <bean name="DesignStats" comment="Nested bean used by the binary compatibility fixture">
+    <var name="attack" type="int" comment="Integer value" />
+    <var name="speed" type="float" comment="Floating point value" />
+    <var name="weight" type="double" comment="Double precision value" />
+  </bean>
+  <bean name="DesignCategory" comment="Referenced category table row">
+    <var name="id" type="int" comment="Stable numeric category ID" />
+    <var name="name" type="string" comment="Category display name" />
+  </bean>
+  <bean name="DesignItem" comment="Broad cs-bin compatibility fixture">
+    <var name="id" type="string" comment="Stable item ID" />
+    <var name="categoryId" type="int#ref=design.TbDesignCategory" comment="Cross-table category reference" />
+    <var name="rarity" type="Rarity" comment="Enum decoding probe" />
+    <var name="stats" type="DesignStats" comment="Nested bean decoding probe" />
+    <var name="tags" type="list,string" comment="List decoding probe" />
+    <var name="flags" type="set,string" comment="Set decoding probe" />
+    <var name="costs" type="map,string,int" comment="Map decoding probe" />
+    <var name="serial" type="long" comment="64-bit integer decoding probe" />
+    <var name="optionalBonus" type="int?" comment="Nullable decoding probe" />
+    <var name="enabled" type="bool" comment="Boolean decoding probe" />
+  </bean>
+  <bean name="DesignProbe" comment="LXFramework Luban integration probe">
+    <var name="id" type="string" comment="Stable identifier" />
+    <var name="displayName" type="string" comment="Human-readable name" />
+    <var name="priority" type="int" comment="Binary integer decoding probe" />
+    <var name="enabled" type="bool" comment="Whether the entry is enabled" />
+  </bean>
+  <table name="TbDesignProbe" value="DesignProbe" input="*@design_probe.json" index="id" group="client" />
+  <table name="TbDesignCategory" value="DesignCategory" input="*@design_category.json" index="id" group="client" />
+  <table name="TbDesignItem" value="DesignItem" input="*@design_item.json" index="id" group="client" />
+</module>

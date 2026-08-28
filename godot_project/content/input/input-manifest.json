@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "actions": [
+    {
+      "scope": "Framework",
+      "id": "cancel",
+      "routes": [
+        { "godotAction": "ui_cancel" }
+      ]
+    },
+    {
+      "scope": "Framework",
+      "id": "confirm",
+      "routes": [
+        { "godotAction": "ui_accept" }
+      ]
+    },
+    {
+      "scope": "Framework",
+      "id": "menu",
+      "routes": [
+        { "godotAction": "lx_menu", "defaultPhysicalKey": "Tab" }
+      ]
+    },
+    {
+      "scope": "Framework",
+      "id": "move_down",
+      "routes": [
+        { "godotAction": "ui_down" },
+        { "godotAction": "lx_move_down", "defaultPhysicalKey": "S" }
+      ]
+    },
+    {
+      "scope": "Framework",
+      "id": "move_left",
+      "routes": [
+        { "godotAction": "ui_left" },
+        { "godotAction": "lx_move_left", "defaultPhysicalKey": "A" }
+      ]
+    },
+    {
+      "scope": "Framework",
+      "id": "move_right",
+      "routes": [
+        { "godotAction": "ui_right" },
+        { "godotAction": "lx_move_right", "defaultPhysicalKey": "D" }
+      ]
+    },
+    {
+      "scope": "Framework",
+      "id": "move_up",
+      "routes": [
+        { "godotAction": "ui_up" },
+        { "godotAction": "lx_move_up", "defaultPhysicalKey": "W" }
+      ]
+    },
+    {
+      "scope": "Framework",
+      "id": "quick_load",
+      "routes": [
+        { "godotAction": "lx_quick_load", "defaultPhysicalKey": "F9" }
+      ]
+    },
+    {
+      "scope": "Framework",
+      "id": "quick_save",
+      "routes": [
+        { "godotAction": "lx_quick_save", "defaultPhysicalKey": "F5" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "id": "lx_framework",
+    "displayName": "LXFramework",
+    "priority": 100,
+    "enabled": true
+  },
+  {
+    "id": "luban_binary",
+    "displayName": "Luban Binary Runtime",
+    "priority": 80,
+    "enabled": true
+  }
+]

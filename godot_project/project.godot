@@ -1,0 +1,34 @@
+; Engine configuration file.
+; Prefer editing non-obvious settings through the Godot editor.
+
+config_version=5
+
+[application]
+
+config/name="LXFramework"
+run/main_scene="uid://s543p8mkoql5"
+config/features=PackedStringArray("4.6", "C#", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=800
+window/size/viewport_height=600
+window/size/window_width_override=800
+window/size/window_height_override=600
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[dotnet]
+
+project/assembly_name="LXFramework"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/lx_tools/plugin.cfg")
+
+[rendering]
+
+rendering_device/driver.windows="d3d12"
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

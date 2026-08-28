@@ -1,0 +1,40 @@
+using LX.Res;
+using LX.Audio;
+using LX.Content;
+using LX.Core.Diagnostics;
+using LX.Core.Events;
+using LX.Core.Lifetime;
+using LX.Core.Random;
+using LX.Core.Time;
+using LX.Core.World;
+using LX.Diagnostics;
+using LX.Features;
+using LX.Input;
+using LX.Localization;
+using LX.Scenes;
+using LX.Settings;
+using LX.UI;
+
+namespace LX.Runtime;
+
+public sealed record LXContext(
+    LifetimeScope Lifetime,
+    EventHub Events,
+    GameClock Clock,
+    GameScheduler Scheduler,
+    GameClock PhysicsClock,
+    GameScheduler PhysicsScheduler,
+    PauseService Pause,
+    DeterministicRng Random,
+    MetricRegistry Metrics,
+    InputRouter Input,
+    LocalizationService Localization,
+    ContentService Content,
+    WorldEventJournal WorldEvents,
+    SettingsService Settings,
+    AssetRegistry Res,
+    FeatureService Features,
+    SceneService Scenes,
+    AudioService Audio,
+    UIService UI,
+    DiagnosticsService Diagnostics);
