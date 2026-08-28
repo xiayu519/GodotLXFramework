@@ -32,6 +32,7 @@ internal static partial class GodotSmoke
             "LX_FEATURE_LIFECYCLE_PASS",
             "LX_PACKED_SCENE_INSTANCE_LIFECYCLE_PASS",
             "LX_PACKED_SCENE_POOL_PASS",
+            "LX_WORLD_CHUNK_STREAMING_PROGRESS_PASS",
             "LX_WORLD_EVENT_TRIGGER_PASS",
             "LX_UI_COVER_POLICY_PASS",
             "LX_UI_RESULT_TRANSITION_PASS",

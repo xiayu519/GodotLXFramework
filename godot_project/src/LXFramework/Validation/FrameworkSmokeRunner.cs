@@ -432,6 +432,83 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
         await poolLifetime.DisposeAsync();
         GD.Print("LX_PACKED_SCENE_POOL_PASS");
 
+        var chunkParent = new Node2D { Name = "ValidationChunks" };
+        host.AddChild(chunkParent);
+        var chunkOwner = LX.Lifetime.CreateChild("Validation:WorldChunkStreaming");
+        var chunkSource = new ValidationWorldChunkSource(
+            [new ChunkCoordinate(0, 0), new ChunkCoordinate(1, 0)],
+            coordinate => new Node2D { Name = $"ValidationChunk_{coordinate.X}_{coordinate.Y}" });
+        var chunkStreamer = new WorldChunkStreamer(
+            chunkParent,
+            chunkSource,
+            chunkOwner,
+            LX.Metrics,
+            () => LX);
+        var chunkProgress = new List<(int Completed, int Total)>();
+        await chunkStreamer.SetFocusAsync(
+            new ChunkCoordinate(0, 0),
+            new WorldChunkStreamingOptions
+            {
+                Radius = 0,
+                Progress = (completed, total) => chunkProgress.Add((completed, total)),
+            },
+            cancellationToken);
+        if (!chunkProgress.SequenceEqual([(0, 1), (1, 1)]) ||
+            !chunkStreamer.ActiveChunks.SequenceEqual([new ChunkCoordinate(0, 0)]))
+        {
+            throw new InvalidOperationException("World chunk loading progress was not deterministic.");
+        }
+
+        chunkProgress.Clear();
+        await chunkStreamer.SetFocusAsync(
+            new ChunkCoordinate(1, 0),
+            new WorldChunkStreamingOptions
+            {
+                Radius = 0,
+                Progress = (completed, total) => chunkProgress.Add((completed, total)),
+            },
+            cancellationToken);
+        var positionedChunk = chunkParent.GetNodeOrNull<Node2D>("ValidationChunk_1_0");
+        if (!chunkProgress.SequenceEqual([(0, 2), (1, 2), (2, 2)]) ||
+            positionedChunk is null ||
+            positionedChunk.Position != new Vector2(32, 0))
+        {
+            throw new InvalidOperationException("World chunk replacement progress or positioning was incorrect.");
+        }
+        await chunkStreamer.DisposeAsync();
+
+        var invalidChunkSource = new ValidationWorldChunkSource(
+            [new ChunkCoordinate(0, 0)],
+            _ => new Node { Name = "InvalidChunkRoot" });
+        var invalidChunkStreamer = new WorldChunkStreamer(
+            chunkParent,
+            invalidChunkSource,
+            chunkOwner,
+            LX.Metrics,
+            () => LX);
+        try
+        {
+            await invalidChunkStreamer.SetFocusAsync(
+                new ChunkCoordinate(0, 0),
+                new WorldChunkStreamingOptions { Radius = 0 },
+                cancellationToken);
+            throw new InvalidOperationException("World chunk streaming accepted a non-Node2D root.");
+        }
+        catch (InvalidDataException exception) when (
+            exception.Message.Contains("must derive from Node2D", StringComparison.Ordinal))
+        {
+        }
+        if (invalidChunkSource.LastCreated is null ||
+            GodotObject.IsInstanceValid(invalidChunkSource.LastCreated) ||
+            invalidChunkStreamer.ActiveChunks.Count != 0)
+        {
+            throw new InvalidOperationException("Invalid world chunk root was not released atomically.");
+        }
+        await invalidChunkStreamer.DisposeAsync();
+        await chunkOwner.DisposeAsync();
+        chunkParent.Free();
+        GD.Print("LX_WORLD_CHUNK_STREAMING_PROGRESS_PASS");
+
         var worldEventId = new WorldEventId("validation.world_event");
         LX.WorldEvents.TryComplete(worldEventId);
         var triggerLifetime = LX.Lifetime.CreateChild("Validation:WorldEventTrigger");
@@ -568,5 +645,31 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
             throw new InvalidOperationException("Unified runtime diagnostics snapshot was incomplete or not written.");
         }
         GD.Print("LX_RUNTIME_DIAGNOSTICS_PASS");
+    }
+
+    private sealed class ValidationWorldChunkSource(
+        IReadOnlyCollection<ChunkCoordinate> coordinates,
+        Func<ChunkCoordinate, Node> factory) : IWorldChunkSource
+    {
+        public int ChunkWidth => 32;
+
+        public int ChunkHeight => 24;
+
+        public IReadOnlyCollection<ChunkCoordinate> Coordinates { get; } = coordinates;
+
+        public Node? LastCreated { get; private set; }
+
+        public ValueTask<Node> InstantiateAsync(
+            ChunkCoordinate coordinate,
+            LifetimeScope lifetime,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var node = factory(coordinate);
+            LastCreated = node;
+            return ValueTask.FromResult(node);
+        }
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

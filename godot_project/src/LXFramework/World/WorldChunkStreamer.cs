@@ -126,10 +126,19 @@ public sealed class WorldChunkStreamer : IAsyncDisposable
                 .ThenBy(key => key.Y)
                 .ThenBy(key => key.X)
                 .ToArray();
+            var loads = targets.Where(coordinate => !_active.ContainsKey(coordinate)).ToArray();
+            var completedOperations = 0;
+            var totalOperations = removals.Length + loads.Length;
+            if (totalOperations > 0)
+            {
+                options.Progress?.Invoke(completedOperations, totalOperations);
+            }
             for (var index = 0; index < removals.Length; index++)
             {
                 operation.Token.ThrowIfCancellationRequested();
                 await ReleaseAsync(removals[index]);
+                completedOperations++;
+                options.Progress?.Invoke(completedOperations, totalOperations);
                 if ((index + 1) % options.MaxUnloadsPerFrame == 0 && index + 1 < removals.Length)
                 {
                     await NextFrameAsync(operation.Token);
@@ -142,11 +151,12 @@ public sealed class WorldChunkStreamer : IAsyncDisposable
                 _source.PurgeIdleCache();
             }
 
-            var loads = targets.Where(coordinate => !_active.ContainsKey(coordinate)).ToArray();
             for (var index = 0; index < loads.Length; index++)
             {
                 operation.Token.ThrowIfCancellationRequested();
                 await LoadAsync(loads[index], operation.Token);
+                completedOperations++;
+                options.Progress?.Invoke(completedOperations, totalOperations);
                 if ((index + 1) % options.MaxLoadsPerFrame == 0 && index + 1 < loads.Length)
                 {
                     await NextFrameAsync(operation.Token);
@@ -214,24 +224,23 @@ public sealed class WorldChunkStreamer : IAsyncDisposable
                 _source.Canonicalize(coordinate),
                 chunkLifetime,
                 cancellationToken);
-            var capturedNode = node;
-            chunkLifetime.Defer(() =>
+            if (node is not Node2D node2D)
             {
-                if (GodotObject.IsInstanceValid(capturedNode))
-                {
-                    capturedNode.QueueFree();
-                }
-            });
-            LXContextInjector.InitializeTree(node, _context(), chunkLifetime);
-
-            if (node is Node2D node2D)
-            {
-                node2D.Position = new Vector2(coordinate.X * _chunkWidth, coordinate.Y * _chunkHeight);
+                var actualType = node.GetType().Name;
+                node.Free();
+                node = null;
+                throw new InvalidDataException(
+                    $"World chunk ({coordinate.X},{coordinate.Y}) root must derive from Node2D, but produced {actualType}.");
             }
 
-            _parent.AddChild(node);
-            _active.Add(coordinate, new ActiveChunk(node, chunkLifetime));
-            _context().Events.Publish(new WorldChunkLoaded(coordinate, node));
+            var capturedNode = node;
+            chunkLifetime.Defer(() => ReleaseNode(capturedNode));
+            node2D.Position = new Vector2(coordinate.X * _chunkWidth, coordinate.Y * _chunkHeight);
+            LXContextInjector.InitializeTree(node2D, _context(), chunkLifetime);
+
+            _parent.AddChild(node2D);
+            _active.Add(coordinate, new ActiveChunk(node2D, chunkLifetime));
+            _context().Events.Publish(new WorldChunkLoaded(coordinate, node2D));
         }
         catch
         {
@@ -260,6 +269,23 @@ public sealed class WorldChunkStreamer : IAsyncDisposable
     }
 
     private void UpdateMetrics() => _metrics.SetGauge("world.chunks_active", _active.Count);
+
+    private static void ReleaseNode(Node node)
+    {
+        if (!GodotObject.IsInstanceValid(node))
+        {
+            return;
+        }
+
+        if (node.IsInsideTree())
+        {
+            node.QueueFree();
+        }
+        else
+        {
+            node.Free();
+        }
+    }
 
     private void EnsureMainThread()
     {
