@@ -1,302 +1,518 @@
 # LXFramework
 
-LXFramework 是面向 Godot 4.6 .NET / C# 12 的游戏客户端框架。它首先为 Codex 全 AI 开发提供明确事实源、脚手架和可执行门禁，同时保留完整的人工编辑器与命令行入口。
+LXFramework 是一个 **Codex 优先、面向全 AI 开发** 的 Godot 4.6 .NET / C# 12 游戏客户端框架。
 
-框架不提供第二套引擎：场景、节点、资源和导出仍遵循 Godot；LX 只统一生命周期、资源租约、UI、输入、内容、存档、配置表和验证工作流。网络、下载与热更新暂不在当前版本范围内。
+它的目标是让 Codex 能从自然语言需求出发，理解项目结构，使用脚手架创建功能，调用统一的运行时 API，并通过可执行检查交付完整结果。仓库内置分层 `AGENTS.md`、领域 Skill、类型化清单和验证命令，开发者不需要在每个任务中重复解释框架规则。
 
-## 主要能力
+LXFramework 仍然是标准 Godot 工程：场景、节点、资源、动画、调试和导出继续使用 Godot 编辑器。人工开发者可以像普通 Godot C# 项目一样打开和修改它，Codex 工作流不会把项目变成只能由 AI 操作的黑盒。
 
-- Codex 原生工作流：分层 `AGENTS.md`、按需 Skill、Project Knowledge、隔离模型评测。
-- 单一工程边界：`godot_project/` 是唯一 `project.godot` 与 `res://` 根。
-- 人工工具：Godot 底部 `LX Tools` 面板可执行检查、生成、Luban、脚手架、资源依赖和视觉比较。
-- 强约束架构：纯 C# Core、Godot adapter、产品层单向依赖；静态语法树门禁禁止越层和动态资源加载。
-- 生命周期：`LifetimeScope` 统一取消与释放，资源、订阅、定时任务和功能实例可绑定生命周期。
-- UI：页面栈、层级、覆盖/缓存/模态/焦点策略、异步过渡和强类型返回值。
-- 资源与场景：类型化引用、租约、缓存策略、批量预热、依赖分析、后台进度和安全场景切换。
-- 输入：类型化动作、输入上下文栈、设备模态、提示文本与绑定冲突检查。
-- 数据：固定版本 Luban，JSON 策划源生成 C# 强类型代码和 `.bytes` 二进制表。
-- 运行时基础：事件、调度器、状态机、对象池、存档迁移/备份、设置、本地化与统一诊断快照。
-- 验证：静态门禁、编译、测试、Godot headless 场景断言、CPU 确定性 UI 视觉回归和性能基线。
+当前版本不包含网络、资源下载和热更新。
 
-## 环境
+## Codex 优先的开发体验
+
+- **仓库即上下文**：Codex 会从根目录开始读取分层 `AGENTS.md`，自动获得架构边界、目录规则和完成标准。
+- **知识按任务加载**：框架开发、产品开发、UI、资源和数据等知识通过 Skill 按需加载，不要求开发者在提示词中复制整套文档。
+- **从需求到验证闭环**：Codex 使用 `lx create` 创建结构，通过类型化 API 实现功能，并以 `check`、`validate` 的真实结果作为完成证据。
+- **人与 AI 使用同一套工程**：Codex、命令行和 Godot 编辑器中的 `LX Tools` 共用相同的清单、生成器和验证入口。
+
+使用 Codex 时，在仓库根目录打开项目并描述要实现的游戏功能即可。具体指令分层和推荐提问方式见 [AI 开发工作流](Books/AI-Development-Workflow.md)。
+
+## 为什么使用 LXFramework
+
+- **保留 Godot 原生开发方式**：仍然使用 `.tscn`、Node、Resource 和 Godot 编辑器，不需要学习另一套引擎。
+- **统一生命周期**：事件订阅、定时任务、资源租约和功能实例可以绑定到节点或功能的 `Lifetime`，退出时自动取消和释放。
+- **减少字符串和路径错误**：世界、UI、输入、资源和内容都从清单生成类型化目录，业务代码不需要到处拼接 `res://` 路径。
+- **产品代码与框架代码分层**：游戏只依赖框架，框架不会反向依赖具体游戏，便于持续升级和复用。
+- **常用系统已经集成**：UI 栈、资源缓存、场景切换、输入上下文、Luban、存档迁移、本地化、音频和诊断使用同一套运行时上下文。
+- **创建和检查都有统一入口**：常用结构通过 `lx create` 创建；一次 `validate` 可以检查清单、生成代码、编译、测试和 Godot 场景。
+
+## 环境要求
 
 - Windows 10/11
-- Godot 4.6.3 .NET（框架基线为 Godot 4.6 系列）
+- Godot 4.6.3 .NET
 - .NET SDK 8.0
-- PowerShell 5.1 或 7+
-- 可选：Godot 4.6.3 export templates，用于 `export windows`
-- 可选：Codex CLI。默认保证配置为 `gpt-5.6-terra/high`，复杂规划可使用 Terra/xhigh，同时支持 Sol/high。
+- PowerShell 5.1 或 PowerShell 7+
+- Windows 导出时需要安装与 Godot 编辑器相同版本的 export templates
 
-不需要全局安装 Luban。首次运行数据命令时，固定版本工具安装到被 Git 忽略的 `.tools/`。
+Luban 不需要全局安装。第一次运行数据生成时，固定版本工具会安装到 Git 忽略的 `.tools/` 目录。
 
-## 目录
+## 开始使用
 
-```text
-LXFramework/
-├─ AGENTS.md                  # Codex 唯一人工入口；向下按目录继承规则
-├─ .agents/skills/            # lx-dev 与 lx-codex-workflow
-├─ .codex/                    # 默认模型、Project Knowledge、临时工作状态
-├─ Books/                     # 工作流与兼容性报告
-├─ game_design/               # Luban 上游 schema、JSON 数据与双击转表
-├─ godot_project/             # 唯一 Godot 工程根
-│  ├─ addons/lx_tools/        # 人工编辑器面板
-│  ├─ content/                # 运行时事实源清单和生成的二进制表
-│  ├─ scene/                  # 固定入口、世界、功能与 UI 场景
-│  ├─ src/LXFramework.Core/   # 不依赖 Godot 的纯 C# 核心
-│  ├─ src/LXFramework/        # Godot 适配层
-│  ├─ tests/                  # 单元测试和视觉基准
-│  └─ tools/                  # lx 命令实现、生成器和验证器
-└─ lx.ps1                     # 所有人与 AI 共用的稳定命令入口
-```
+### 1. 直接打开 Godot 工程
 
-`game_design/` 必须与 `godot_project/` 同级。生成结果进入 `godot_project/content/data/luban/` 和产品 `Generated/Luban/`；不要手改生成目录。
+LXFramework 已经包含完整的 `project.godot` 和 C# 工程文件，不需要先运行脚本才能打开。使用 Godot 官方推荐的 Project Manager：
 
-## 五分钟开始
+1. 启动 **Godot 4.6.3 .NET**。
+2. 在 Project Manager 中点击 **Import**。
+3. 选择 `godot_project/` 目录，或直接选择 `godot_project/project.godot`。
+4. 点击 **Import & Edit**，等待 Godot 完成首次资源导入。
 
-克隆后在仓库外层执行：
+以后可以直接在 Project Manager 中双击该项目进入编辑器。这与打开普通 Godot 项目的方式完全相同；仓库外层目录只是额外保存 `game_design/`、Git 和统一命令入口。
 
-```powershell
-.\lx.ps1 doctor
-.\lx.ps1 inspect
-.\lx.ps1 validate
-```
+Godot 官方说明见 [Using the Project Manager](https://docs.godotengine.org/en/stable/tutorials/editor/project_manager.html) 和 [C# basics](https://docs.godotengine.org/en/stable/tutorials/scripting/c_sharp/c_sharp_basics.html)。
 
-创建一个产品层：
+### 2. 第一次创建游戏产品层
+
+当前仓库是干净的框架基线，第一次开发具体游戏时需要创建一次产品层。优先在 Godot 底部的 **LX Tools** 面板中点击 **Create…**，类型选择 `game`，输入游戏名，例如 `MyGame`。
+
+也可以从仓库外层根目录使用命令行：
 
 ```powershell
 .\lx.ps1 create game MyGame
-.\lx.ps1 validate
 ```
 
-随后用 Godot .NET 打开 `godot_project/project.godot`。固定入口为 `godot_project/scene/main.tscn`，不要改入口 UID。
-
-## 人工开发工作流
-
-### Godot 编辑器
-
-打开工程后，底部 `LX Tools` 面板提供：
-
-- `Validate`：显示结构化问题；双击 `res://` 路径可定位脚本或场景。
-- `Generate Bindings`：从清单重建类型化目录、输入、资源和 UI 绑定。
-- `Luban Data`：编译策划 schema，验证生成确定性、编译生成代码并执行负向引用测试。
-- `Create`：选择 `game/world/feature/screen/content/input/res/node` 并填写参数。
-- `Dependencies`：分析当前场景的资源依赖。
-- `Visual Compare`：将通用 UI 示例与已批准基准逐像素比较。
-- `Visual Approve`：显式更新基准；它是审阅动作，不应在未知差异时盲目点击。
-- `Open game_design`：打开 Godot 工程外的策划源目录。
-
-面板只调用公开 `lx.ps1 --json` 协议，和 Codex/CI 使用同一实现，不存在一套只在编辑器生效的隐藏逻辑。
-
-### 命令行
-
-```powershell
-.\lx.ps1 inspect
-.\lx.ps1 create screen InventoryScreen inventory
-.\lx.ps1 check godot_project/content/ui/ui-manifest.json godot_project/scene/ui/inventory.tscn
-.\lx.ps1 validate
-```
-
-任意命令末尾可追加 `--json`。自动化读取 `lx.command-report/v1` 的 `success`、`exitCode`、`code` 和 `diagnostics`，不要解析彩色控制台文本。
-
-### 脚手架命令
-
-| 命令 | 用途 |
-|---|---|
-| `.\lx.ps1 create game <Name>` | 创建产品项目、入口根节点与初始世界 |
-| `.\lx.ps1 create world <Name> [id]` | 创建并注册世界场景 |
-| `.\lx.ps1 create feature <Name> [id]` | 创建可装卸功能场景 |
-| `.\lx.ps1 create screen <Class> [id]` | 创建 `UIScreen` 与场景并注册清单 |
-| `.\lx.ps1 create input <Name> <action>` | 新增类型化输入动作 |
-| `.\lx.ps1 create res <id> <type> <path>` | 注册类型化资源引用 |
-| `.\lx.ps1 create content <Name> [table]` | 创建普通 JSON 内容表 |
-| `.\lx.ps1 create node <Class> <GodotBase> [id]` | 创建任意 Godot 节点并保留 LX 上下文注入 |
-
-## Codex 开发工作流
-
-把仓库交给 Codex 时只需让它读取根 `AGENTS.md`。Codex 会按目标路径加载最近规则，并在任务命中时使用 `lx-dev` 或 `lx-codex-workflow`。开发者不需要复制一大段提示词，也不需要先读内部 Skill。
-
-推荐请求方式：
+该命令会自动创建：
 
 ```text
-给 MyGame 新增背包纵向切片：InventoryFeature、InventoryScreen、OpenInventory 输入和资源注册。
-使用框架脚手架，完成实现并验证。
+godot_project/
+├─ script/MyGame/
+│  ├─ AGENTS.md
+│  ├─ GameRoot.cs
+│  └─ Generated/
+├─ scene/world/              # 初始世界场景
+└─ content/game/
+   └─ game-manifest.json     # 游戏名称、代码根目录和初始世界
 ```
 
-对会实质改变结果且仓库无法消除的歧义，Codex 会集中提问；明确的修改任务会直接实现。完成标准不是“代码看起来正确”，而是结果存在且 `check`/`validate` 证据通过。
+它还会生成 `GameCatalog` 和 `WorldCatalog`。`Generated/` 中的文件由工具维护，不要手动修改。
 
-模型工作流的说明见 [AI 开发工作流](Books/AI-Development-Workflow.md)，真实兼容性证据见 [模型兼容性报告](Books/Model-Compatibility-Report.md)。
+`create game` 是框架的一次性初始化，不是每次打开 Godot 都要执行的步骤。
 
-## Luban 策划数据
+### 3. 构建并运行
 
-上游事实源：
+回到 Godot 编辑器：
 
-- `game_design/schema/`：XML 类型、bean、enum 和 table 定义。
-- `game_design/data/`：人工可审查的 JSON 数据。
-- `game_design/toolchain.json`：官方 Luban 仓库、版本和 40 位 commit 固定值。
+1. 点击编辑器右上角的 **Build** 编译 C#。
+2. 按 **F6** 可以运行当前场景。
+3. 按 **F5** 可以从项目主场景运行完整游戏。
 
-一键生成：
+工程固定主场景是 `godot_project/scene/main.tscn`。其中的 `LXHost` 会创建框架服务、加载产品清单并进入初始世界，不要为了运行自己的游戏而替换这个入口。
+
+### 4. 验证项目
+
+日常编辑和运行仍然使用 Godot。完成一项功能后，可以在 **LX Tools → Validate** 执行完整检查，也可以从仓库外层运行：
 
 ```powershell
-.\lx.ps1 data
+.\lx.ps1 validate
 ```
 
-Windows 策划也可直接双击 `game_design/build.bat`。一次成功生成会：
+`validate` 是 LXFramework 的提交前门禁，不是打开 Godot 的前置条件。只有环境或工具异常时才需要运行：
 
-1. 运行固定版本 Luban，生成 C# 和 `.bytes`。
-2. 再生成一次并比较哈希，防止非确定性输出。
-3. 在隔离项目中编译生成的 C#。
-4. 使用缺失引用 fixture 验证错误数据确实被拒绝。
-5. 写入 `.lx/luban/report.json` 和运行时 `luban-manifest.json`。
+```powershell
+.\lx.ps1 doctor
+```
 
-示例表覆盖基础数值、`long`、布尔、字符串、枚举、嵌套 bean、list、set、map、nullable 和跨表引用。产品启动时通过 `LX.Content.LoadLubanTables(...)` 读取，不建立全局表单例。
+### 版本管理建议
 
-## 常用运行时 API
+如果要在这份框架上开发游戏，建议先从干净的 `main` 创建产品分支，再执行 `create game`：
 
-产品节点继承 `LXNode`，页面继承 `UIScreen`。框架通过注入的 `LXContext` 暴露服务；不要创建全局上下文或服务定位器。
+```powershell
+git switch -c game/my-game
+```
 
-### 生命周期、事件与时间
+Git 分支是项目版本管理建议，与 Godot 如何打开和运行工程无关。
+
+## 项目目录
+
+```text
+LXFramework/
+├─ godot_project/                 # 唯一 Godot 工程根，也是 res:// 根
+│  ├─ content/                    # 游戏、世界、UI、资源、输入和内容清单
+│  ├─ scene/                      # 世界、Feature、UI 和其他场景
+│  ├─ script/<GameName>/          # 产品代码，主要开发区域
+│  ├─ src/LXFramework.Core/       # 纯 C# 基础模块，不依赖 Godot
+│  ├─ src/LXFramework/            # Godot 适配与运行时服务
+│  ├─ tests/                      # 单元测试、场景测试和视觉基准
+│  └─ addons/lx_tools/            # Godot 编辑器中的 LX Tools 面板
+├─ game_design/                   # Luban schema 和策划源数据
+└─ lx.ps1                         # 创建、生成、检查、运行和导出的统一入口
+```
+
+一般游戏开发主要修改以下位置：
+
+- `godot_project/script/<GameName>/`：游戏 C# 代码。
+- `godot_project/scene/`：Godot 场景。
+- `godot_project/content/`：运行时清单和普通内容数据。
+- `game_design/schema/`、`game_design/data/`：Luban 策划表源文件。
+- 美术、音频等资源目录：由项目自行在 `godot_project/content/` 下组织，再通过资源清单注册。
+
+不要手改 `Generated/`、Luban 生成代码或生成的二进制表。
+
+## 使用框架的基本方式
+
+### 从节点访问框架服务
+
+产品节点通常继承 `LXNode`，UI 页面继承 `UIScreen`。节点进入框架管理的场景树前会收到 `LXContext`，之后通过实例属性 `LX` 调用服务：
 
 ```csharp
-protected override void OnLXInitialized()
+public partial class PlayerController : LXNode
 {
-    LX.Events.Subscribe<PlayerDied>(OnPlayerDied, Lifetime);
-    LX.Scheduler.Schedule(TimeSpan.FromSeconds(1), Tick, Lifetime);
+    protected override void OnLXInitialized()
+    {
+        LX.Events.Subscribe<PlayerDied>(OnPlayerDied, Lifetime);
+        LX.Scheduler.Schedule(TimeSpan.FromSeconds(1), UpdateEnergy, Lifetime);
+    }
+
+    private void OnPlayerDied(PlayerDied message)
+    {
+        // 处理事件
+    }
+
+    private void UpdateEnergy()
+    {
+        // 定时逻辑
+    }
 }
 ```
 
-`LifetimeScope` 释放时会取消 Token 并逆序释放绑定对象。事件、调度器、资源和功能都应绑定最窄生命周期。
+这里的 `LX` 是注入到当前节点的上下文，不是静态全局对象。`Lifetime` 结束时，订阅和定时任务会一起取消。
 
-### 资源
+如果节点必须继承 `CharacterBody2D`、`Area2D` 等 Godot 原生类型，使用：
 
-```csharp
-using var icon = LX.Res.Acquire(ResCatalog.InventoryIcon);
-var texture = icon.Resource;
-
-using var preload = await LX.Res.PreloadAsync(new AssetPreloadSet<Texture2D>(
-    "inventory",
-    [new AssetLoadRequest<Texture2D>("inventory_icon", ResCatalog.InventoryIcon)]));
+```powershell
+.\lx.ps1 create node PlayerBody CharacterBody2D player_body
 ```
 
-`AssetCachePolicy.Transient/Cached/Resident` 决定最后一个租约归还后的缓存行为。`AnalyzeDependencies` 在加载前报告缺失依赖和环。
+生成的节点会保留 Godot 原生继承关系，并显式接收 LX 上下文。
 
-### 场景
+### 使用类型化目录
+
+框架根据清单生成以下入口：
+
+- `WorldCatalog`：世界。
+- `FeatureCatalog`：可装卸功能。
+- `UICatalog`：UI 页面。
+- `InputCatalog`：输入动作。
+- `ResCatalog`：资源。
+- `ContentCatalog`：普通内容表。
+
+业务代码调用生成项，不直接拼资源路径或清单 ID：
+
+```csharp
+await LX.Scenes.ChangeAsync(WorldCatalog.Dungeon.Id, Lifetime.Token);
+var menu = await LX.UI.NavigateAsync(
+    UICatalog.MainMenu.Id,
+    parentLifetime: Lifetime);
+using var texture = Lifetime.Own(LX.Res.Acquire(ResCatalog.PlayerSprite));
+```
+
+## 创建游戏结构
+
+优先使用脚手架命令创建结构。命令会同时创建源码或场景、更新清单并刷新类型化目录。
+
+| 需求 | 命令 |
+|---|---|
+| 创建游戏产品层 | `.\lx.ps1 create game MyGame` |
+| 创建世界 | `.\lx.ps1 create world Dungeon dungeon` |
+| 创建可装卸功能 | `.\lx.ps1 create feature Player player` |
+| 创建 UI 页面 | `.\lx.ps1 create screen MainMenu main_menu` |
+| 创建 Godot 原生节点 | `.\lx.ps1 create node PlayerBody CharacterBody2D player_body` |
+| 创建普通 JSON 内容表 | `.\lx.ps1 create content Item items` |
+| 注册输入动作 | `.\lx.ps1 create input Jump game_jump Space` |
+| 注册资源 | `.\lx.ps1 create res player_sprite Texture2D res://content/art/player.png Cached` |
+
+### World、Feature、Screen 和 Node 怎么选
+
+- **World**：游戏当前运行的主要世界，例如主菜单世界、城镇、地牢或战斗关卡。
+- **Feature**：可以独立生成和释放的功能场景，例如玩家、任务系统、战斗模块或调试工具。
+- **Screen**：由 UI 栈管理的页面、弹窗或覆盖层。
+- **Node**：必须继承特定 Godot 原生节点，并且需要调用 LX 服务的普通场景节点。
+
+## 框架功能与调用方式
+
+### 生命周期、事件和定时任务
+
+`LifetimeScope` 负责统一取消和释放。事件订阅、定时任务、资源租约和 Feature 应绑定到最窄的生命周期：
+
+```csharp
+LX.Events.Subscribe<QuestCompleted>(OnQuestCompleted, Lifetime);
+LX.Scheduler.Schedule(TimeSpan.FromSeconds(2), RefreshQuest, Lifetime);
+```
+
+框架同时提供：
+
+- `LX.Clock`、`LX.Scheduler`：普通游戏时间与调度。
+- `LX.PhysicsClock`、`LX.PhysicsScheduler`：物理帧时间与调度。
+- `LX.Pause`：暂停状态。
+- `LX.Random`：可确定性复现的随机数。
+
+### 世界和场景切换
+
+创建世界：
+
+```powershell
+.\lx.ps1 create world Dungeon dungeon
+```
+
+切换到生成的世界：
+
+```csharp
+await LX.Scenes.ChangeAsync(WorldCatalog.Dungeon.Id, Lifetime.Token);
+```
+
+需要加载进度或控制旧世界释放时机时，可以先预载：
 
 ```csharp
 Action<SceneLoadProgress> progress = value => UpdateLoading(value.Ratio);
-using var preloaded = await LX.Scenes.PreloadAsync(WorldCatalog.Hangar.Id, progress);
+using var preloaded = await LX.Scenes.PreloadAsync(
+    WorldCatalog.Dungeon.Id,
+    progress);
+
 await LX.Scenes.ChangeAsync(
-    WorldCatalog.Hangar.ScenePath,
+    WorldCatalog.Dungeon.ScenePath,
     SceneTransitionMode.KeepPreviousUntilReady,
     progress);
 ```
 
-`KeepPreviousUntilReady` 保留旧世界直到新世界就绪；`ReleasePreviousBeforeLoad` 降低峰值内存，但失败时可能没有活动世界。
+`KeepPreviousUntilReady` 会在新世界准备完成后才释放旧世界；`ReleasePreviousBeforeLoad` 可以降低峰值内存，但加载失败时可能没有活动世界。
+
+### Feature
+
+Feature 是由框架创建、注入并释放的独立功能场景：
+
+```csharp
+await using var player = await LX.Features.SpawnAsync(
+    FeatureCatalog.Player.Id,
+    this,
+    Lifetime,
+    Lifetime.Token);
+```
+
+Feature 适合有独立节点树和生命周期的模块。纯数据或纯算法不需要为了使用框架而包装成 Feature。
 
 ### UI
 
+创建并注册页面：
+
+```powershell
+.\lx.ps1 create screen InventoryScreen inventory
+```
+
+打开页面并等待强类型结果：
+
 ```csharp
 var handle = await LX.UI.OpenAsync(UICatalog.Inventory, payload);
-UIResult<InventoryChoice> choice = await handle.WaitForResultAsync<InventoryChoice>();
+UIResult<InventoryChoice> choice =
+    await handle.WaitForResultAsync<InventoryChoice>();
 await handle.CloseAsync();
 ```
 
-页面描述支持 `UILayer`、`UICachePolicy`、`UICoverPolicy`、`UIInputPolicy` 和 `UIFocusPolicy`。`OnTransitionAsync` 处理进入/退出动画；页面内部用 `RequestClose(result)` 返回强类型结果。
+页面内部通过 `RequestClose(result)` 返回结果。UI 描述支持：
 
-框架自带白底和彩色文字组合的 UI 示例：Toast、确认对话框、Loading/Progress、Tooltip、虚拟列表和组合展示。场景为 `res://scene/ui/examples/ui_components_showcase.tscn`。
+- 页面层级与页面栈。
+- 缓存策略。
+- 覆盖、模态和输入策略。
+- 焦点策略。
+- 异步进入/退出过渡。
+- Toast、确认框、Loading、Tooltip 和虚拟列表等基础组件。
+
+内置组件展示场景：
+
+```text
+res://scene/ui/examples/ui_components_showcase.tscn
+```
+
+### 资源
+
+先把资源注册到清单：
+
+```powershell
+.\lx.ps1 create res inventory_icon Texture2D res://content/art/inventory.png Cached
+```
+
+然后通过生成目录获取资源租约：
+
+```csharp
+using var icon = Lifetime.Own(LX.Res.Acquire(ResCatalog.InventoryIcon));
+Texture2D texture = icon.Resource;
+```
+
+资源策略：
+
+- `Transient`：最后一个租约释放后立即移除。
+- `Cached`：允许框架继续缓存。
+- `Resident`：常驻资源。
+
+不要在产品代码中使用 `GD.Load` 或 `ResourceLoader.Load*` 动态加载资源。这样资源依赖、缓存、释放和缺失检查才能由同一个系统管理。
+
+批量资源可以预热并报告进度：
+
+```csharp
+using var preload = await LX.Res.PreloadAsync(
+    new AssetPreloadSet<Texture2D>(
+        "inventory",
+        [new AssetLoadRequest<Texture2D>(
+            "inventory_icon",
+            ResCatalog.InventoryIcon)]));
+```
 
 ### 输入
 
+注册输入动作：
+
+```powershell
+.\lx.ps1 create input OpenInventory game_open_inventory I
+```
+
+代码使用 `InputCatalog`，并可通过输入上下文限制当前允许的动作：
+
 ```csharp
-using var menu = LX.Input.PushContext(new InputContextDescriptor(
-    "inventory",
-    new HashSet<InputActionId> { InputCatalog.Confirm, InputCatalog.Cancel },
-    InputContextMode.Exclusive));
+using var inventoryInput = LX.Input.PushContext(
+    new InputContextDescriptor(
+        "inventory",
+        new HashSet<InputActionId>
+        {
+            InputCatalog.Confirm,
+            InputCatalog.Cancel,
+        },
+        InputContextMode.Exclusive));
 
 InputPrompt prompt = LX.Input.Prompt(InputCatalog.Confirm);
 var conflicts = LX.Input.FindBindingConflicts();
 ```
 
-Exclusive 上下文拦截未列出的动作；Passthrough 允许继续向下查询。输入设备切换通过 `InputModalityChanged` 事件发布。
+- `Exclusive`：拦截当前上下文未声明的动作。
+- `Passthrough`：允许继续查询下层上下文。
+- `InputPrompt`：获取与当前设备匹配的按键提示。
+
+### 内容和 Luban 策划表
+
+少量、简单的 JSON 数据可以使用：
+
+```powershell
+.\lx.ps1 create content Item items
+```
+
+跨表引用、复杂类型或批量策划数据使用 Luban：
+
+- `game_design/schema/`：XML schema。
+- `game_design/data/`：人工维护的 JSON 数据。
+- `game_design/toolchain.json`：固定 Luban 版本。
+
+生成数据：
+
+```powershell
+.\lx.ps1 data
+```
+
+运行时通过 `LX.Content` 创建生成的表集合：
+
+```csharp
+var tables = LX.Content.LoadLubanTables(
+    loader => new GameData.Tables(loader));
+var probe = tables.TbDesignProbe.Get("lx_framework");
+```
+
+不要手改 `content/data/luban/` 或产品目录中的 `Generated/Luban/`，也不要创建静态 `Tables` 单例。
 
 ### 存档、设置和本地化
 
-`SaveStore<T>` 提供版本迁移、原子替换、主文件损坏时备份回退、`ListSlots()` 和 `DeleteAsync()`。设置使用 `SettingsService`，不要把机器偏好混进游戏存档。
+- `SaveStore<T>`：版本迁移、原子替换、备份回退、存档槽枚举和删除。
+- `LX.Settings`：保存设备或用户偏好，避免把机器设置混进游戏进度存档。
+- `LX.Localization`：文本查询、缺失 key 记录、伪本地化和本地化资源变体。
 
 ```csharp
 using var titleKey = new StringName("inventory.title");
 string title = LX.Localization.Text(titleKey);
-string localizedAsset = LX.Localization.ResolveVariant(new Dictionary<string, string>
-{
-    ["zh_CN"] = "res://art/title.zh_CN.png",
-    ["en"] = "res://art/title.en.png",
-});
+
+string localizedTexture = LX.Localization.ResolveVariant(
+    new Dictionary<string, string>
+    {
+        ["zh_CN"] = "res://content/art/title.zh_CN.png",
+        ["en"] = "res://content/art/title.en.png",
+    });
 ```
 
-本地化会记录缺失 key；伪本地化可检查截断和硬编码文本。资源变体按完整 locale、语言和 fallback 顺序选择。
+### 音频
 
-### 统一诊断
+`LX.Audio` 统一管理音频组、并发上限、拒绝/抢占策略、音频快照和音乐淡入淡出。音频资源仍然通过 `LX.Res` 注册和持有，避免建立另一套资源生命周期。
+
+### 运行时诊断
 
 ```csharp
-LX.Diagnostics.Log(DiagnosticSeverity.Information, "inventory", "opened");
-string path = LX.Diagnostics.WriteSnapshot();
+LX.Diagnostics.Log(
+    DiagnosticSeverity.Information,
+    "inventory",
+    "opened");
+
+string snapshotPath = LX.Diagnostics.WriteSnapshot();
 ```
 
-`DiagnosticsService` 的 `lx.runtime-snapshot/v1` 快照统一包含生命周期、场景、指标、资源、UI、Feature、音频、输入、本地化、设置和近期结构化日志。它是后续可视化 runtime debugger 的稳定数据入口。
+诊断快照会汇总生命周期、场景、资源、UI、Feature、音频、输入、本地化、设置、指标和近期结构化日志，适合定位“当前运行时到底处于什么状态”。
 
-## 验证、视觉和导出
+## 推荐的开发流程
 
-迭代时把本次明确变更路径一次交给：
+一次常见功能开发可以按下面的顺序进行：
+
+1. 使用 `create world|feature|screen|node|input|res|content` 创建结构。
+2. 在产品目录中实现 C# 逻辑，在 Godot 编辑器中编辑场景。
+3. 修改内容清单或 `game_design/` 中的策划源数据。
+4. 把本次明确改动的路径一次交给 `check`。
+5. 功能完成后运行 `validate`。
+
+例如：
 
 ```powershell
-.\lx.ps1 check godot_project/src/LXFramework/UI/UIScreen.cs
-```
+.\lx.ps1 create feature Inventory inventory
+.\lx.ps1 create screen InventoryScreen inventory
+.\lx.ps1 create input OpenInventory game_open_inventory I
 
-交付前运行：
-
-```powershell
+.\lx.ps1 check godot_project/script/MyGame godot_project/content/ui/ui-manifest.json godot_project/content/input/input-manifest.json
 .\lx.ps1 validate
 ```
 
-最终门禁依次检查工作流、Luban、静态事实源与架构、构建、测试、Godot headless 场景断言和 UI 视觉基准。
+`check` 用于快速迭代，只运行当前修改需要的生成和检查；`validate` 是提交前的完整验证。
 
-视觉命令：
+## Godot 编辑器工具
+
+打开工程后，Godot 底部的 `LX Tools` 面板提供：
+
+- 创建 Game、World、Feature、Screen、Node、Input、Resource 和 Content。
+- 生成类型化绑定。
+- 运行检查和完整验证。
+- 生成 Luban 数据。
+- 分析当前场景资源依赖。
+- 执行 UI 视觉比较。
+- 打开 Godot 工程外的 `game_design/`。
+
+面板与命令行调用同一套 `lx.ps1` 实现，可以按个人习惯选择。
+
+## UI 视觉检查与导出
+
+修改 UI 后先比较视觉基准：
 
 ```powershell
-.\lx.ps1 visual capture ui_components
 .\lx.ps1 visual compare ui_components
+```
+
+只有人工确认差异符合设计时才更新基准：
+
+```powershell
 .\lx.ps1 visual approve ui_components
 ```
 
-Godot 的 Dummy headless renderer 不提供可靠 ViewportTexture，因此视觉运行器实例化真实 Control 场景后，用 CPU 确定性渲染布局、颜色、进度值和文本指纹。文本或布局的语义变化仍会形成像素 diff。
-
-Windows Release 导出：
+安装相同版本的 Godot export templates 后，可导出并启动 Windows 产物进行 smoke：
 
 ```powershell
 .\lx.ps1 export windows
 ```
 
-需要先在 Godot 安装与编辑器同版本的 export templates。命令会构建 Release、导出、记录哈希并启动产物执行 smoke；报告写入 `.lx/export.json`。
+普通开发和 `validate` 不要求安装导出模板。
 
-性能基线：
-
-```powershell
-.\lx.ps1 benchmark
-```
-
-报告写入 `.lx/benchmark.json`，覆盖诊断日志、事件分发和对象池。性能报告用于比较，不把不稳定的机器绝对值设为 CI 硬阈值。
-
-## 架构红线
+## 开发时必须遵守的边界
 
 - `LXFramework.Core` 不依赖 Godot。
-- `LXFramework` 不依赖任何产品命名空间；产品只能反向依赖框架。
-- 禁止反射发现、服务定位器、静态全局服务状态。
-- 禁止第二套事件总线、时钟、资源注册表、生命周期容器、对象池、场景管理器或 UI 管理器。
-- 游戏代码禁止 `GD.Load` 与 `ResourceLoader.Load*`；资源必须由清单生成类型化引用并经 `LX.Res` 获取。
-- `content/` 和 `game_design/` 是事实源，生成目录不可手改。
-- 框架公开枚举、枚举成员和常量必须写清语义；`LX_DOC_001` 会阻止缺少注释的提交。
+- `LXFramework` 不依赖产品代码；产品代码只能反向依赖框架。
+- 不创建全局 `LXContext`、服务定位器或第二套事件、时间、资源、生命周期、场景、对象池和 UI 系统。
+- 产品代码不使用动态 `GD.Load` 或 `ResourceLoader.Load*`。
+- `content/` 和 `game_design/` 是数据事实源，生成目录不可手改。
+- Godot 场景树操作必须留在主线程。
 
-## 发布与贡献
+## 进一步了解
 
-`main` 是可验证基线。版本发布前运行 `validate`；只有安装了 export templates 才追加 `export windows`。变更说明写入 [CHANGELOG.md](CHANGELOG.md)，贡献规则见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+- [贡献与提交约定](CONTRIBUTING.md)
+- [更新记录](CHANGELOG.md)
+- [AI 开发工作流](Books/AI-Development-Workflow.md)
+- [模型兼容性报告](Books/Model-Compatibility-Report.md)
 
 许可证：[MIT](LICENSE)。
