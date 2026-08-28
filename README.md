@@ -347,11 +347,39 @@ res://scene/ui/examples/ui_components_showcase.tscn
 .\lx.ps1 create res inventory_icon Texture2D res://content/art/inventory.png Cached
 ```
 
-然后通过生成目录获取资源租约：
+`Texture2D`、`AtlasTexture`、`PackedScene`、`AudioStream`、字体、材质、Shader、Mesh 和自定义 `Resource` 都使用同一个 `LX.Res`。短作用域读取通过生成目录获取资源租约：
 
 ```csharp
 using var icon = Lifetime.Own(LX.Res.Acquire(ResCatalog.InventoryIcon));
 Texture2D texture = icon.Resource;
+```
+
+会动态替换的资源属性使用 `AssetBinding<T>`。它会在替换或生命周期结束时先清空目标引用，再归还旧租约，避免材质、字体、Mesh 等资源在重开流程中不断叠加：
+
+```csharp
+var material = AssetBinding<Material>.Create(
+    LX.Res,
+    Lifetime,
+    value => sprite.Material = value);
+await material.SetAsync(ResCatalog.PlayerMaterial, Lifetime.Token);
+```
+
+UI 动态图片和 Godot 原生 `AtlasTexture` 使用页面激活期绑定；缓存页面隐藏后也不会继续占用这次打开加载的图片：
+
+```csharp
+var portrait = BindTexture(_portrait);
+await portrait.SetAsync(ResCatalog.PlayerPortrait, cancellationToken);
+```
+
+`PackedScene` 是 Godot 原生的场景模板，也是最接近 Unity Prefab 的概念。一次性实例使用 `PackedSceneInstance<TNode>`，大量重复的敌机、子弹或特效使用 `PackedSceneNodePool<TNode>`：
+
+```csharp
+await using var enemy = await PackedSceneInstance<Enemy>.CreateAsync(
+    LX,
+    ResCatalog.Enemy,
+    this,
+    Lifetime,
+    Lifetime.Token);
 ```
 
 资源策略：
@@ -360,7 +388,7 @@ Texture2D texture = icon.Resource;
 - `Cached`：允许框架继续缓存。
 - `Resident`：常驻资源。
 
-不要在产品代码中使用 `GD.Load` 或 `ResourceLoader.Load*` 动态加载资源。这样资源依赖、缓存、释放和缺失检查才能由同一个系统管理。
+不要在产品代码中使用 `GD.Load` 或 `ResourceLoader.Load*` 动态加载资源，也不要对加载得到的共享 `Resource` 手动 `Dispose()`。这样资源依赖、缓存、替换、释放和缺失检查才能由同一个系统管理。`LX.Res.Snapshot()` 可区分活动租约和空闲缓存；重开闭环应确认活动租约回到基线，Node 在异步释放后已经失效。
 
 批量资源可以预热并报告进度：
 

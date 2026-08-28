@@ -80,6 +80,22 @@ public abstract partial class UIScreen : Control, ILXContextReceiver
     protected void RequestClose<TResult>(TResult result) =>
         CloseRequested?.Invoke(new UICompletion(true, result));
 
+    /// <summary>
+    /// 为当前页面激活期绑定动态纹理；页面隐藏、关闭或重新打开前会先清空控件再释放租约。
+    /// </summary>
+    protected UITextureBinding BindTexture(TextureRect target) =>
+        UITextureBinding.Create(LX.Res, Activation, target);
+
+    /// <summary>
+    /// 为当前页面激活期绑定动态九宫格纹理；AtlasTexture 也使用此入口。
+    /// </summary>
+    protected UITextureBinding BindTexture(NinePatchRect target) =>
+        UITextureBinding.Create(LX.Res, Activation, target);
+
+    /// <summary>为当前页面激活期绑定 TextureButton 的指定状态纹理。</summary>
+    protected UITextureBinding BindTexture(TextureButton target, TextureButtonSlot slot) =>
+        UITextureBinding.Create(LX.Res, Activation, target, slot);
+
     internal void SetActivation(LifetimeScope? activation) => _activation = activation;
 }
 

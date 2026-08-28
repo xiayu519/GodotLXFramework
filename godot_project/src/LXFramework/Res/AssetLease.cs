@@ -2,6 +2,10 @@ using Godot;
 
 namespace LX.Res;
 
+/// <summary>
+/// Represents one LX.Res ownership claim. Resource must not be retained by a
+/// longer-lived target after this lease is released.
+/// </summary>
 public sealed class AssetLease<T> : IDisposable where T : Resource
 {
     private AssetRegistry? _owner;
@@ -18,6 +22,7 @@ public sealed class AssetLease<T> : IDisposable where T : Resource
 
     public bool IsDisposed => _owner is null;
 
+    /// <summary>租约有效期内可使用的 Godot Resource。</summary>
     public T Resource => _resource ??
         throw new ObjectDisposedException(nameof(AssetLease<T>), $"Asset lease '{Path}' is already released.");
 

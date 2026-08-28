@@ -88,10 +88,11 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
         GD.Print("LX_RUNTIME_GUARDS_PASS");
 
         const string generatedAssetKey = "generated://validation/resource_lifetime";
+        Gradient generatedGradient = null!;
         var assetLifetime = LX.Lifetime.CreateChild("Validation:ResourceLease");
         _ = assetLifetime.Own(LX.Res.AcquireGenerated(
             generatedAssetKey,
-            static () => new Gradient(),
+            () => generatedGradient = new Gradient(),
             AssetCachePolicy.Transient));
         var activeAsset = LX.Res.Snapshot().SingleOrDefault(record => record.Path == generatedAssetKey);
         if (activeAsset is null || activeAsset.LeaseCount != 1)
@@ -103,10 +104,31 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
         {
             throw new InvalidOperationException("Transient resource survived its owning lifetime.");
         }
+        if (GodotObject.IsInstanceValid(generatedGradient))
+        {
+            throw new InvalidOperationException("Registry-owned generated resource was not disposed.");
+        }
         GD.Print("LX_RESOURCE_LEASE_LIFECYCLE_PASS");
 
         var loadOrder = new List<string>();
         var icon = new AssetRef<Texture2D>("res://icon.svg", AssetCachePolicy.Transient);
+        var sharedIcon = ResourceLoader.Load<Texture2D>(icon.Path) ??
+            throw new InvalidOperationException("Validation icon could not be loaded through Godot's shared cache.");
+        using (var sharedLease = LX.Res.Acquire(
+                   new AssetRef<Texture2D>(icon.Path, AssetCachePolicy.Cached)))
+        {
+            if (!ReferenceEquals(sharedIcon, sharedLease.Resource))
+            {
+                throw new InvalidOperationException("LX.Res did not reuse Godot's shared cached resource.");
+            }
+        }
+        LX.Res.PurgeIdleCache();
+        if (!GodotObject.IsInstanceValid(sharedIcon) || sharedIcon.GetWidth() <= 0)
+        {
+            throw new InvalidOperationException("Purging LX.Res disposed a ResourceLoader-owned shared resource.");
+        }
+        GD.Print("LX_RESOURCE_SHARED_CACHE_SAFETY_PASS");
+
         using (var batch = await LX.Res.AcquireBatchAsync(
                    [
                        new AssetLoadRequest<Texture2D>("low", icon),
@@ -172,6 +194,36 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
             }
         }
         GD.Print("LX_RESOURCE_PRELOAD_PLAN_PASS");
+
+        const string atlasPath = "res://scene/validation/icon_atlas.tres";
+        var dynamicTextureTarget = new TextureRect { Name = "DynamicTextureValidation" };
+        host.AddChild(dynamicTextureTarget);
+        var dynamicTextureLifetime = LX.Lifetime.CreateChild("Validation:DynamicTexture");
+        var dynamicTexture = UITextureBinding.Create(
+            LX.Res,
+            dynamicTextureLifetime,
+            dynamicTextureTarget);
+        var atlas = new AssetRef<AtlasTexture>(atlasPath, AssetCachePolicy.Transient);
+        for (var cycle = 0; cycle < 8; cycle++)
+        {
+            if (!await dynamicTexture.SetAsync(atlas, cancellationToken) ||
+                dynamicTextureTarget.Texture is not AtlasTexture loadedAtlas ||
+                loadedAtlas.Atlas is null ||
+                LX.Res.Snapshot().Single(record => record.Path == atlasPath).LeaseCount != 1)
+            {
+                throw new InvalidOperationException("Dynamic AtlasTexture binding did not own its active resource.");
+            }
+
+            dynamicTexture.Clear();
+            if (dynamicTextureTarget.Texture is not null ||
+                LX.Res.Snapshot().Any(record => record.Path == atlasPath))
+            {
+                throw new InvalidOperationException("Dynamic AtlasTexture binding retained a released resource.");
+            }
+        }
+        await dynamicTextureLifetime.DisposeAsync();
+        dynamicTextureTarget.Free();
+        GD.Print("LX_DYNAMIC_TEXTURE_ATLAS_LIFECYCLE_PASS");
 
         var sceneProgress = new List<SceneLoadProgress>();
         using (var scenePreload = await LX.Scenes.PreloadAsync(
@@ -320,6 +372,34 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
             throw new InvalidOperationException("Feature despawn did not release its active record.");
         }
         GD.Print("LX_FEATURE_LIFECYCLE_PASS");
+
+        const string prefabPath = "res://scene/validation/context_probe.tscn";
+        LX.Res.PurgeIdleCache();
+        var prefabLifetime = LX.Lifetime.CreateChild("Validation:PackedSceneInstance");
+        for (var cycle = 0; cycle < 4; cycle++)
+        {
+            var prefab = await PackedSceneInstance<ContextProbeNode>.CreateAsync(
+                LX,
+                new AssetRef<PackedScene>(prefabPath, AssetCachePolicy.Transient),
+                host,
+                prefabLifetime,
+                cancellationToken);
+            var prefabNode = prefab.Node;
+            if (!prefabNode.IsLXInitialized ||
+                LX.Res.Snapshot().Single(record => record.Path == prefabPath).LeaseCount != 1)
+            {
+                throw new InvalidOperationException("PackedScene instance did not own its injected node and lease.");
+            }
+
+            await prefab.DisposeAsync();
+            if (GodotObject.IsInstanceValid(prefabNode) ||
+                LX.Res.Snapshot().Any(record => record.Path == prefabPath))
+            {
+                throw new InvalidOperationException("PackedScene instance did not complete its release boundary.");
+            }
+        }
+        await prefabLifetime.DisposeAsync();
+        GD.Print("LX_PACKED_SCENE_INSTANCE_LIFECYCLE_PASS");
 
         var poolLifetime = LX.Lifetime.CreateChild("Validation:PackedScenePool");
         var pool = await PackedSceneNodePool<ContextProbeNode>.CreateAsync(

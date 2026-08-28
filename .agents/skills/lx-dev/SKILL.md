@@ -24,12 +24,13 @@ description: 开发、审查、诊断或扩展 LXFramework Godot 4.6 C# 框架�
 | 层级、模块、API 定位 | `references/architecture.md` 或 `references/modules.md` | `references/design-decisions.md` |
 | 运行时、线程、注入、生命周期、关闭 | `references/runtime-contracts.md` | `references/memory-safety.md` |
 | 新抽象、通信或资源所有权取舍 | `references/design-decisions.md` | 对应实现源码 |
+| 动态资源、Prefab、图集或释放闭环 | `references/resource-lifecycle.md` | `references/runtime-contracts.md` |
 | 创建游戏、世界、Feature、UI、内容、输入或资源 | `references/product-workflow.md` | 对应清单和生成目录 |
 
 ## 实施
 
 - 结构单元使用 `lx create`；修改清单和非生成源码，让 `check` 负责必要生成。
-- 动态资源由 `LX.Res` 返回的 `AssetLease<T>` 持有在最窄 `LifetimeScope`；场景树操作保持 Godot 主线程。
+- 动态资源只使用 `LX.Res` 及其生命周期句柄；具体选型和闭环验证读取 `references/resource-lifecycle.md`。
 - 只同步本次行为变化直接影响的 reference；只读审查发现过期内容时报告，不擅自写文档。
 
 ## 收尾

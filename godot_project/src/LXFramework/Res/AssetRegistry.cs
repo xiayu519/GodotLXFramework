@@ -3,12 +3,18 @@ using Godot;
 
 namespace LX.Res;
 
+/// <summary>
+/// The single runtime registry for every dynamically loaded Godot Resource.
+/// Loaded resources follow Godot reference counting; generated resources are
+/// registry-owned and deterministically disposed when removed.
+/// </summary>
 public sealed class AssetRegistry : IDisposable
 {
     private sealed class Entry
     {
         public required Resource Resource { get; init; }
         public required AssetCachePolicy Policy { get; set; }
+        public required bool RegistryOwned { get; init; }
         public int LeaseCount { get; set; }
         public long LastTouched { get; set; }
     }
@@ -82,9 +88,12 @@ public sealed class AssetRegistry : IDisposable
             }
         }
 
-        var resource = GD.Load<T>(path) ??
+        var cacheMode = policy == AssetCachePolicy.Transient
+            ? ResourceLoader.CacheMode.Ignore
+            : ResourceLoader.CacheMode.Reuse;
+        var resource = ResourceLoader.Load<T>(path, cacheMode: cacheMode) ??
             throw new InvalidOperationException($"Godot failed to load asset '{path}' as {typeof(T).Name}.");
-        return AcquireLoaded(path, resource, policy);
+        return AcquireLoaded(path, resource, policy, registryOwned: false);
     }
 
     public AssetLease<T> Acquire<T>(AssetRef<T> asset) where T : Resource =>
@@ -115,7 +124,7 @@ public sealed class AssetRegistry : IDisposable
 
         var resource = factory() ?? throw new InvalidOperationException(
             $"Generated asset factory '{key}' returned null.");
-        return AcquireLoaded(key, resource, policy);
+        return AcquireLoaded(key, resource, policy, registryOwned: true);
     }
 
     public async ValueTask<AssetLease<T>> AcquireAsync<T>(
@@ -166,7 +175,7 @@ public sealed class AssetRegistry : IDisposable
         }
 
         progress?.Invoke(1);
-        return AcquireLoaded(path, typed, policy);
+        return AcquireLoaded(path, typed, policy, registryOwned: false);
     }
 
     public ValueTask<AssetLease<T>> AcquireAsync<T>(
@@ -304,7 +313,8 @@ public sealed class AssetRegistry : IDisposable
                     pair.Key,
                     pair.Value.Resource.GetType().Name,
                     pair.Value.LeaseCount,
-                    pair.Value.Policy))
+                    pair.Value.Policy,
+                    pair.Value.RegistryOwned))
                 .ToArray();
         }
     }
@@ -329,8 +339,7 @@ public sealed class AssetRegistry : IDisposable
                          .Select(pair => pair.Key)
                          .ToArray())
             {
-                _entries[path].Resource.Dispose();
-                _entries.Remove(path);
+                RemoveEntryLocked(path, _entries[path]);
             }
 
             UpdateMetricsLocked();
@@ -348,11 +357,10 @@ public sealed class AssetRegistry : IDisposable
             }
 
             _disposed = true;
-            foreach (var entry in _entries.Values)
+            foreach (var path in _entries.Keys.ToArray())
             {
-                entry.Resource.Dispose();
+                RemoveEntryLocked(path, _entries[path]);
             }
-            _entries.Clear();
             _inflight.Clear();
             UpdateMetricsLocked();
         }
@@ -377,8 +385,7 @@ public sealed class AssetRegistry : IDisposable
             entry.LastTouched = ++_touchSequence;
             if (entry.LeaseCount == 0 && entry.Policy == AssetCachePolicy.Transient)
             {
-                entry.Resource.Dispose();
-                _entries.Remove(path);
+                RemoveEntryLocked(path, entry);
             }
 
             TrimIdleCacheLocked();
@@ -386,7 +393,11 @@ public sealed class AssetRegistry : IDisposable
         }
     }
 
-    private AssetLease<T> AcquireLoaded<T>(string path, T resource, AssetCachePolicy policy)
+    private AssetLease<T> AcquireLoaded<T>(
+        string path,
+        T resource,
+        AssetCachePolicy policy,
+        bool registryOwned)
         where T : Resource
     {
         lock (_gate)
@@ -401,6 +412,7 @@ public sealed class AssetRegistry : IDisposable
             {
                 Resource = resource,
                 Policy = policy,
+                RegistryOwned = registryOwned,
                 LeaseCount = 1,
                 LastTouched = ++_touchSequence,
             };
@@ -498,8 +510,16 @@ public sealed class AssetRegistry : IDisposable
         var removeCount = Math.Max(0, idleCached.Length - _maxIdleCacheEntries);
         for (var index = 0; index < removeCount; index++)
         {
-            idleCached[index].Value.Resource.Dispose();
-            _entries.Remove(idleCached[index].Key);
+            RemoveEntryLocked(idleCached[index].Key, idleCached[index].Value);
+        }
+    }
+
+    private void RemoveEntryLocked(string path, Entry entry)
+    {
+        _entries.Remove(path);
+        if (entry.RegistryOwned && GodotObject.IsInstanceValid(entry.Resource))
+        {
+            entry.Resource.Dispose();
         }
     }
 
@@ -508,9 +528,11 @@ public sealed class AssetRegistry : IDisposable
         _metrics.SetGauge("assets.entries", _entries.Count);
         _metrics.SetGauge("assets.inflight", _inflight.Count);
         _metrics.SetGauge("assets.leases", _entries.Values.Sum(entry => entry.LeaseCount));
+        _metrics.SetGauge("assets.generated_entries", _entries.Values.Count(entry => entry.RegistryOwned));
+        _metrics.SetGauge("assets.idle", _entries.Values.Count(entry => entry.LeaseCount == 0));
     }
 
-    private void EnsureMainThread()
+    internal void EnsureMainThread()
     {
         if (System.Environment.CurrentManagedThreadId != _mainThreadId)
         {
@@ -539,4 +561,5 @@ public sealed record AssetRecord(
     string Path,
     string ResourceType,
     int LeaseCount,
-    AssetCachePolicy Policy);
+    AssetCachePolicy Policy,
+    bool RegistryOwned);

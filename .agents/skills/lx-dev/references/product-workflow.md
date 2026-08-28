@@ -60,11 +60,18 @@ await using var player = await LX.Features.SpawnAsync(
     Lifetime.Token);
 var menu = await LX.UI.NavigateAsync(UICatalog.MainMenu.Id, parentLifetime: Lifetime);
 using var texture = Lifetime.Own(LX.Res.Acquire(ResCatalog.PlayerSprite));
+var material = AssetBinding<Material>.Create(
+    LX.Res,
+    Lifetime,
+    value => sprite.Material = value);
+await material.SetAsync(ResCatalog.PlayerMaterial, Lifetime.Token);
 ```
 
 目录属性名由清单 ID 生成。需要准确名称时读取生成目录，或运行 `inspect` 后查看 `.lx/project-index.json`。
 
 根规则要求池化的节点直接使用 `NodePool<TNode>`。池由所属 Feature 或世界的 `Lifetime` 持有；短作用域优先使用 `RentLease`，动态集合在所属流程收口时逐一 `Return`。
+
+一次性动态场景使用 `PackedSceneInstance<TNode>`；动态 UI 图片和 Godot `AtlasTexture` 使用 `UIScreen.BindTexture`。材质、字体、Shader、Mesh 或自定义 `Resource` 的动态替换使用 `AssetBinding<T>`。所有入口都复用 `LX.Res`，具体所有权与闭环断言读取 `resource-lifecycle.md`。
 
 重开闭环采样放在 UI 与 Feature handle 退出作用域之后，通过 `LX.Diagnostics.Snapshot()` 取得框架所有权事实；明确区分稳定缓存与活跃租约。需要交付安装包时，再用 `export <platform>` 运行包内产品 smoke，确认生成数据和非 Godot 原生文件确实进入产物。
 

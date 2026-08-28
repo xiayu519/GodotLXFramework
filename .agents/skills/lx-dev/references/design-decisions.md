@@ -6,9 +6,10 @@
 |---|---|---|
 | 纯确定性或数据逻辑 | `LX.Core` 或产品根目录中的纯 C# 类型 | 只为承载逻辑而创建 Godot `Node` |
 | 可复用场景能力 | `lx create feature` 与 `FeatureCatalog` | 未注册的动态 `PackedScene` 加载 |
+| 局部一次性场景模板 | `ResCatalog` 与 `PackedSceneInstance<TNode>` | 裸 `Instantiate()` 后自行拼接释放逻辑 |
 | 完整可玩世界 | `lx create world` 与 `WorldCatalog` | 直接调用 `SceneTree.ChangeScene*` |
 | 页面、弹窗、覆盖层 | `lx create screen`，再编辑 UI 清单层级 | 第二个 UI 管理器 |
-| 动态 Godot 资源 | 资源清单、`ResCatalog`、`LX.Res`、`AssetLease<T>` | 游戏代码中的 `GD.Load`/`ResourceLoader.Load` |
+| 动态 Godot 资源 | 资源清单、`ResCatalog`、`LX.Res`、`AssetLease<T>`/`AssetBinding<T>` | 游戏代码中的 `GD.Load`/`ResourceLoader.Load` |
 | 场景已序列化的静态资源 | 导出属性或场景引用 | 不必要的资源租约 |
 | 数据表 | `lx create content` 与生成的 `ContentCatalog` | 游戏逻辑中的临时 JSON 路径 |
 | 语义输入 | 输入清单与 `InputCatalog`/`LXInputActions` | 游戏代码硬编码注册动作 |
