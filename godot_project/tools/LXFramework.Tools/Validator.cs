@@ -46,6 +46,8 @@ internal static class Validator
             "export_presets.cfg",
             "addons/lx_tools/plugin.cfg",
             "addons/lx_tools/LXToolsPlugin.cs",
+            "addons/lx_tools/run-command.ps1",
+            "addons/lx_tools/invoke-command.ps1",
             "scene/main.tscn",
             "scene/ui/examples/ui_components_showcase.tscn",
             "tests/Visual/Baselines/ui_components.png",
@@ -462,6 +464,41 @@ internal static class Validator
             if (!readme.Contains(term, StringComparison.Ordinal))
             {
                 errors.Add($"README.md must document the human workflow term '{term}'.");
+            }
+        }
+
+        var editorPluginPath = Path.Combine(root, "addons", "lx_tools", "LXToolsPlugin.cs");
+        if (File.Exists(editorPluginPath))
+        {
+            var editorPlugin = File.ReadAllText(editorPluginPath);
+            foreach (var label in new[]
+                     {
+                         "创建内容…",
+                         "生成策划数据",
+                         "场景依赖",
+                         "打开策划数据目录",
+                     })
+            {
+                if (!editorPlugin.Contains($"\"{label}\"", StringComparison.Ordinal))
+                {
+                    errors.Add($"LX Tools must expose the Chinese developer action '{label}'.");
+                }
+            }
+            foreach (var maintenanceLabel in new[]
+                     {
+                         "Validate",
+                         "Generate Bindings",
+                         "Luban Data",
+                         "Create…",
+                         "Visual Compare",
+                         "Visual Approve",
+                     })
+            {
+                if (editorPlugin.Contains($"\"{maintenanceLabel}\"", StringComparison.Ordinal))
+                {
+                    errors.Add(
+                        $"LX Tools must keep maintenance action '{maintenanceLabel}' out of the developer toolbar.");
+                }
             }
         }
 

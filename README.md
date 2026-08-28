@@ -13,7 +13,7 @@ LXFramework 仍然是标准 Godot 工程：场景、节点、资源、动画、�
 - **仓库即上下文**：Codex 会从根目录开始读取分层 `AGENTS.md`，自动获得架构边界、目录规则和完成标准。
 - **知识按任务加载**：框架开发、产品开发、UI、资源和数据等知识通过 Skill 按需加载，不要求开发者在提示词中复制整套文档。
 - **从需求到验证闭环**：Codex 使用 `lx create` 创建结构，通过类型化 API 实现功能，并以 `check`、`validate` 的真实结果作为完成证据。
-- **人与 AI 使用同一套工程**：Codex、命令行和 Godot 编辑器中的 `LX Tools` 共用相同的清单、生成器和验证入口。
+- **人与 AI 使用同一套事实源**：Codex 和 CI 使用完整 CLI；Godot 中的 `LX Tools` 只呈现开发者真正需要的中文操作，两者共用相同的清单和生成器。
 
 使用 Codex 时，在仓库根目录打开项目并描述要实现的游戏功能即可。具体指令分层和推荐提问方式见 [AI 开发工作流](Books/AI-Development-Workflow.md)。
 
@@ -53,7 +53,7 @@ Godot 官方说明见 [Using the Project Manager](https://docs.godotengine.org/e
 
 ### 2. 第一次创建游戏产品层
 
-当前仓库是干净的框架基线，第一次开发具体游戏时需要创建一次产品层。优先在 Godot 底部的 **LX Tools** 面板中点击 **Create…**，类型选择 `game`，输入游戏名，例如 `MyGame`。
+当前仓库是干净的框架基线，第一次开发具体游戏时需要创建一次产品层。优先打开 Godot 底部的 **LX 开发工具**，点击 **创建内容…**，创建类型选择 **游戏产品层**，在 **游戏名称** 中输入 `MyGame`。
 
 也可以从仓库外层根目录使用命令行：
 
@@ -90,7 +90,7 @@ godot_project/
 
 ### 4. 验证项目
 
-日常编辑和运行仍然使用 Godot。完成一项功能后，可以在 **LX Tools → Validate** 执行完整检查，也可以从仓库外层运行：
+日常编辑和运行仍然使用 Godot。完成一项功能后，从仓库外层运行完整检查：
 
 ```powershell
 .\lx.ps1 validate
@@ -465,21 +465,20 @@ string snapshotPath = LX.Diagnostics.WriteSnapshot();
 
 ## Godot 编辑器工具
 
-打开工程后，Godot 底部的 `LX Tools` 面板提供：
+打开工程后，Godot 底部的 `LX Tools` 插件显示为 **LX 开发工具**，默认只提供面向人工开发者的操作：
 
-- 创建 Game、World、Feature、Screen、Node、Input、Resource 和 Content。
-- 生成类型化绑定。
-- 运行检查和完整验证。
-- 生成 Luban 数据。
-- 分析当前场景资源依赖。
-- 执行 UI 视觉比较。
-- 打开 Godot 工程外的 `game_design/`。
+- **创建内容…**：通过中文表单创建游戏产品层、World、Feature、UIScreen、Godot 节点、JSON 内容表、输入动作和资源引用。
+- **生成策划数据**：修改 `game_design/schema` 或 `game_design/data` 后生成 Luban C# 和 `.bytes`。
+- **场景依赖**：检查当前已保存场景引用的资源，并标出缺失项。
+- **打开策划数据目录**：打开 Godot `res://` 之外的 `game_design/`。
 
-面板与命令行调用同一套 `lx.ps1` 实现，可以按个人习惯选择。
+创建和数据生成在独立后台进程中运行。顶部状态会明确显示 **正在执行**、**成功** 或 **失败**；左侧列出中文诊断，右侧保留原始输出用于排错。生成 C# 导致 Godot 重新加载程序集时，面板重新加载后仍会从 `.lx/editor-command.json` 恢复最终结果。
+
+`generate`、`validate` 和视觉基准属于 Codex、CI 或框架维护命令，不显示在普通开发者工具栏中，仍可从仓库外层通过 `lx.ps1` 使用。
 
 ## UI 视觉检查与导出
 
-修改 UI 后先比较视觉基准：
+视觉基准是框架维护工作，不显示在普通 Godot 工具栏中。修改框架 UI 后从仓库外层比较：
 
 ```powershell
 .\lx.ps1 visual compare ui_components

@@ -73,4 +73,4 @@ using var texture = Lifetime.Own(LX.Res.Acquire(ResCatalog.PlayerSprite));
 
 `check` 会在事实源需要时先运行 Luban 或现有生成器，再执行最小去重检查组合。`validate` 是最终门禁，覆盖固定版本 Luban 转表、架构与 API 注释边界、清单、生成漂移、编译、纯核心测试、Godot 无窗口场景矩阵和 UI 视觉基准。
 
-人工开发者可在 Godot 底部 `LX Tools` 面板执行同一命令。Windows 导出模板安装后用 `.\lx.ps1 export windows` 做 Release 产物 smoke；普通环境不会因没有模板而伪造导出成功。
+Godot 底部的 `LX 开发工具` 只提供中文的创建向导、Luban 生成、当前场景依赖和策划目录入口；`generate`、`check`、`validate` 与视觉基准仍由 Codex、CI 或框架维护者从外层 `lx.ps1` 调用。Windows 导出模板安装后用 `.\lx.ps1 export windows` 做 Release 产物 smoke；普通环境不会因没有模板而伪造导出成功。
