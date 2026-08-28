@@ -27,6 +27,8 @@ LXFramework 是 Codex 优先的 Godot 4.6 C# 框架。默认基线为 `gpt-5.6-t
 
 - `godot_project/src/LXFramework.Core` 是纯 C#；`godot_project/src/LXFramework` 是 Godot 适配层且禁止依赖产品层；产品代码只能反向依赖 LXFramework。
 - 禁止反射发现、服务定位器，以及第二套事件总线、时钟、资源注册表、生命周期容器、对象池、场景管理器或 UI 管理器。
+- 产品实现前映射 `LX` 能力；禁止只转发框架 API 的产品管理器。可调数据使用 Luban，高频节点使用 `NodePool<TNode>`。
+- 可重开流程连续覆盖死亡、胜利和重开；每轮验证 UI、Feature、音频、资源租约及池借出闭合，预热后节点、资源和产品资产不持续增长。
 - `godot_project/content/` 清单是运行时内容事实源；Luban 表以 `game_design/schema` 与 `game_design/data` 为上游事实源，并通过 `./lx.ps1 data` 生成到 `content/data/luban` 和产品 `Generated/Luban`。禁止手改任何生成输出。
 - 产品节点通过注入上下文调用 `LX.UI.*`、`LX.Res.*` 等服务；禁止全局上下文和游戏代码中的动态 `GD.Load`/`ResourceLoader.Load*`。
 - `godot_project/scene/main.tscn` 及其 UID 是固定入口；自动化 Godot 使用 `--headless --audio-driver Dummy`。

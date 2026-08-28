@@ -40,6 +40,41 @@ internal static partial class GameGenerator
             _ = ProductLayout.GetSourceRoot(manifest);
         }
 
+        var duplicateSmoke = manifest.ExportSmokes
+            .GroupBy(smoke => smoke.Id, StringComparer.Ordinal)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicateSmoke is not null)
+        {
+            throw new InvalidDataException($"Export smoke ID '{duplicateSmoke.Key}' is duplicated.");
+        }
+        foreach (var smoke in manifest.ExportSmokes)
+        {
+            CodeNames.RequireSnakeCase(smoke.Id, nameof(smoke.Id));
+            if (string.Equals(smoke.Id, "framework", StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "Export smoke ID 'framework' is reserved for the built-in framework smoke.");
+            }
+            if (!smoke.Argument.StartsWith("--", StringComparison.Ordinal) ||
+                smoke.Argument.Any(char.IsWhiteSpace))
+            {
+                throw new InvalidDataException(
+                    $"Export smoke '{smoke.Id}' must declare one '--' prefixed user argument.");
+            }
+            if (string.IsNullOrWhiteSpace(smoke.SuccessMarker) ||
+                smoke.SuccessMarker.Contains('\r', StringComparison.Ordinal) ||
+                smoke.SuccessMarker.Contains('\n', StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    $"Export smoke '{smoke.Id}' must declare a single-line success marker.");
+            }
+            if (smoke.TimeoutSeconds is < 1 or > 300)
+            {
+                throw new InvalidDataException(
+                    $"Export smoke '{smoke.Id}' timeoutSeconds must be between 1 and 300.");
+            }
+        }
+
         var duplicate = manifest.Worlds.GroupBy(world => world.Id, StringComparer.Ordinal)
             .FirstOrDefault(group => group.Count() > 1);
         if (duplicate is not null)

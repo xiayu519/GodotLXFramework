@@ -496,7 +496,7 @@ string snapshotPath = LX.Diagnostics.WriteSnapshot();
 .\lx.ps1 export windows
 ```
 
-普通开发和 `validate` 不要求安装导出模板。
+产物固定写入外层 `build/windows/`。产品可在 `game-manifest.json` 声明包内 smoke，验证真实玩法流程和 Luban 等非 Godot 原生文件已进入产物。普通开发和 `validate` 不要求安装导出模板。
 
 ## 开发时必须遵守的边界
 

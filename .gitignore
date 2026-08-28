@@ -6,7 +6,10 @@
 # .NET build outputs
 **/bin/
 **/obj/
+**/Generated/Luban/*.uid
+**/Generated/Luban/**/*.uid
 TestResults/
+/build/
 
 # LXFramework 生成的报告（生成的 C# 仍提交到版本库）
 .lx/

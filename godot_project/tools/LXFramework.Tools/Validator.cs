@@ -191,7 +191,8 @@ internal static class Validator
             !string.Equals(report.FileExtension, ".bytes", StringComparison.Ordinal) ||
             string.IsNullOrWhiteSpace(report.OutputHash) ||
             !report.GeneratedCodeCompiled ||
-            !report.NegativeReferenceRejected)
+            !report.NegativeReferenceRejected ||
+            !report.NegativeProductDataRejected)
         {
             errors.Add("Luban build report does not match the pinned toolchain or verification contract.");
         }
@@ -451,19 +452,28 @@ internal static class Validator
         }
 
         var readme = File.ReadAllText(readmePath);
-        foreach (var term in new[]
-                 {
-                     "LX Tools",
-                     ".\\lx.ps1 create",
-                     ".\\lx.ps1 data",
-                     ".\\lx.ps1 visual compare",
-                     ".\\lx.ps1 export windows",
-                     "game_design/schema",
-                 })
+        var game = ToolFiles.ReadJson<GameManifest>(
+            Path.Combine(root, "content", "game", "game-manifest.json"));
+        var requiredReadmeTerms = string.IsNullOrWhiteSpace(game.Name)
+            ? new[]
+            {
+                "LX Tools",
+                ".\\lx.ps1 create",
+                ".\\lx.ps1 data",
+                ".\\lx.ps1 visual compare",
+                ".\\lx.ps1 export windows",
+                "game_design/schema",
+            }
+            : new[]
+            {
+                ".\\lx.ps1 validate",
+                ".\\lx.ps1 export windows",
+            };
+        foreach (var term in requiredReadmeTerms)
         {
             if (!readme.Contains(term, StringComparison.Ordinal))
             {
-                errors.Add($"README.md must document the human workflow term '{term}'.");
+                errors.Add($"README.md must document the current workspace entry '{term}'.");
             }
         }
 
@@ -503,10 +513,20 @@ internal static class Validator
         }
 
         var presetPath = Path.Combine(root, "export_presets.cfg");
-        if (File.Exists(presetPath) &&
-            !File.ReadAllText(presetPath).Contains("name=\"Windows Desktop\"", StringComparison.Ordinal))
+        if (!File.Exists(presetPath))
+        {
+            return;
+        }
+
+        var exportPresets = File.ReadAllText(presetPath);
+        if (!exportPresets.Contains("name=\"Windows Desktop\"", StringComparison.Ordinal))
         {
             errors.Add("export_presets.cfg must contain the Windows Desktop release preset.");
+        }
+        if (!exportPresets.Contains("content/data/luban/*.bytes", StringComparison.Ordinal))
+        {
+            errors.Add(
+                "export_presets.cfg must include content/data/luban/*.bytes so generated Luban tables ship in release packages.");
         }
     }
 
@@ -789,7 +809,8 @@ internal sealed record LubanBuildReport(
     IReadOnlyList<string> DataFiles,
     string OutputHash,
     bool GeneratedCodeCompiled,
-    bool NegativeReferenceRejected);
+    bool NegativeReferenceRejected,
+    bool NegativeProductDataRejected);
 
 internal sealed record LubanOutputManifest(
     int SchemaVersion,

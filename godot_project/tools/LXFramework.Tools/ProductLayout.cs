@@ -2,18 +2,16 @@ namespace LXFramework.Tools;
 
 internal static class ProductLayout
 {
-    private const string LegacySourceRoot = "src/Game";
-
     public static string GetSourceRoot(GameManifest manifest)
     {
         var sourceRoot = manifest.SourceRoot.Replace('\\', '/').Trim('/');
-        if (sourceRoot.Length == 0 && !string.IsNullOrWhiteSpace(manifest.Name))
-        {
-            sourceRoot = LegacySourceRoot;
-        }
-
         if (sourceRoot.Length == 0)
         {
+            if (!string.IsNullOrWhiteSpace(manifest.Name))
+            {
+                throw new InvalidDataException(
+                    "A declared game product must define an explicit workspace-relative sourceRoot.");
+            }
             return string.Empty;
         }
 

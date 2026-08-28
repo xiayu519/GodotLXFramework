@@ -11,6 +11,8 @@
 
 命令在 `godot_project/` 内创建 `script/MyGame/AGENTS.md`、`script/MyGame/GameRoot.cs` 和初始世界场景，把产品根目录与根命名空间写入 `content/game/game-manifest.json`，并生成 `GameCatalog` 与 `WorldCatalog`。产品目录规则会随新游戏一起就位，不需要另行复制提示词。
 
+按根仓库不变量先完成框架能力映射。落地时从注入上下文和生成目录定位 UI、资源、场景、Feature、输入、音频、内容、对象池或诊断入口；产品类型只承载游戏语义。框架确实缺少能力时，把缺口与产品临时方案分开说明。
+
 ## 添加结构单元
 
 ```powershell
@@ -27,7 +29,7 @@
 
 ## Luban 策划数据
 
-跨表引用、策划 schema 或批量配置使用外层 `game_design/`。schema 使用可审查的 XML，源数据使用 JSON；工具版本和提交由 `game_design/toolchain.json` 固定。Windows 人工转表可双击 `game_design/build.bat`，命令行和 Codex 使用统一入口：
+根规则指定的可调游戏数据使用外层 `game_design/`；只有无需策划维护的少量静态内容才使用普通 JSON。schema 使用可审查的 XML，源数据使用 JSON；工具版本和提交由 `game_design/toolchain.json` 固定。Windows 人工转表可双击 `game_design/build.bat`，命令行和 Codex 使用统一入口：
 
 ```powershell
 .\lx.ps1 data
@@ -61,6 +63,10 @@ using var texture = Lifetime.Own(LX.Res.Acquire(ResCatalog.PlayerSprite));
 ```
 
 目录属性名由清单 ID 生成。需要准确名称时读取生成目录，或运行 `inspect` 后查看 `.lx/project-index.json`。
+
+根规则要求池化的节点直接使用 `NodePool<TNode>`。池由所属 Feature 或世界的 `Lifetime` 持有；短作用域优先使用 `RentLease`，动态集合在所属流程收口时逐一 `Return`。
+
+重开闭环采样放在 UI 与 Feature handle 退出作用域之后，通过 `LX.Diagnostics.Snapshot()` 取得框架所有权事实；明确区分稳定缓存与活跃租约。需要交付安装包时，再用 `export <platform>` 运行包内产品 smoke，确认生成数据和非 Godot 原生文件确实进入产物。
 
 ## 必需循环
 

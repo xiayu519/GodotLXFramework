@@ -47,7 +47,7 @@ internal static class Program
               validate                       校验事实源、生成结果并完成最终门禁。
               smoke                          用 Godot 无窗口导入并启动框架。
               visual capture|compare|approve 捕获、比较或显式批准 UI 视觉基准。
-              export windows                  Release 导出并启动 Windows 产物烟测。
+              export <platform>               Release 导出到 build/<platform> 并运行框架与产品烟测；当前支持 windows。
               benchmark                       写入核心性能基线报告。
               create game <Name>             创建产品层与初始世界。
               create world <Name> [id]       创建并注册世界。
