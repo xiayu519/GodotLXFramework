@@ -7,6 +7,10 @@ using Godot;
 
 namespace LX.World;
 
+/// <summary>
+/// 按焦点加载和释放 2D 世界区块。实例会自动注册到传入的 parentLifetime，
+/// 因此父生命周期关闭会等待区块、数据源和内部生命周期完整释放。
+/// </summary>
 public sealed class WorldChunkStreamer : IAsyncDisposable
 {
     private sealed record ActiveChunk(Node Node, LifetimeScope Lifetime);
@@ -54,6 +58,8 @@ public sealed class WorldChunkStreamer : IAsyncDisposable
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _context = context ?? throw new ArgumentNullException(nameof(context));
+        ArgumentNullException.ThrowIfNull(parentLifetime);
+        parentLifetime.ThrowIfDisposed();
         _available = source.Coordinates.ToHashSet();
         if (_available.Count == 0 || _available.Count != source.Coordinates.Count)
         {
@@ -68,6 +74,7 @@ public sealed class WorldChunkStreamer : IAsyncDisposable
         _lifetime = parentLifetime.CreateChild("WorldChunkStreamer");
         _mainThreadId = System.Environment.CurrentManagedThreadId;
         UpdateMetrics();
+        parentLifetime.Own(this);
     }
 
     public IReadOnlyCollection<ChunkCoordinate> ActiveChunks
@@ -115,10 +122,12 @@ public sealed class WorldChunkStreamer : IAsyncDisposable
             _lifetime.Token);
         _focusChange?.Cancel();
         _focusChange = operation;
-        await _gate.WaitAsync(operation.Token);
+        var enteredGate = false;
         try
         {
-            var targets = ChunkPlanner.VisibleSquare(focus, options.Radius, _source.IsAvailable);
+            await _gate.WaitAsync(operation.Token);
+            enteredGate = true;
+            var targets = ChunkPlanner.VisibleSquare(focus, options.Radius, _available.Contains);
             var targetSet = targets.ToHashSet();
             var removals = _active.Keys
                 .Where(key => !targetSet.Contains(key))
@@ -169,7 +178,10 @@ public sealed class WorldChunkStreamer : IAsyncDisposable
         }
         finally
         {
-            _gate.Release();
+            if (enteredGate)
+            {
+                _gate.Release();
+            }
             if (ReferenceEquals(_focusChange, operation))
             {
                 _focusChange = null;
@@ -188,11 +200,19 @@ public sealed class WorldChunkStreamer : IAsyncDisposable
         _disposed = true;
         _focusChange?.Cancel();
         await _gate.WaitAsync();
+        List<Exception>? errors = null;
         try
         {
             foreach (var coordinate in _active.Keys.ToArray())
             {
-                await ReleaseAsync(coordinate);
+                try
+                {
+                    await ReleaseAsync(coordinate);
+                }
+                catch (Exception exception)
+                {
+                    (errors ??= []).Add(exception);
+                }
             }
 
             // Scene shutdown detaches the parent before _ExitTree callbacks
@@ -200,12 +220,44 @@ public sealed class WorldChunkStreamer : IAsyncDisposable
             // owned resources are still released synchronously below.
             if (_parent.IsInsideTree() && _parent.GetTree() is { } tree)
             {
-                await _parent.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
+                try
+                {
+                    await _parent.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
+                }
+                catch (Exception exception)
+                {
+                    (errors ??= []).Add(exception);
+                }
             }
-            _source.PurgeIdleCache();
-            await _source.DisposeAsync();
-            await _lifetime.DisposeAsync();
+            try
+            {
+                _source.PurgeIdleCache();
+            }
+            catch (Exception exception)
+            {
+                (errors ??= []).Add(exception);
+            }
+            try
+            {
+                await _source.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                (errors ??= []).Add(exception);
+            }
+            try
+            {
+                await _lifetime.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                (errors ??= []).Add(exception);
+            }
             UpdateMetrics();
+            if (errors is not null)
+            {
+                throw new AggregateException("World chunk streamer reported cleanup errors.", errors);
+            }
         }
         finally
         {

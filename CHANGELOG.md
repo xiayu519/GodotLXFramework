@@ -2,6 +2,24 @@
 
 本项目遵循 Keep a Changelog 的组织方式；版本号遵循语义化版本。
 
+## [Unreleased]
+
+### Changed
+
+- Codex 唯一保证配置收敛为 `gpt-5.6-sol/high`；普通任务与 Plan mode 不再维护其他模型或 reasoning 的兼容分支。
+- 根 `AGENTS.md` 删除模型、原生发现机制和显式 Skill 路由，改由 Skill description 完成语义发现；当前 11 项 Sol/high outcome eval 通过 11/11。
+
+### Added
+
+- 版本化公开 API 基线、push/PR CI、可选多轮 Godot soak，以及标签/手动 Windows Release export。
+- 可恢复维护事务状态机与 `doctor|upgrade --recover`。
+
+### Fixed
+
+- PackedScene 池、ActionRunner、GameFlow、LXHost 与 WorldChunkStreamer 的关闭、清理和所有权边界。
+- AssetRegistry 共享 inflight 进度观察者隔离、RuntimeBridge I/O 容错、诊断分区按需采集和设置按键默认值恢复。
+- Capability 副作用分类、Mono export template 版本识别和无 .NET SDK 时的 PowerShell 前置诊断。
+
 ## [0.1.0] - 2026-08-28
 
 ### Added

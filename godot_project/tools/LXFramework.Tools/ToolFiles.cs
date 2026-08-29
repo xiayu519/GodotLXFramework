@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Encodings.Web;
 
 namespace LXFramework.Tools;
 
@@ -11,6 +12,7 @@ internal static class ToolFiles
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         Converters = { new JsonStringEnumConverter() },
     };
 
@@ -49,9 +51,23 @@ internal static class ToolFiles
             return false;
         }
 
-        var temporary = path + ".tmp";
-        File.WriteAllText(temporary, normalized, new System.Text.UTF8Encoding(false));
-        File.Move(temporary, path, true);
+        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(temporary, normalized, new System.Text.UTF8Encoding(false));
+            File.Move(temporary, path, true);
+        }
+        finally
+        {
+            try
+            {
+                File.Delete(temporary);
+            }
+            catch
+            {
+                // A subsequent atomic write uses a unique temporary path.
+            }
+        }
         return true;
     }
 

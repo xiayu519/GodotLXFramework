@@ -33,7 +33,7 @@ internal static class ExportRunner
             Path.Combine(root, "content", "game", "game-manifest.json"));
         var productName = GetSafeProductName(game.Name);
         var version = FileVersionInfo.GetVersionInfo(executable).ProductVersion ?? "unknown";
-        var templateVersion = GetTemplateVersion(version);
+        var templateVersion = GodotLocator.RequiredTemplateVersion;
         var templateRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Godot",
@@ -284,12 +284,6 @@ internal static class ExportRunner
                Enumerable.Range(1, 9).Any(index =>
                    stem.Equals($"COM{index}", StringComparison.OrdinalIgnoreCase) ||
                    stem.Equals($"LPT{index}", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static string GetTemplateVersion(string productVersion)
-    {
-        var parts = productVersion.Split('.', StringSplitOptions.RemoveEmptyEntries);
-        return parts.Length >= 3 ? string.Join('.', parts.Take(3)) : "4.6.3";
     }
 
     private static async Task<ProcessResult> RunProcessAsync(

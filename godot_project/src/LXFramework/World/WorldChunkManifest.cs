@@ -1,4 +1,5 @@
 using LX.Core.World;
+using LX.Res;
 
 namespace LX.World;
 
@@ -20,9 +21,7 @@ public sealed class WorldChunkManifest
         var result = new Dictionary<ChunkCoordinate, WorldChunkEntry>();
         foreach (var entry in Chunks)
         {
-            if (string.IsNullOrWhiteSpace(entry.ScenePath) ||
-                !entry.ScenePath.StartsWith("res://", StringComparison.Ordinal) ||
-                !entry.ScenePath.EndsWith(".tscn", StringComparison.OrdinalIgnoreCase))
+            if (!GodotResourcePath.IsCanonical(entry.ScenePath, ".tscn"))
             {
                 throw new InvalidDataException(
                     $"World chunk ({entry.X}, {entry.Y}) has an invalid scene path '{entry.ScenePath}'.");

@@ -35,17 +35,44 @@ public sealed class PauseService
     public void SetPaused(bool paused)
     {
         EnsureMainThread();
-        if (IsPaused == paused)
+        var tree = _host.GetTree();
+        if (_host.IsInsideTree() && !_host.CanProcess())
+        {
+            throw new InvalidOperationException(
+                "Pause state cannot change while the LXHost is suspended or disabled.");
+        }
+        if (IsPaused == paused && tree.Paused == paused)
         {
             return;
         }
 
+        var previous = IsPaused;
         IsPaused = paused;
         _frameClock.IsPaused = paused;
         _physicsClock.IsPaused = paused;
-        _host.GetTree().Paused = paused;
+        try
+        {
+            tree.Paused = paused;
+            if (tree.Paused != paused)
+            {
+                throw new InvalidOperationException(
+                    $"Godot rejected the requested SceneTree pause state '{paused}'.");
+            }
+        }
+        catch
+        {
+            IsPaused = previous;
+            _frameClock.IsPaused = previous;
+            _physicsClock.IsPaused = previous;
+            UpdateMetrics();
+            throw;
+        }
+
         UpdateMetrics();
-        _events.Publish(new PauseChanged(paused));
+        if (previous != paused)
+        {
+            _events.Publish(new PauseChanged(paused));
+        }
     }
 
     public void Toggle() => SetPaused(!IsPaused);

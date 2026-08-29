@@ -1,8 +1,13 @@
 using System.Text.Json;
+using System.Text.Encodings.Web;
+using System.Text.Json.Serialization;
 using LX.Res;
 using LX.Audio;
 using LX.Core.Diagnostics;
+using LX.Core.Actions;
+using LX.Core.Events;
 using LX.Core.Lifetime;
+using LX.Core.Time;
 using LX.Features;
 using LX.Input;
 using LX.Localization;
@@ -19,16 +24,28 @@ public sealed class DiagnosticsService
     public const string SnapshotSchema = "lx.runtime-snapshot";
 
     /// <summary>运行时快照格式版本。</summary>
-    public const int SnapshotSchemaVersion = 1;
+    public const int SnapshotSchemaVersion = 2;
+
+    internal static IReadOnlyList<string> AvailableSections { get; } =
+    [
+        "all", "runtime", "events", "scheduler", "actions", "metrics", "resources",
+        "ui", "features", "audio", "input", "localization", "settings", "logs",
+    ];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        Converters = { new JsonStringEnumConverter() },
     };
 
     private readonly MetricRegistry _metrics;
     private readonly LifetimeScope _lifetime;
+    private readonly EventHub _events;
+    private readonly GameScheduler _scheduler;
+    private readonly GameScheduler _physicsScheduler;
+    private readonly ActionRunner _actions;
     private readonly AssetRegistry _assets;
     private readonly UIService _ui;
     private readonly FeatureService _features;
@@ -43,6 +60,10 @@ public sealed class DiagnosticsService
     public DiagnosticsService(
         MetricRegistry metrics,
         LifetimeScope lifetime,
+        EventHub events,
+        GameScheduler scheduler,
+        GameScheduler physicsScheduler,
+        ActionRunner actions,
         AssetRegistry assets,
         UIService ui,
         FeatureService features,
@@ -55,6 +76,10 @@ public sealed class DiagnosticsService
     {
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _lifetime = lifetime ?? throw new ArgumentNullException(nameof(lifetime));
+        _events = events ?? throw new ArgumentNullException(nameof(events));
+        _scheduler = scheduler ?? throw new ArgumentNullException(nameof(scheduler));
+        _physicsScheduler = physicsScheduler ?? throw new ArgumentNullException(nameof(physicsScheduler));
+        _actions = actions ?? throw new ArgumentNullException(nameof(actions));
         _assets = assets ?? throw new ArgumentNullException(nameof(assets));
         _ui = ui ?? throw new ArgumentNullException(nameof(ui));
         _features = features ?? throw new ArgumentNullException(nameof(features));
@@ -100,6 +125,10 @@ public sealed class DiagnosticsService
         DateTimeOffset.UtcNow - _startedAtUtc,
         new LifetimeRecord(_lifetime.Name, _lifetime.IsDisposed, _lifetime.OwnedCount),
         new SceneRecord(_scenes.ActivePath, _scenes.ActiveNode?.Name.ToString()),
+        _events.Snapshot(),
+        _scheduler.Snapshot(),
+        _physicsScheduler.Snapshot(),
+        _actions.Snapshot(),
         _metrics.Snapshot(),
         _assets.Snapshot(),
         _ui.Snapshot(),
@@ -112,6 +141,42 @@ public sealed class DiagnosticsService
 
     /// <summary>把当前快照序列化为稳定、可供工具读取的 JSON。</summary>
     public string ToJson() => JsonSerializer.Serialize(Snapshot(), JsonOptions);
+
+    internal object SnapshotSection(string section)
+    {
+        if (string.IsNullOrWhiteSpace(section))
+        {
+            throw new ArgumentException("Runtime snapshot section cannot be empty.", nameof(section));
+        }
+
+        return section.ToLowerInvariant() switch
+        {
+            "all" => Snapshot(),
+            "runtime" => new RuntimeOverviewRecord(
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow - _startedAtUtc,
+                new LifetimeRecord(_lifetime.Name, _lifetime.IsDisposed, _lifetime.OwnedCount),
+                new SceneRecord(_scenes.ActivePath, _scenes.ActiveNode?.Name.ToString())),
+            "events" => _events.Snapshot(),
+            "scheduler" => new SchedulerOverviewRecord(
+                _scheduler.Snapshot(),
+                _physicsScheduler.Snapshot()),
+            "actions" => _actions.Snapshot(),
+            "metrics" => _metrics.Snapshot(),
+            "resources" => _assets.Snapshot(),
+            "ui" => _ui.Snapshot(),
+            "features" => _features.Snapshot(),
+            "audio" => _audio.Snapshot(),
+            "input" => _input.Snapshot(),
+            "localization" => _localization.Snapshot(),
+            "settings" => _settings.Current,
+            "logs" => _log.Snapshot(),
+            _ => throw new ArgumentException(
+                $"Unknown runtime snapshot section '{section}'. Available: " +
+                string.Join(", ", AvailableSections),
+                nameof(section)),
+        };
+    }
 
     /// <summary>把当前快照写入 user://，并返回绝对文件路径。</summary>
     public string WriteSnapshot(string userPath = "user://lx-runtime.json")
@@ -134,6 +199,10 @@ public sealed record RuntimeSnapshot(
     TimeSpan Uptime,
     LifetimeRecord Lifetime,
     SceneRecord Scene,
+    EventHubSnapshot Events,
+    GameSchedulerSnapshot Scheduler,
+    GameSchedulerSnapshot PhysicsScheduler,
+    ActionRunnerSnapshot Actions,
     MetricSnapshot Metrics,
     IReadOnlyList<AssetRecord> Assets,
     IReadOnlyList<UIRecord> UI,
@@ -149,3 +218,13 @@ public sealed record LifetimeRecord(string Name, bool IsDisposed, int OwnedCount
 
 /// <summary>当前活动世界场景的诊断信息。</summary>
 public sealed record SceneRecord(string? Path, string? RootNodeName);
+
+internal sealed record RuntimeOverviewRecord(
+    DateTimeOffset CapturedAtUtc,
+    TimeSpan Uptime,
+    LifetimeRecord Lifetime,
+    SceneRecord Scene);
+
+internal sealed record SchedulerOverviewRecord(
+    GameSchedulerSnapshot Frame,
+    GameSchedulerSnapshot Physics);

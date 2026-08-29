@@ -28,6 +28,41 @@ foreach ($argument in @($CommandArguments)) {
 }
 $CommandArguments = $filteredArguments.ToArray()
 
+$requiredDotnetSdk = "8.0.416"
+$dotnetCommand = Get-Command "dotnet" -ErrorAction SilentlyContinue
+$detectedDotnetSdk = $null
+if ($null -ne $dotnetCommand) {
+    $detectedDotnetSdk = (& $dotnetCommand.Source --version 2>$null | Select-Object -First 1)
+    if ($null -ne $detectedDotnetSdk) { $detectedDotnetSdk = $detectedDotnetSdk.Trim() }
+}
+if ($detectedDotnetSdk -ne $requiredDotnetSdk) {
+    $message = "LXFramework requires .NET SDK $requiredDotnetSdk; found " +
+        $(if ([string]::IsNullOrWhiteSpace($detectedDotnetSdk)) { "none" } else { $detectedDotnetSdk }) +
+        ". Install the exact SDK, then rerun '.\lx.ps1 doctor'."
+    if ($jsonMode) {
+        [Console]::Out.WriteLine(([ordered]@{
+            schema = "lx.command-report"
+            schemaVersion = 1
+            command = $Command.ToLowerInvariant()
+            arguments = @($CommandArguments)
+            success = $false
+            exitCode = 1
+            code = "LX_DOTNET_SDK_MISSING"
+            startedAtUtc = [DateTimeOffset]::UtcNow.ToString("O", [System.Globalization.CultureInfo]::InvariantCulture)
+            durationMs = 0
+            diagnostics = @([ordered]@{
+                code = "LX_DOTNET_SDK_MISSING"
+                severity = "error"
+                message = $message
+            })
+        } | ConvertTo-Json -Depth 6))
+    }
+    else {
+        [Console]::Error.WriteLine($message)
+    }
+    exit 1
+}
+
 function Invoke-LxOperation {
     Push-Location $repoRoot
     $lxExitCode = 0
@@ -53,11 +88,20 @@ function Invoke-LxOperation {
             if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
             dotnet test "LXFramework.sln" --no-build --nologo --verbosity quiet
             if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
+            dotnet run --project $toolProject --no-build -- benchmark
+            if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
             dotnet run --project $toolProject --no-build -- smoke
             if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
             dotnet run --project $toolProject --no-build -- visual compare ui_components
         }
         "check" {
+            if ($CommandArguments.Count -eq 1 -and
+                $CommandArguments[0] -in @("--help", "-h", "help")) {
+                Write-Host "Usage: lx check <changed-path> [changed-path ...]"
+                Write-Host "Runs one deduplicated validation profile selected from the changed paths."
+                $lxExitCode = 0
+                break
+            }
             if ($CommandArguments.Count -eq 0) {
                 Write-Error "check requires one or more changed paths."
                 $lxExitCode = 2
@@ -95,6 +139,11 @@ function Invoke-LxOperation {
                 $_ -like "src/LXFramework.Core/Data/Luban*" -or
                 $_ -eq "src/LXFramework/Content/ContentService.cs"
             })
+            # A clean clone has no ignored .lx report or generated product-side
+            # Luban output. Static validation requires both, so any cold check
+            # must establish that prerequisite instead of failing and asking the
+            # caller to discover and retry `lx data` manually.
+            $needsData = $needsData -or -not (Test-Path -LiteralPath ".lx\luban\report.json" -PathType Leaf)
             $needsGenerate = [bool]($changedPaths | Where-Object {
                 $_ -like "content/*/*-manifest.json" -or
                 $_ -like "scene/ui/*" -or

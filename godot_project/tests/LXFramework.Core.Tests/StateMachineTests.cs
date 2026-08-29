@@ -38,6 +38,22 @@ public sealed class StateMachineTests
         Assert.Equal(["enter:idle", "exit:idle", "enter:broken"], log);
     }
 
+    [Fact]
+    public async Task Transition_ReenteredFromStateHook_FailsImmediatelyInsteadOfDeadlocking()
+    {
+        var context = new ReentrantContext();
+        var machine = new StateMachine<string, ReentrantContext>(context);
+        context.Machine = machine;
+        machine.Register("first", new ReentrantState("second"));
+        machine.Register("second", new PassiveState());
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await machine.TransitionAsync("first"));
+
+        Assert.Contains("cannot be re-entered", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.False(machine.HasCurrent);
+    }
+
     private sealed class ProbeState(string name) : IState<List<string>>
     {
         public ValueTask EnterAsync(List<string> context, CancellationToken cancellationToken)
@@ -64,5 +80,32 @@ public sealed class StateMachineTests
         }
 
         public void Tick(List<string> context, double deltaSeconds) => context.Add("tick:broken");
+    }
+
+    private sealed class ReentrantContext
+    {
+        public StateMachine<string, ReentrantContext> Machine { get; set; } = null!;
+    }
+
+    private sealed class ReentrantState(string next) : IState<ReentrantContext>
+    {
+        public async ValueTask EnterAsync(
+            ReentrantContext context,
+            CancellationToken cancellationToken)
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+            await context.Machine.TransitionAsync(next, timeout.Token);
+        }
+
+        public void Tick(ReentrantContext context, double deltaSeconds)
+        {
+        }
+    }
+
+    private sealed class PassiveState : IState<ReentrantContext>
+    {
+        public void Tick(ReentrantContext context, double deltaSeconds)
+        {
+        }
     }
 }

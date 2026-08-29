@@ -12,14 +12,19 @@ internal static class Program
 
             return command switch
             {
-                "doctor" => Doctor.Run(root),
+                "doctor" => Doctor.Run(root, commandArgs),
+                "upgrade" => MaintenancePlanner.Run(root, "upgrade", commandArgs),
                 "inspect" => ProjectInspector.Run(root, commandArgs),
+                "capabilities" => CapabilityCatalog.Run(root, commandArgs),
                 "generate" => ProjectGenerator.Run(root, commandArgs),
                 "validate" => Validator.Run(root),
                 "smoke" => await GodotSmoke.RunAsync(root),
                 "visual" => await VisualRunner.RunAsync(root, commandArgs),
                 "export" => await ExportRunner.RunAsync(root, commandArgs),
                 "benchmark" => BenchmarkRunner.Run(root),
+                "api" => PublicApiBaseline.Run(root, commandArgs),
+                "soak" => await SoakRunner.RunAsync(root, commandArgs),
+                "runtime" => RuntimeBridgeClient.Run(root, commandArgs),
                 "create" => Scaffolder.Run(root, commandArgs),
                 "run" => await GodotRunner.RunAsync(root, commandArgs),
                 "help" or "--help" or "-h" => PrintHelp(),
@@ -39,8 +44,10 @@ internal static class Program
             """
             LXFramework.Tools
 
-              doctor                         检查本地工具链与框架基线。
+              doctor [--plan|--apply|--rollback|--recover] 检查环境并事务化修复当前派生状态。
+              upgrade --plan|--apply|--rollback|--recover  将产品派生状态升级到当前 LX checkout。
               inspect [--full]               写入紧凑项目索引；--full 才附完整文件表。
+              capabilities [id]              写入机器可读能力、前置条件、副作用与验收配方。
               data                            用固定版本 Luban 生成强类型 C# 与 .bytes 二进制表。
               generate [--verbose]           生成目录与绑定；默认只报告汇总。
               check <changed-path> [...]      执行最小去重检查组合（仅 lx.ps1）。
@@ -49,6 +56,10 @@ internal static class Program
               visual capture|compare|approve 捕获、比较或显式批准 UI 视觉基准。
               export <platform>               Release 导出到 build/<platform> 并运行框架与产品烟测；当前支持 windows。
               benchmark                       写入核心性能基线报告。
+              api check|update                 检查或显式更新公开 API 兼容基线。
+              soak [cycles]                    重复运行隔离 Godot smoke 并写入稳定性报告。
+              runtime status                  查询当前 Editor/Debug 运行会话。
+              runtime snapshot [section]      读取当前运行实例的有界结构化快照。
               create game <Name>             创建产品层与初始世界。
               create world <Name> [id]       创建并注册世界。
               create input <Name> <action>   创建并生成输入动作。

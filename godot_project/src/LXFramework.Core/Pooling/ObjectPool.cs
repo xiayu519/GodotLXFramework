@@ -7,7 +7,6 @@ public sealed class ObjectPool<T> : IDisposable where T : class
     private readonly Action<T>? _reset;
     private readonly Action<T>? _discard;
     private readonly Stack<T> _available = [];
-    private readonly HashSet<T> _availableSet = new(ReferenceEqualityComparer.Instance);
     private readonly HashSet<T> _ownedSet = new(ReferenceEqualityComparer.Instance);
     private readonly HashSet<T> _rentedSet = new(ReferenceEqualityComparer.Instance);
     private long _createdCount;
@@ -76,7 +75,6 @@ public sealed class ObjectPool<T> : IDisposable where T : class
             ObjectDisposedException.ThrowIf(_disposed, this);
             if (_available.TryPop(out var item))
             {
-                _availableSet.Remove(item);
                 _rentedSet.Add(item);
                 _reusedCount++;
                 return item;
@@ -143,14 +141,24 @@ public sealed class ObjectPool<T> : IDisposable where T : class
         {
             _reset?.Invoke(item);
         }
-        catch
+        catch (Exception resetException)
         {
             lock (_gate)
             {
                 _ownedSet.Remove(item);
                 _discardedCount++;
             }
-            _discard?.Invoke(item);
+            try
+            {
+                _discard?.Invoke(item);
+            }
+            catch (Exception discardException)
+            {
+                throw new AggregateException(
+                    "Pool reset and discard both failed.",
+                    resetException,
+                    discardException);
+            }
             throw;
         }
 
@@ -166,7 +174,6 @@ public sealed class ObjectPool<T> : IDisposable where T : class
             else
             {
                 _available.Push(item);
-                _availableSet.Add(item);
             }
         }
 
@@ -194,12 +201,24 @@ public sealed class ObjectPool<T> : IDisposable where T : class
             }
             _discardedCount += discarded.Length;
             _available.Clear();
-            _availableSet.Clear();
         }
 
+        List<Exception>? errors = null;
         foreach (var item in discarded)
         {
-            _discard?.Invoke(item);
+            try
+            {
+                _discard?.Invoke(item);
+            }
+            catch (Exception exception)
+            {
+                (errors ??= []).Add(exception);
+            }
+        }
+
+        if (errors is not null)
+        {
+            throw new AggregateException("One or more pooled objects could not be discarded.", errors);
         }
     }
 }

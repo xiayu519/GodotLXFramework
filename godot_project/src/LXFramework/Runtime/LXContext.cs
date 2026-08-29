@@ -2,6 +2,7 @@ using LX.Res;
 using LX.Audio;
 using LX.Content;
 using LX.Core.Diagnostics;
+using LX.Core.Actions;
 using LX.Core.Events;
 using LX.Core.Lifetime;
 using LX.Core.Random;
@@ -24,6 +25,7 @@ public sealed record LXContext(
     GameScheduler Scheduler,
     GameClock PhysicsClock,
     GameScheduler PhysicsScheduler,
+    ActionRunner Actions,
     PauseService Pause,
     DeterministicRng Random,
     MetricRegistry Metrics,

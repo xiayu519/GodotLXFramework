@@ -1,6 +1,6 @@
 # LXFramework
 
-LXFramework 是一个 **Codex 优先、面向全 AI 游戏开发** 的 Godot 4.6 .NET / C# 游戏客户端框架。
+LXFramework 是一个 **Codex 优先、面向全 AI 游戏开发** 的 Godot 4.7.2 .NET / C# 游戏客户端框架。
 
 > 不要求先成为 Godot 专家，也可以从游戏需求直接做到可运行的 Windows PC 包。
 
@@ -29,7 +29,7 @@ LXFramework 是一个 **Codex 优先、面向全 AI 游戏开发** 的 Godot 4.6
 - **交付结果可以验证**：Codex 使用 `lx create` 创建结构，通过类型化 API 实现功能，并以 `check`、`validate` 和实际导出结果作为完成证据。
 - **人与 AI 使用同一套事实源**：Codex 和 CI 使用完整 CLI；Godot 中的 `LX Tools` 只呈现开发者真正需要的中文操作，两者共用相同的清单和生成器。
 
-使用 Codex 时，在仓库根目录打开项目并描述要实现的游戏功能即可。具体指令分层和推荐提问方式见 [AI 开发工作流](Books/AI-Development-Workflow.md)。
+使用 Codex 时，在仓库根目录打开项目并描述要实现的游戏功能即可。当前唯一保证配置是 `gpt-5.6-sol/high`。具体指令分层和推荐提问方式见 [AI 开发工作流](Books/AI-Development-Workflow.md)。
 
 ## 为什么使用 LXFramework
 
@@ -45,7 +45,7 @@ LXFramework 是一个 **Codex 优先、面向全 AI 游戏开发** 的 Godot 4.6
 ## 环境要求
 
 - Windows 10/11
-- Godot 4.6.3 .NET
+- Godot 4.7.2 .NET
 - .NET SDK 8.0
 - PowerShell 5.1 或 PowerShell 7+
 - Windows 导出时需要安装与 Godot 编辑器相同版本的 export templates
@@ -69,7 +69,7 @@ Codex 会读取仓库指令和对应 Skill，使用框架原生能力完成结�
 
 LXFramework 已经包含完整的 `project.godot` 和 C# 工程文件，不需要先运行脚本才能打开。使用 Godot 官方推荐的 Project Manager：
 
-1. 启动 **Godot 4.6.3 .NET**。
+1. 启动 **Godot 4.7.2 .NET**。
 2. 在 Project Manager 中点击 **Import**。
 3. 选择 `godot_project/` 目录，或直接选择 `godot_project/project.godot`。
 4. 点击 **Import & Edit**，等待 Godot 完成首次资源导入。
@@ -123,10 +123,24 @@ godot_project/
 .\lx.ps1 validate
 ```
 
-`validate` 是 LXFramework 的提交前门禁，不是打开 Godot 的前置条件。只有环境或工具异常时才需要运行：
+`validate` 是 LXFramework 的提交前门禁，包含生成一致性、公开 API 基线、Core 测试、EventHub 严格零分配、Godot smoke 与视觉比较；它不是打开 Godot 的前置条件。只有环境或工具异常时才需要运行：
 
 ```powershell
 .\lx.ps1 doctor
+```
+
+Codex 需要审查修复内容时先生成计划；`apply` 只修改当前 checkout 可以确定生成的派生文件，系统安装仍需明确授权：
+
+```powershell
+.\lx.ps1 doctor --plan
+.\lx.ps1 upgrade --plan
+```
+
+维护进程意外中断后使用计划 ID 恢复；如果 apply 后文件又被修改，恢复会报告冲突并保留新修改：
+
+```powershell
+.\lx.ps1 doctor --recover <plan-id>
+.\lx.ps1 upgrade --recover <plan-id>
 ```
 
 ### 版本管理建议
@@ -262,6 +276,18 @@ LX.Scheduler.Schedule(TimeSpan.FromSeconds(2), RefreshQuest, Lifetime);
 - `LX.PhysicsClock`、`LX.PhysicsScheduler`：物理帧时间与调度。
 - `LX.Pause`：暂停状态。
 - `LX.Random`：可确定性复现的随机数。
+- `LX.Actions`：受生命周期管理的顺序、并行、竞速、超时、重试和清理编排。
+
+复杂过程保持为可观测动作树，而不是散落的异步状态变量：
+
+```csharp
+await LX.Actions.RunAsync(
+    LXActions.Sequence(
+        LXActions.Async(ct => LX.UI.PlayFadeAsync(UIFadeMode.FadeOut, cancellationToken: ct)),
+        LXActions.Async(ct => LX.Scenes.ChangeAsync(WorldCatalog.Dungeon.Id, ct)),
+        LXActions.Async(ct => LX.UI.PlayFadeAsync(UIFadeMode.FadeIn, cancellationToken: ct))),
+    Lifetime);
+```
 
 ### 世界和场景切换
 
@@ -292,6 +318,25 @@ await LX.Scenes.ChangeAsync(
 ```
 
 `KeepPreviousUntilReady` 会在新世界准备完成后才释放旧世界；`ReleasePreviousBeforeLoad` 可以降低峰值内存，但加载失败时可能没有活动世界。
+
+### 2D 相机
+
+相机控制器绑定调用方传入的具体 `Camera2D`，不建立全局“当前相机”，因此单相机和多相机使用相同 API。控制器随指定 `Lifetime` 回收，并提供平滑跟随、死区、相机中心边界和衰减震动：
+
+```csharp
+var cameraController = Camera2DController.Attach(camera, Lifetime);
+cameraController.Follow(
+    player,
+    new Camera2DFollowOptions
+    {
+        DeadZoneSize = new Vector2(96, 64),
+        SmoothingSpeed = 8,
+    });
+cameraController.SetCenterBounds(new Rect2(0, 0, 4096, 2304));
+cameraController.Shake(10, TimeSpan.FromSeconds(0.25));
+```
+
+边界约束的是相机中心世界坐标。需要改变震动之外的基础偏移时设置 `BaseOffset`；3D 相机将使用独立的 `Camera3DController`，当前版本尚未实现。
 
 ### Feature
 
@@ -332,6 +377,26 @@ await handle.CloseAsync();
 - 焦点策略。
 - 异步进入/退出过渡。
 - Toast、确认框、Loading、Tooltip 和虚拟列表等基础组件。
+
+全屏黑幕过场由内置缓存 prefab 执行。`FadeOut` 会保持黑幕，后续 `FadeIn` 将其移除；
+`FadeOutIn` 自动完成透明、黑色、透明的完整流程：
+
+```csharp
+await LX.UI.PlayFadeAsync(UIFadeMode.FadeOut, cancellationToken: Lifetime.Token);
+// 在黑幕保持期间切换世界或完成其他原子操作。
+await LX.UI.PlayFadeAsync(
+    UIFadeMode.FadeIn,
+    new UIFadeOptions
+    {
+        FadeInDuration = TimeSpan.FromSeconds(0.5),
+        Transition = Tween.TransitionType.Cubic,
+        Ease = Tween.EaseType.Out,
+    },
+    Lifetime.Token);
+```
+
+默认淡出、淡入各为 `0.35s`，完整流程中间保持 `0.05s`，曲线为 `Sine/InOut`；
+同一 `UIService` 上的过场请求会串行执行。
 
 内置组件展示场景：
 
@@ -495,6 +560,21 @@ string snapshotPath = LX.Diagnostics.WriteSnapshot();
 
 诊断快照会汇总生命周期、场景、资源、UI、Feature、音频、输入、本地化、设置、指标和近期结构化日志，适合定位“当前运行时到底处于什么状态”。
 
+Godot Editor/Debug 正在运行时，Codex 可以读取当前会话而不修改游戏状态：
+
+```powershell
+.\lx.ps1 runtime status --json
+.\lx.ps1 runtime snapshot ui --json
+.\lx.ps1 runtime snapshot resources --json
+.\lx.ps1 runtime snapshot actions --json
+```
+
+查询会验证进程、心跳、`sessionId` 和 `generation`，不会把上次运行残留的文件当成当前证据。可查询领域和命令副作用通过按需能力目录发现：
+
+```powershell
+.\lx.ps1 capabilities runtime --json
+```
+
 ## 推荐的开发流程
 
 一次常见功能开发可以按下面的顺序进行：
@@ -516,7 +596,7 @@ string snapshotPath = LX.Diagnostics.WriteSnapshot();
 .\lx.ps1 validate
 ```
 
-`check` 用于快速迭代，只运行当前修改需要的生成和检查；`validate` 是提交前的完整验证。
+`check` 用于快速迭代，只运行当前修改需要的生成和检查；`validate` 是提交前的完整验证。公开 API 有意改变时，先审查差异，再运行 `.\lx.ps1 api update` 更新版本化基线。
 
 ## Godot 编辑器工具
 
@@ -553,6 +633,8 @@ string snapshotPath = LX.Diagnostics.WriteSnapshot();
 
 产物固定写入外层 `build/windows/`。产品可在 `game-manifest.json` 声明包内 smoke，验证真实玩法流程和 Luban 等非 Godot 原生文件已进入产物。普通开发和 `validate` 不要求安装导出模板。
 
+`.github/workflows/validate.yml` 在 push/PR 运行完整门禁；定时或手动任务可运行 `.\lx.ps1 soak 5`，版本标签或手动任务会安装精确 `4.7.2.stable.mono` templates 并验证 Windows Release。soak 与 export 不进入普通本地 `validate`。
+
 ## 开发时必须遵守的边界
 
 - `LXFramework.Core` 不依赖 Godot。
@@ -567,6 +649,5 @@ string snapshotPath = LX.Diagnostics.WriteSnapshot();
 - [贡献与提交约定](CONTRIBUTING.md)
 - [更新记录](CHANGELOG.md)
 - [AI 开发工作流](Books/AI-Development-Workflow.md)
-- [模型兼容性报告](Books/Model-Compatibility-Report.md)
 
 许可证：[MIT](LICENSE)。

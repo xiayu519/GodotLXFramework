@@ -1,11 +1,11 @@
 ---
 name: lx-codex-workflow
-description: 维护或审查 LXFramework 的 Codex 原生工作流。用于 AGENTS.md 分层、.agents/skills、Skill 触发与 reference、.codex/config.toml、Project Knowledge、工作流提示词、验证脚本，以及 Terra/Sol 路由或 outcome eval。普通 Godot/C# 功能开发使用 lx-dev；仅修业务代码时不触发。
+description: 维护或审查 LXFramework 的 Codex 原生工作流。用于 AGENTS.md 分层、.agents/skills、Capability/运行时桥、Project Knowledge、模型配置、工作流提示词、验证脚本，以及 Sol/high outcome eval。普通 Godot/C# 功能开发使用 lx-dev；仅修业务代码时不触发。
 ---
 
 # LXFramework Codex 工作流
 
-目标是让 `gpt-5.6-terra/high` 以最少常驻上下文可靠完成任务，同时不限制 Terra/xhigh 与 Sol。
+目标是让唯一保证配置 `gpt-5.6-sol/high` 以最少常驻上下文可靠完成任务。
 
 ## 权威与边界
 
@@ -17,8 +17,9 @@ description: 维护或审查 LXFramework 的 Codex 原生工作流。用于 AGEN
 ## 按需读取
 
 - Codex 发现、模型基线、提示结构和仓库映射：`references/codex-native-workflow.md`
+- Capability、运行时快照和事务化维护：`references/ai-control-plane.md`
 - Project Knowledge 读取、写入和失效规则：`references/project-knowledge.md`
-- 真实模型矩阵、指标和结果判定：`references/model-evaluation.md`
+- 真实模型评测、指标和结果判定：`references/model-evaluation.md`
 
 ## 文件职责
 
@@ -33,5 +34,5 @@ description: 维护或审查 LXFramework 的 Codex 原生工作流。用于 AGEN
 
 1. 对每个修改的 Skill 运行官方 `quick_validate.py`。
 2. 运行 `scripts/check-workflow.ps1` 检查分层、入口、配置、重复规则与 eval schema。
-3. 路由、授权、Skill 触发或完成语义改变时运行 smoke model eval；发布工作流或明确要求时运行完整矩阵。
+3. 路由、授权、Skill 触发或完成语义改变时运行 smoke model eval；发布工作流或明确要求时运行 Sol/high 完整套件。
 4. eval 失败只按观测到的行为做窄修正，不为单个措辞堆叠全局规则。

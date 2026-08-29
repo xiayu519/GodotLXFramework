@@ -16,6 +16,10 @@
 
 产品代码先用 `lx create res <id> <ResourceType> <res://path> <policy>` 登记，再使用生成的 `ResCatalog`。不要直接调用 `GD.Load` 或 `ResourceLoader.Load*`。
 
+只读审查被问到“租约由谁持有”时，结论必须明确：调用方或实际使用目标的所有者在最窄生命周期内持有租约；短作用域用 `using`，对象作用域交给对应 `LifetimeScope`，裸 `Resource` 不得活得比租约更久。
+
+所有运行时资源路径必须是规范 `res://` 路径：使用 `/`，不含空段、`.`、`..` 或重复分隔符。Godot 会把路径别名规范化到同一原生资源，但 `LX.Res` 以调用方路径作为租约键；框架入口会拒绝非规范路径，防止同一资源形成多个注册表条目。`ContentRef` 还必须留在 `res://content/` 下。
+
 ## 所有权顺序
 
 - 磁盘加载的 `Resource` 属于 Godot 的引用计数与全局路径缓存。`LX.Res` 释放租约时只删除自己的强引用，不对共享加载资源调用 `Dispose()`。
@@ -68,7 +72,7 @@ await using var enemy = await PackedSceneInstance<Enemy>.CreateAsync(
     Lifetime.Token);
 ```
 
-句柄负责场景租约、递归 LX 注入、实例子生命周期和 Node 回收。大量子弹、敌机或特效改用现有 `PackedSceneNodePool<TNode>`；完整页面、Feature 或世界仍走对应服务，不绕过目录和状态管理。
+句柄负责场景租约、递归 LX 注入、实例子生命周期和 Node 回收。大量子弹、敌机或特效改用现有 `PackedSceneNodePool<TNode>`；需要每轮订阅、异步任务或动态资源的节点实现 `IPooledNodeLifecycle`，把它们绑定到 `OnRent` 收到的激活生命周期。使用带 `configure` 的 Rent/RentLease 重载可在节点进入树、触发 EnterTree 前完成本轮配置。完整页面、Feature 或世界仍走对应服务，不绕过目录和状态管理。
 
 ## 闭环验证
 

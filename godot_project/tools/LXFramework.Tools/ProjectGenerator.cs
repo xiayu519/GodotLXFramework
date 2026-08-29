@@ -11,7 +11,7 @@ internal static class ProjectGenerator
         }
 
         var outputs = BuildOutputs(root);
-        var removed = PruneOrphanedOutputs(root, outputs.Keys);
+        var removed = PruneOrphanedOutputs(root, FindOrphanedOutputs(root, outputs.Keys));
         var changed = new List<string>();
         foreach (var output in outputs)
         {
@@ -50,7 +50,7 @@ internal static class ProjectGenerator
         return outputs;
     }
 
-    private static IReadOnlyList<string> PruneOrphanedOutputs(
+    public static IReadOnlyList<string> FindOrphanedOutputs(
         string root,
         IEnumerable<string> expectedPaths)
     {
@@ -68,7 +68,7 @@ internal static class ProjectGenerator
         {
             generatedRoots.Add(ProductLayout.GetGeneratedDirectory(root, game));
         }
-        var removed = new List<string>();
+        var orphaned = new List<string>();
 
         foreach (var generatedRoot in generatedRoots.Where(Directory.Exists))
         {
@@ -86,13 +86,12 @@ internal static class ProjectGenerator
                         $"Refusing to remove unrecognized generated file '{ToolFiles.Relative(root, path)}'.");
                 }
 
-                File.Delete(path);
+                orphaned.Add(path);
                 var uidPath = path + ".uid";
                 if (File.Exists(uidPath))
                 {
-                    File.Delete(uidPath);
+                    orphaned.Add(uidPath);
                 }
-                removed.Add(ToolFiles.Relative(root, path));
             }
 
             foreach (var uidPath in Directory.EnumerateFiles(generatedRoot, "*.g.cs.uid", SearchOption.AllDirectories))
@@ -103,11 +102,23 @@ internal static class ProjectGenerator
                     continue;
                 }
 
-                File.Delete(uidPath);
-                removed.Add(ToolFiles.Relative(root, uidPath));
+                orphaned.Add(uidPath);
             }
         }
 
+        return orphaned;
+    }
+
+    private static IReadOnlyList<string> PruneOrphanedOutputs(
+        string root,
+        IEnumerable<string> orphanedPaths)
+    {
+        var removed = new List<string>();
+        foreach (var path in orphanedPaths)
+        {
+            File.Delete(path);
+            removed.Add(ToolFiles.Relative(root, path));
+        }
         return removed;
     }
 

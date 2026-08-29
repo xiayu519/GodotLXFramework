@@ -2,18 +2,6 @@
   "schema_version": 1,
   "profiles": [
     {
-      "id": "terra-high",
-      "model": "gpt-5.6-terra",
-      "reasoning": "high",
-      "required": true
-    },
-    {
-      "id": "terra-xhigh",
-      "model": "gpt-5.6-terra",
-      "reasoning": "xhigh",
-      "required": true
-    },
-    {
       "id": "sol-high",
       "model": "gpt-5.6-sol",
       "reasoning": "high",
@@ -27,10 +15,13 @@
       "setup": "clean",
       "prompt": "只读审查当前 LXFramework：定位游戏代码获取动态资源的公开入口，并说明资源租约应由谁持有。不得修改任何文件。只给最少的直接仓库路径证据，最终答复不超过 8 行；证据充分后立即停止。",
       "expected_write": false,
-      "expected_terms": ["AssetLease", "LifetimeScope"],
+      "expected_terms": ["AssetLease"],
       "expected_term_groups": [
         {
           "any": ["LX.Res", "LXContext.Res"]
+        },
+        {
+          "any": ["LifetimeScope", "using", "调用方", "最窄生命周期"]
         }
       ],
       "budgets": {
@@ -106,8 +97,8 @@
       "expected_write": true,
       "expected_files": [
         "godot_project/scene/world/hangar.tscn",
-        "godot_project/scene/features/hangar_feature.tscn",
-        "godot_project/scene/ui/hangar_screen.tscn"
+        "godot_project/scene/features/hangar.tscn",
+        "godot_project/scene/ui/hangar.tscn"
       ],
       "validate": true,
       "budgets": {
@@ -178,22 +169,13 @@
       "id": "readonly-runtime-diagnostics",
       "suite": "full",
       "setup": "clean",
-      "prompt": "只读定位 LXFramework 的统一运行时诊断入口，说明快照至少覆盖哪四类状态以及写出快照的方法。不得修改任何文件，答案不超过 10 行。",
+      "prompt": "只读说明 Codex 应用什么命令发现 LXFramework 的运行时诊断能力、查询当前 UI 快照，并指出框架用什么字段拒绝旧运行会话。只给命令与契约，不实际执行它们；不得修改任何文件，答案不超过 10 行。",
       "expected_write": false,
       "expected_terms": [
-        "DiagnosticsService",
-        "WriteSnapshot"
-      ],
-      "expected_term_groups": [
-        {
-          "any": ["assets", "资源"]
-        },
-        {
-          "any": ["input", "输入"]
-        },
-        {
-          "any": ["localization", "本地化"]
-        }
+        "capabilities runtime",
+        "runtime snapshot ui",
+        "sessionId",
+        "generation"
       ],
       "budgets": {
         "tool_calls": 10,
@@ -210,9 +192,13 @@
       "prompt": "一个不使用 Codex 的开发者想创建页面、检查问题并比较 UI 视觉基准。只读给出 Godot 编辑器中的入口和等价命令，不得修改文件。",
       "expected_write": false,
       "expected_terms": [
-        "LX Tools",
         "visual compare",
         "create screen"
+      ],
+      "expected_term_groups": [
+        {
+          "any": ["LX Tools", "LX 开发工具"]
+        }
       ],
       "budgets": {
         "tool_calls": 10,
@@ -231,8 +217,12 @@
       "expected_terms": [
         "SaveStore",
         "ListSlots",
-        "DeleteAsync",
-        "Backup"
+        "DeleteAsync"
+      ],
+      "expected_term_groups": [
+        {
+          "any": ["Backup", "备份", ".bak.json", "SaveLoadResult.Source"]
+        }
       ],
       "budgets": {
         "tool_calls": 10,

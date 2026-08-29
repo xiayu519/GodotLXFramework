@@ -8,7 +8,7 @@ namespace LX.Res;
 /// Loaded resources follow Godot reference counting; generated resources are
 /// registry-owned and deterministically disposed when removed.
 /// </summary>
-public sealed class AssetRegistry : IDisposable
+public sealed class AssetRegistry : IDisposable, IAsyncDisposable
 {
     private sealed class Entry
     {
@@ -19,13 +19,29 @@ public sealed class AssetRegistry : IDisposable
         public long LastTouched { get; set; }
     }
 
+    private sealed class InflightLoad
+    {
+        private float _progress;
+
+        public Task<Resource> Task { get; set; } = null!;
+
+        public float Progress => Volatile.Read(ref _progress);
+
+        public void ReportProgress(float value) =>
+            Volatile.Write(ref _progress, Math.Clamp(value, 0, 1));
+    }
+
     private readonly object _gate = new();
     private readonly Node _host;
     private readonly MetricRegistry _metrics;
     private readonly int _mainThreadId;
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, Task<Resource>> _inflight = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, InflightLoad> _inflight = new(StringComparer.Ordinal);
     private int _maxIdleCacheEntries;
+    private int _totalLeases;
+    private int _generatedEntries;
+    private int _idleEntries;
+    private int _idleCachedEntries;
     private long _touchSequence;
     private bool _disposed;
 
@@ -147,25 +163,30 @@ public sealed class AssetRegistry : IDisposable
         ValidatePolicy(policy);
         cancellationToken.ThrowIfCancellationRequested();
 
-        Task<Resource> loadTask;
+        InflightLoad? load = null;
+        AssetLease<T>? existingLease = null;
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             if (_entries.TryGetValue(path, out var existing))
             {
-                progress?.Invoke(1);
-                return AcquireExisting<T>(path, existing, policy);
+                existingLease = AcquireExisting<T>(path, existing, policy);
             }
-
-            if (!_inflight.TryGetValue(path, out loadTask!))
+            else if (!_inflight.TryGetValue(path, out load))
             {
-                loadTask = LoadThreadedAsync(path, policy, progress);
-                _inflight.Add(path, loadTask);
-                _ = ObserveInflightAsync(path, loadTask);
+                load = new InflightLoad();
+                load.Task = LoadThreadedAsync(path, policy, load);
+                _inflight.Add(path, load);
+                _ = ObserveInflightAsync(path, load);
             }
         }
 
-        var loaded = await loadTask.WaitAsync(cancellationToken);
+        if (existingLease is not null)
+        {
+            return CompleteAcquire(existingLease, progress);
+        }
+
+        var loaded = await AwaitLoadAsync(load!, progress, cancellationToken);
         EnsureMainThread();
         cancellationToken.ThrowIfCancellationRequested();
         if (loaded is not T typed)
@@ -174,8 +195,9 @@ public sealed class AssetRegistry : IDisposable
                 $"Asset '{path}' loaded as {loaded.GetType().Name}, not {typeof(T).Name}.");
         }
 
-        progress?.Invoke(1);
-        return AcquireLoaded(path, typed, policy, registryOwned: false);
+        return CompleteAcquire(
+            AcquireLoaded(path, typed, policy, registryOwned: false),
+            progress);
     }
 
     public ValueTask<AssetLease<T>> AcquireAsync<T>(
@@ -357,12 +379,48 @@ public sealed class AssetRegistry : IDisposable
             }
 
             _disposed = true;
-            foreach (var path in _entries.Keys.ToArray())
+            DisposeEntriesLocked();
+        }
+    }
+
+    /// <summary>
+    /// 停止接受新租约，并在常规有序关闭时等待 Godot 后台加载完成及消费对应 user token。
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        EnsureMainThread();
+        Task<Resource>[] inflight;
+        lock (_gate)
+        {
+            if (_disposed)
             {
-                RemoveEntryLocked(path, _entries[path]);
+                return;
             }
-            _inflight.Clear();
-            UpdateMetricsLocked();
+
+            _disposed = true;
+            inflight = _inflight.Values.Select(load => load.Task).Distinct().ToArray();
+        }
+
+        if (_host.IsInsideTree())
+        {
+            foreach (var loadTask in inflight)
+            {
+                try
+                {
+                    await loadTask;
+                }
+                catch
+                {
+                    // Load callers observe their own result. Disposal only guarantees
+                    // that ResourceLoader's user token has reached a terminal state.
+                }
+                EnsureMainThread();
+            }
+        }
+
+        lock (_gate)
+        {
+            DisposeEntriesLocked();
         }
     }
 
@@ -382,10 +440,19 @@ public sealed class AssetRegistry : IDisposable
             }
 
             entry.LeaseCount--;
+            _totalLeases--;
             entry.LastTouched = ++_touchSequence;
-            if (entry.LeaseCount == 0 && entry.Policy == AssetCachePolicy.Transient)
+            if (entry.LeaseCount == 0)
             {
-                RemoveEntryLocked(path, entry);
+                _idleEntries++;
+                if (entry.Policy == AssetCachePolicy.Cached)
+                {
+                    _idleCachedEntries++;
+                }
+                if (entry.Policy == AssetCachePolicy.Transient)
+                {
+                    RemoveEntryLocked(path, entry);
+                }
             }
 
             TrimIdleCacheLocked();
@@ -417,8 +484,32 @@ public sealed class AssetRegistry : IDisposable
                 LastTouched = ++_touchSequence,
             };
             _entries.Add(path, entry);
+            _totalLeases++;
+            if (registryOwned)
+            {
+                _generatedEntries++;
+            }
             UpdateMetricsLocked();
             return new AssetLease<T>(this, path, resource);
+        }
+    }
+
+    private AssetLease<T> CompleteAcquire<T>(AssetLease<T> lease, Action<float>? progress)
+        where T : Resource
+    {
+        try
+        {
+            progress?.Invoke(1);
+            lock (_gate)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+            }
+            return lease;
+        }
+        catch
+        {
+            lease.Dispose();
+            throw;
         }
     }
 
@@ -431,17 +522,56 @@ public sealed class AssetRegistry : IDisposable
                 $"Asset '{path}' is already registered as {entry.Resource.GetType().Name}, not {typeof(T).Name}.");
         }
 
+        if (entry.LeaseCount == 0)
+        {
+            _idleEntries--;
+            if (entry.Policy == AssetCachePolicy.Cached)
+            {
+                _idleCachedEntries--;
+            }
+        }
         entry.Policy = (AssetCachePolicy)Math.Max((int)entry.Policy, (int)requestedPolicy);
         entry.LeaseCount++;
+        _totalLeases++;
         entry.LastTouched = ++_touchSequence;
         UpdateMetricsLocked();
         return new AssetLease<T>(this, path, typed);
     }
 
+    private async Task<Resource> AwaitLoadAsync(
+        InflightLoad load,
+        Action<float>? progress,
+        CancellationToken cancellationToken)
+    {
+        if (progress is null)
+        {
+            return await load.Task.WaitAsync(cancellationToken);
+        }
+
+        var lastProgress = -1.0f;
+        while (!load.Task.IsCompleted)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var current = load.Progress;
+            if (current != lastProgress)
+            {
+                // Each caller owns its observer. Cancellation or observer failure
+                // stops only this await and never faults the shared load task.
+                progress(current);
+                lastProgress = current;
+            }
+
+            await _host.ToSignal(_host.GetTree(), SceneTree.SignalName.ProcessFrame);
+            EnsureMainThread();
+        }
+
+        return await load.Task.WaitAsync(cancellationToken);
+    }
+
     private async Task<Resource> LoadThreadedAsync(
         string path,
         AssetCachePolicy policy,
-        Action<float>? progress)
+        InflightLoad load)
     {
         var cacheMode = policy == AssetCachePolicy.Transient
             ? ResourceLoader.CacheMode.Ignore
@@ -452,36 +582,60 @@ public sealed class AssetRegistry : IDisposable
             throw new InvalidOperationException($"Threaded load request for '{path}' failed with {error}.");
         }
 
-        while (true)
+        var collected = false;
+        try
         {
-            var values = new Godot.Collections.Array();
-            var status = ResourceLoader.LoadThreadedGetStatus(path, values);
-            if (values.Count > 0)
+            while (true)
             {
-                progress?.Invoke(Math.Clamp(values[0].AsSingle(), 0, 1));
+                using var values = new Godot.Collections.Array();
+                var status = ResourceLoader.LoadThreadedGetStatus(path, values);
+                if (values.Count > 0)
+                {
+                    using var progressValue = values[0];
+                    load.ReportProgress(progressValue.AsSingle());
+                }
+                switch (status)
+                {
+                    case ResourceLoader.ThreadLoadStatus.Loaded:
+                    {
+                        var resource = ResourceLoader.LoadThreadedGet(path);
+                        collected = true;
+                        if (resource is null)
+                        {
+                            throw new InvalidOperationException($"Threaded load returned null for '{path}'.");
+                        }
+                        load.ReportProgress(1);
+                        return resource;
+                    }
+                    case ResourceLoader.ThreadLoadStatus.Failed:
+                    case ResourceLoader.ThreadLoadStatus.InvalidResource:
+                        _ = ResourceLoader.LoadThreadedGet(path);
+                        collected = true;
+                        throw new InvalidOperationException($"Threaded load for '{path}' ended with {status}.");
+                    case ResourceLoader.ThreadLoadStatus.InProgress:
+                        await _host.ToSignal(_host.GetTree(), SceneTree.SignalName.ProcessFrame);
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(status), status, null);
+                }
             }
-            switch (status)
+        }
+        finally
+        {
+            if (!collected)
             {
-                case ResourceLoader.ThreadLoadStatus.Loaded:
-                    return ResourceLoader.LoadThreadedGet(path) ??
-                           throw new InvalidOperationException($"Threaded load returned null for '{path}'.");
-                case ResourceLoader.ThreadLoadStatus.Failed:
-                case ResourceLoader.ThreadLoadStatus.InvalidResource:
-                    throw new InvalidOperationException($"Threaded load for '{path}' ended with {status}.");
-                case ResourceLoader.ThreadLoadStatus.InProgress:
-                    await _host.ToSignal(_host.GetTree(), SceneTree.SignalName.ProcessFrame);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(status), status, null);
+                // Godot retains one user token for every successful request
+                // until LoadThreadedGet consumes it, including exceptional exits.
+                _ = ResourceLoader.LoadThreadedGet(path);
             }
         }
     }
 
-    private async Task ObserveInflightAsync(string path, Task<Resource> loadTask)
+    private async Task ObserveInflightAsync(string path, InflightLoad load)
     {
         try
         {
-            await loadTask;
+            await load.Task;
         }
         catch
         {
@@ -491,7 +645,7 @@ public sealed class AssetRegistry : IDisposable
         {
             lock (_gate)
             {
-                if (_inflight.TryGetValue(path, out var current) && ReferenceEquals(current, loadTask))
+                if (_inflight.TryGetValue(path, out var current) && ReferenceEquals(current, load))
                 {
                     _inflight.Remove(path);
                 }
@@ -503,33 +657,70 @@ public sealed class AssetRegistry : IDisposable
 
     private void TrimIdleCacheLocked()
     {
-        var idleCached = _entries
-            .Where(pair => pair.Value.Policy == AssetCachePolicy.Cached && pair.Value.LeaseCount == 0)
-            .OrderBy(pair => pair.Value.LastTouched)
-            .ToArray();
-        var removeCount = Math.Max(0, idleCached.Length - _maxIdleCacheEntries);
-        for (var index = 0; index < removeCount; index++)
+        while (_idleCachedEntries > _maxIdleCacheEntries)
         {
-            RemoveEntryLocked(idleCached[index].Key, idleCached[index].Value);
+            string? oldestPath = null;
+            Entry? oldest = null;
+            foreach (var pair in _entries)
+            {
+                if (pair.Value.Policy != AssetCachePolicy.Cached || pair.Value.LeaseCount != 0)
+                {
+                    continue;
+                }
+                if (oldest is null || pair.Value.LastTouched < oldest.LastTouched)
+                {
+                    oldestPath = pair.Key;
+                    oldest = pair.Value;
+                }
+            }
+
+            if (oldestPath is null || oldest is null)
+            {
+                throw new InvalidOperationException("Asset idle-cache accounting is inconsistent.");
+            }
+            RemoveEntryLocked(oldestPath, oldest);
         }
     }
 
     private void RemoveEntryLocked(string path, Entry entry)
     {
         _entries.Remove(path);
+        _totalLeases -= entry.LeaseCount;
+        if (entry.LeaseCount == 0)
+        {
+            _idleEntries--;
+            if (entry.Policy == AssetCachePolicy.Cached)
+            {
+                _idleCachedEntries--;
+            }
+        }
+        if (entry.RegistryOwned)
+        {
+            _generatedEntries--;
+        }
         if (entry.RegistryOwned && GodotObject.IsInstanceValid(entry.Resource))
         {
             entry.Resource.Dispose();
         }
     }
 
+    private void DisposeEntriesLocked()
+    {
+        foreach (var path in _entries.Keys.ToArray())
+        {
+            RemoveEntryLocked(path, _entries[path]);
+        }
+        _inflight.Clear();
+        UpdateMetricsLocked();
+    }
+
     private void UpdateMetricsLocked()
     {
         _metrics.SetGauge("assets.entries", _entries.Count);
         _metrics.SetGauge("assets.inflight", _inflight.Count);
-        _metrics.SetGauge("assets.leases", _entries.Values.Sum(entry => entry.LeaseCount));
-        _metrics.SetGauge("assets.generated_entries", _entries.Values.Count(entry => entry.RegistryOwned));
-        _metrics.SetGauge("assets.idle", _entries.Values.Count(entry => entry.LeaseCount == 0));
+        _metrics.SetGauge("assets.leases", _totalLeases);
+        _metrics.SetGauge("assets.generated_entries", _generatedEntries);
+        _metrics.SetGauge("assets.idle", _idleEntries);
     }
 
     internal void EnsureMainThread()
@@ -542,10 +733,7 @@ public sealed class AssetRegistry : IDisposable
 
     private static void ValidatePath(string path)
     {
-        if (string.IsNullOrWhiteSpace(path) || !path.StartsWith("res://", StringComparison.Ordinal))
-        {
-            throw new ArgumentException("Asset paths must be non-empty res:// paths.", nameof(path));
-        }
+        GodotResourcePath.Validate(path, nameof(path));
     }
 
     private static void ValidatePolicy(AssetCachePolicy policy)

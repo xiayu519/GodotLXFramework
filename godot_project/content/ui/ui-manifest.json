@@ -13,6 +13,18 @@
     },
     {
       "scope": "Framework",
+      "id": "ui_fade_transition",
+      "className": "UIFadeTransitionScreen",
+      "namespace": "LX.UI",
+      "scenePath": "res://scene/ui/ui_fade_transition.tscn",
+      "layer": "Overlay",
+      "cachePolicy": "CachedSingleton",
+      "coverPolicy": "KeepVisible",
+      "inputPolicy": "Modal",
+      "focusPolicy": "Preserve"
+    },
+    {
+      "scope": "Framework",
       "id": "ui_components_showcase",
       "className": "UIComponentsShowcase",
       "namespace": "LX.UI.Components",

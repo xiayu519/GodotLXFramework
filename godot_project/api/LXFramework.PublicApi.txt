@@ -1,0 +1,751 @@
+# LXFramework public API baseline v1
+enum LX.Audio.AudioOverflowPolicy.RejectNew
+enum LX.Audio.AudioOverflowPolicy.StopOldest
+enum LX.Audio.AudioPlayResult.Completed
+enum LX.Audio.AudioPlayResult.Preempted
+enum LX.Audio.AudioPlayResult.Rejected
+enum LX.Core.Actions.ActionNodeState.Cancelled
+enum LX.Core.Actions.ActionNodeState.Completed
+enum LX.Core.Actions.ActionNodeState.Failed
+enum LX.Core.Actions.ActionNodeState.Pending
+enum LX.Core.Actions.ActionNodeState.Running
+enum LX.Core.Diagnostics.DiagnosticSeverity.Critical
+enum LX.Core.Diagnostics.DiagnosticSeverity.Debug
+enum LX.Core.Diagnostics.DiagnosticSeverity.Error
+enum LX.Core.Diagnostics.DiagnosticSeverity.Information
+enum LX.Core.Diagnostics.DiagnosticSeverity.Trace
+enum LX.Core.Diagnostics.DiagnosticSeverity.Warning
+enum LX.Core.Persistence.SaveSource.Backup
+enum LX.Core.Persistence.SaveSource.Primary
+enum LX.Input.InputContextMode.Exclusive
+enum LX.Input.InputContextMode.Passthrough
+enum LX.Input.InputModality.Gamepad
+enum LX.Input.InputModality.MouseKeyboard
+enum LX.Input.InputModality.Touch
+enum LX.Input.PointerPhase.Moved
+enum LX.Input.PointerPhase.Pressed
+enum LX.Input.PointerPhase.Released
+enum LX.Input.PointerPhase.Wheel
+enum LX.Res.AssetCachePolicy.Cached = 1
+enum LX.Res.AssetCachePolicy.Resident = 2
+enum LX.Res.AssetCachePolicy.Transient = 0
+enum LX.Res.AssetPlanStatus.Cycle
+enum LX.Res.AssetPlanStatus.MissingDependency
+enum LX.Res.AssetPlanStatus.Ready
+enum LX.Scenes.SceneLoadStage.Instantiating
+enum LX.Scenes.SceneLoadStage.LoadingResource
+enum LX.Scenes.SceneLoadStage.Ready
+enum LX.Scenes.SceneTransitionMode.KeepPreviousUntilReady
+enum LX.Scenes.SceneTransitionMode.ReleasePreviousBeforeLoad
+enum LX.UI.TextureButtonSlot.Disabled
+enum LX.UI.TextureButtonSlot.Focused
+enum LX.UI.TextureButtonSlot.Hover
+enum LX.UI.TextureButtonSlot.Normal
+enum LX.UI.TextureButtonSlot.Pressed
+enum LX.UI.UICachePolicy.CachedSingleton
+enum LX.UI.UICachePolicy.Transient
+enum LX.UI.UICoverPolicy.ClosePrevious
+enum LX.UI.UICoverPolicy.HidePrevious
+enum LX.UI.UICoverPolicy.KeepVisible
+enum LX.UI.UIFadeMode.FadeIn
+enum LX.UI.UIFadeMode.FadeOut
+enum LX.UI.UIFadeMode.FadeOutIn
+enum LX.UI.UIFocusPolicy.GrabFirst
+enum LX.UI.UIFocusPolicy.Preserve
+enum LX.UI.UIInputPolicy.Modal
+enum LX.UI.UIInputPolicy.Normal
+enum LX.UI.UILayer.Overlay
+enum LX.UI.UILayer.Popup
+enum LX.UI.UILayer.Screen
+enum LX.UI.UITransitionPhase.Entering
+enum LX.UI.UITransitionPhase.Exiting
+enum LX.UI.UIVisualState.Covered
+enum LX.UI.UIVisualState.Visible
+member LX.Audio.AudioGroupPolicy public static AudioGroupPolicy Default { get; }
+member LX.Audio.AudioService public AudioService(Node host, AssetRegistry assets, MetricRegistry metrics)
+member LX.Audio.AudioService public AudioStateRecord Snapshot()
+member LX.Audio.AudioService public IReadOnlyList<AudioGroupRecord> SnapshotGroups()
+member LX.Audio.AudioService public ValueTask DisposeAsync()
+member LX.Audio.AudioService public ValueTask FadeMusicVolumeAsync(float targetVolumeDb, TimeSpan duration, CancellationToken cancellationToken = default)
+member LX.Audio.AudioService public ValueTask PlayMusicAsync(AssetRef<AudioStream> asset, float volumeDb = 0, CancellationToken cancellationToken = default)
+member LX.Audio.AudioService public ValueTask PlayMusicAsync(string path, float volumeDb = 0, CancellationToken cancellationToken = default)
+member LX.Audio.AudioService public ValueTask PlaySfxAsync(AssetRef<AudioStream> asset, float volumeDb = 0, float pitchScale = 1, CancellationToken cancellationToken = default)
+member LX.Audio.AudioService public ValueTask PlaySfxAsync(string path, float volumeDb = 0, float pitchScale = 1, CancellationToken cancellationToken = default)
+member LX.Audio.AudioService public ValueTask StopMusicAndDrainAsync(CancellationToken cancellationToken = default)
+member LX.Audio.AudioService public ValueTask<AudioPlayResult> PlayPcmSfxAsync(string id, PcmWave pcm, AudioGroupPolicy group, float volumeDb = 0, float pitchScale = 1, CancellationToken cancellationToken = default)
+member LX.Audio.AudioService public ValueTask<AudioPlayResult> PlaySfxAsync(AssetRef<AudioStream> asset, AudioGroupPolicy group, float volumeDb = 0, float pitchScale = 1, CancellationToken cancellationToken = default)
+member LX.Audio.AudioService public ValueTask<AudioPlayResult> PlaySfxAsync(string path, AudioGroupPolicy group, float volumeDb = 0, float pitchScale = 1, CancellationToken cancellationToken = default)
+member LX.Audio.AudioService public void PlayPcmMusic(string id, PcmWave pcm, int? loopBegin = null, int? loopEnd = null, float volumeDb = 0)
+member LX.Audio.AudioService public void StopMusic()
+member LX.Camera.Camera2DController public Camera2D Camera { get; }
+member LX.Camera.Camera2DController public Node2D? FollowTarget { get; }
+member LX.Camera.Camera2DController public Rect2? CenterBounds { get; }
+member LX.Camera.Camera2DController public Vector2 BaseOffset { get; set; }
+member LX.Camera.Camera2DController public override void _Process(double delta)
+member LX.Camera.Camera2DController public static Camera2DController Attach(Camera2D camera, LifetimeScope lifetime)
+member LX.Camera.Camera2DController public void ClearFollow()
+member LX.Camera.Camera2DController public void Follow(Node2D target, Camera2DFollowOptions? options = null)
+member LX.Camera.Camera2DController public void SetCenterBounds(Rect2? bounds)
+member LX.Camera.Camera2DController public void Shake(float amplitude, TimeSpan duration, float frequency = 24)
+member LX.Camera.Camera2DController public void SnapToTarget()
+member LX.Camera.Camera2DController public void StopShake()
+member LX.Camera.Camera2DFollowOptions public Vector2 DeadZoneSize { get; init; }
+member LX.Camera.Camera2DFollowOptions public Vector2 TargetOffset { get; init; }
+member LX.Camera.Camera2DFollowOptions public float SmoothingSpeed { get; init; }
+member LX.Content.ContentRef public ContentRef(string path)
+member LX.Content.ContentRef public string Path { get; }
+member LX.Content.ContentService public ContentService(JsonSerializerOptions? jsonOptions = null)
+member LX.Content.ContentService public DataCatalog<TId, TValue> LoadCatalog<TId, TValue>(string resourcePath, IEqualityComparer<TId>? comparer = null) where TId : notnull where TValue : IDataRecord<TId>
+member LX.Content.ContentService public T Load<T>(ContentRef<T> content) where T : notnull
+member LX.Content.ContentService public T LoadJson<T>(string resourcePath) where T : notnull
+member LX.Content.ContentService public TTables LoadLubanTables<TTables>(Func<Func<string, ByteBuf>, TTables> createTables, string resourceDirectory = "res://content/data/luban") where TTables : notnull
+member LX.Core.Actions.ActionRunner public ActionRunner(LifetimeScope parentLifetime, int recentCapacity = 32)
+member LX.Core.Actions.ActionRunner public ActionRunnerSnapshot Snapshot()
+member LX.Core.Actions.ActionRunner public Task RunAsync(LXAction action, LifetimeScope owner, CancellationToken cancellationToken = default)
+member LX.Core.Actions.ActionRunner public ValueTask DisposeAsync()
+member LX.Core.Actions.ActionRunner public void Dispose()
+member LX.Core.Actions.LXAction protected LXAction(string name)
+member LX.Core.Actions.LXAction public string Name { get; }
+member LX.Core.Actions.LXActions public static LXAction Async(Func<CancellationToken, ValueTask> callback, string name = "async")
+member LX.Core.Actions.LXActions public static LXAction Delay(TimeSpan duration, string name = "delay")
+member LX.Core.Actions.LXActions public static LXAction Finally(LXAction body, LXAction cleanup, string name = "finally")
+member LX.Core.Actions.LXActions public static LXAction Invoke(Action callback, string name = "invoke")
+member LX.Core.Actions.LXActions public static LXAction Parallel(params LXAction[] actions)
+member LX.Core.Actions.LXActions public static LXAction Race(params LXAction[] actions)
+member LX.Core.Actions.LXActions public static LXAction Retry(LXAction action, int maxAttempts, TimeSpan? delay = null, string name = "retry")
+member LX.Core.Actions.LXActions public static LXAction Sequence(params LXAction[] actions)
+member LX.Core.Actions.LXActions public static LXAction Timeout(LXAction action, TimeSpan timeout, string name = "timeout")
+member LX.Core.Audio.PcmWave public double DurationSeconds { get; }
+member LX.Core.Audio.PcmWave public int BytesPerFrame { get; }
+member LX.Core.Audio.PcmWave public int SampleFrames { get; }
+member LX.Core.Audio.PcmWave public static PcmWave Parse(ReadOnlySpan<byte> bytes)
+member LX.Core.Common.Error public override string ToString()
+member LX.Core.Common.Result public Error? Error { get; }
+member LX.Core.Common.Result public T Value { get; }
+member LX.Core.Common.Result public bool IsFailure { get; }
+member LX.Core.Common.Result public bool IsSuccess { get; }
+member LX.Core.Common.Result public static Result Failure(string code, string message, Exception? exception = null)
+member LX.Core.Common.Result public static Result Success()
+member LX.Core.Common.Result public static Result<T> Failure(string code, string message, Exception? exception = null)
+member LX.Core.Common.Result public static Result<T> Success(T value)
+member LX.Core.Common.StrongId public StrongId(string value)
+member LX.Core.Common.StrongId public int CompareTo(StrongId<TTag> other)
+member LX.Core.Common.StrongId public override string ToString()
+member LX.Core.Common.StrongId public string Value { get; }
+member LX.Core.Data.DataCatalog public DataCatalog(IEnumerable<TValue> records, IEqualityComparer<TId>? comparer = null)
+member LX.Core.Data.DataCatalog public IReadOnlyCollection<TValue> Records { get; }
+member LX.Core.Data.DataCatalog public TValue this[TId id] 
+member LX.Core.Data.DataCatalog public bool TryGet(TId id, out TValue value)
+member LX.Core.Data.DataCatalog public int Count { get; }
+member LX.Core.Data.LubanTableLoader public static TTables Load<TTables>(Func<string, byte[]> readBytes, Func<Func<string, ByteBuf>, TTables> createTables) where TTables : notnull
+member LX.Core.Diagnostics.DiagnosticLog public DiagnosticEntry Write(DiagnosticSeverity severity, string category, string message, Exception? exception = null, IReadOnlyDictionary<string, string>? fields = null)
+member LX.Core.Diagnostics.DiagnosticLog public DiagnosticLog(int capacity = 256)
+member LX.Core.Diagnostics.DiagnosticLog public IReadOnlyList<DiagnosticEntry> Snapshot(DiagnosticSeverity minimum = DiagnosticSeverity.Trace)
+member LX.Core.Diagnostics.DiagnosticLog public int Capacity { get; }
+member LX.Core.Diagnostics.DiagnosticLog public int Count { get; }
+member LX.Core.Diagnostics.DiagnosticLog public void Clear()
+member LX.Core.Diagnostics.MetricRegistry public MetricSnapshot Snapshot()
+member LX.Core.Diagnostics.MetricRegistry public long Increment(string name, long amount = 1)
+member LX.Core.Diagnostics.MetricRegistry public void SetGauge(string name, double value)
+member LX.Core.Events.EventHub public EventHub(Action<Exception>? handlerFailureSink = null, bool isolateHandlerExceptions = false)
+member LX.Core.Events.EventHub public EventHubSnapshot Snapshot()
+member LX.Core.Events.EventHub public IDisposable Subscribe<TEvent>(Action<TEvent> handler, LifetimeScope? lifetime = null)
+member LX.Core.Events.EventHub public void Dispose()
+member LX.Core.Events.EventHub public void Publish<TEvent>(TEvent message)
+member LX.Core.Flow.GameFlow public GameFlow(TContext context, LifetimeScope parentLifetime, string name = "GameFlow")
+member LX.Core.Flow.GameFlow public TState? Current { get; private set; }
+member LX.Core.Flow.GameFlow public ValueTask DisposeAsync()
+member LX.Core.Flow.GameFlow public ValueTask TransitionAsync(TState next, CancellationToken cancellationToken = default)
+member LX.Core.Flow.GameFlow public bool HasCurrent { get; }
+member LX.Core.Flow.GameFlow public event Action<Exception>? TransitionObserverFailed
+member LX.Core.Flow.GameFlow public event Action<GameFlowTransition<TState>>? Transitioned
+member LX.Core.Flow.GameFlow public void Register(TState key, IGameFlowState<TContext> state)
+member LX.Core.Flow.GameFlow public void Tick(double deltaSeconds)
+member LX.Core.Flow.StateMachine public StateMachine(TContext context)
+member LX.Core.Flow.StateMachine public TState? Current { get; private set; }
+member LX.Core.Flow.StateMachine public ValueTask TransitionAsync(TState next, CancellationToken cancellationToken = default)
+member LX.Core.Flow.StateMachine public bool HasCurrent { get; }
+member LX.Core.Flow.StateMachine public void Register(TState key, IState<TContext> state)
+member LX.Core.Flow.StateMachine public void Tick(double deltaSeconds)
+member LX.Core.Lifetime.DelegateDisposable public DelegateDisposable(Action dispose)
+member LX.Core.Lifetime.DelegateDisposable public void Dispose()
+member LX.Core.Lifetime.LifetimeScope public CancellationToken Token { get; }
+member LX.Core.Lifetime.LifetimeScope public IDisposable Defer(Action cleanup)
+member LX.Core.Lifetime.LifetimeScope public LifetimeScope CreateChild(string name)
+member LX.Core.Lifetime.LifetimeScope public LifetimeScope(string name)
+member LX.Core.Lifetime.LifetimeScope public T Own<T>(T owned) where T : notnull
+member LX.Core.Lifetime.LifetimeScope public ValueTask DisposeAsync()
+member LX.Core.Lifetime.LifetimeScope public bool IsDisposed { get; }
+member LX.Core.Lifetime.LifetimeScope public int OwnedCount { get; }
+member LX.Core.Lifetime.LifetimeScope public string Name { get; }
+member LX.Core.Lifetime.LifetimeScope public void Dispose()
+member LX.Core.Lifetime.LifetimeScope public void DisposeEmergency(Action<Exception>? failureSink = null)
+member LX.Core.Lifetime.LifetimeScope public void ThrowIfDisposed()
+member LX.Core.Persistence.SaveStore public IReadOnlyList<SaveSlotMetadata> ListSlots()
+member LX.Core.Persistence.SaveStore public SaveStore(string directory, int currentVersion, IEnumerable<ISaveMigration>? migrations = null, JsonSerializerOptions? jsonOptions = null)
+member LX.Core.Persistence.SaveStore public ValueTask SaveAsync(string slot, TState state, CancellationToken cancellationToken = default)
+member LX.Core.Persistence.SaveStore public ValueTask<Result<SaveLoadResult<TState>>> LoadAsync(string slot, CancellationToken cancellationToken = default)
+member LX.Core.Persistence.SaveStore public ValueTask<bool> DeleteAsync(string slot, CancellationToken cancellationToken = default)
+member LX.Core.Persistence.SaveStore public bool Exists(string slot)
+member LX.Core.Pooling.ObjectPool public ObjectPool(Func<T> factory, Action<T>? reset = null, Action<T>? discard = null, int maxRetained = 128)
+member LX.Core.Pooling.ObjectPool public PoolStatistics Statistics { get; }
+member LX.Core.Pooling.ObjectPool public PooledObject<T> RentLease()
+member LX.Core.Pooling.ObjectPool public T Rent()
+member LX.Core.Pooling.ObjectPool public int MaxRetained { get; }
+member LX.Core.Pooling.ObjectPool public int RentedCount { get; }
+member LX.Core.Pooling.ObjectPool public int RetainedCount { get; }
+member LX.Core.Pooling.ObjectPool public void Dispose()
+member LX.Core.Pooling.ObjectPool public void Return(T item)
+member LX.Core.Pooling.PooledObject public T Value { get; }
+member LX.Core.Pooling.PooledObject public void Dispose()
+member LX.Core.Random.DeterministicRng public DeterministicRng(ulong seed, ulong stream = 54)
+member LX.Core.Random.DeterministicRng public RngState Capture()
+member LX.Core.Random.DeterministicRng public double NextDouble()
+member LX.Core.Random.DeterministicRng public int NextInt(int exclusiveMax)
+member LX.Core.Random.DeterministicRng public int NextInt(int inclusiveMin, int exclusiveMax)
+member LX.Core.Random.DeterministicRng public uint NextUInt()
+member LX.Core.Random.DeterministicRng public void Restore(RngState state)
+member LX.Core.Time.GameClock public ClockFrame Advance(double unscaledDeltaSeconds)
+member LX.Core.Time.GameClock public bool IsPaused { get; set; }
+member LX.Core.Time.GameClock public double ElapsedSeconds { get; private set; }
+member LX.Core.Time.GameClock public double TimeScale { get; set; }
+member LX.Core.Time.GameClock public double UnscaledElapsedSeconds { get; private set; }
+member LX.Core.Time.GameClock public ulong FrameIndex { get; private set; }
+member LX.Core.Time.GameScheduler public GameScheduler(GameClock clock)
+member LX.Core.Time.GameScheduler public GameSchedulerSnapshot Snapshot()
+member LX.Core.Time.GameScheduler public IDisposable Schedule(TimeSpan delay, Action callback, LifetimeScope? lifetime = null)
+member LX.Core.Time.GameScheduler public int PendingCount { get; }
+member LX.Core.Time.GameScheduler public void Dispose()
+member LX.Core.Time.GameScheduler public void Tick()
+member LX.Core.World.ChunkCoordinate public int ChebyshevDistanceTo(ChunkCoordinate other)
+member LX.Core.World.ChunkCoordinate public int ManhattanDistanceTo(ChunkCoordinate other)
+member LX.Core.World.ChunkPlanner public static IReadOnlyList<ChunkCoordinate> VisibleSquare(ChunkCoordinate focus, int radius, Func<ChunkCoordinate, bool> isAvailable)
+member LX.Core.World.ChunkPlanner public static IReadOnlyList<ChunkCoordinate> VisibleSquare(ChunkCoordinate focus, int radius, IEnumerable<ChunkCoordinate> available)
+member LX.Core.World.WorldEventId public WorldEventId(string value)
+member LX.Core.World.WorldEventId public override string ToString()
+member LX.Core.World.WorldEventId public string Value { get; }
+member LX.Core.World.WorldEventJournal public WorldEventJournalSnapshot Capture()
+member LX.Core.World.WorldEventJournal public bool IsCompleted(WorldEventId eventId)
+member LX.Core.World.WorldEventJournal public bool Reset(WorldEventId eventId)
+member LX.Core.World.WorldEventJournal public bool TryComplete(WorldEventId eventId)
+member LX.Core.World.WorldEventJournal public int Count { get; }
+member LX.Core.World.WorldEventJournal public void Clear()
+member LX.Core.World.WorldEventJournal public void Restore(WorldEventJournalSnapshot snapshot)
+member LX.Diagnostics.DiagnosticsService public DiagnosticEntry Log(DiagnosticSeverity severity, string category, string message, Exception? exception = null, IReadOnlyDictionary<string, string>? fields = null)
+member LX.Diagnostics.DiagnosticsService public DiagnosticsService(MetricRegistry metrics, LifetimeScope lifetime, EventHub events, GameScheduler scheduler, GameScheduler physicsScheduler, ActionRunner actions, AssetRegistry assets, UIService ui, FeatureService features, SceneService scenes, AudioService audio, InputRouter input, LocalizationService localization, SettingsService settings, int logCapacity = 256)
+member LX.Diagnostics.DiagnosticsService public RuntimeSnapshot Snapshot()
+member LX.Diagnostics.DiagnosticsService public const int SnapshotSchemaVersion = 2
+member LX.Diagnostics.DiagnosticsService public const string SnapshotSchema = "lx.runtime-snapshot"
+member LX.Diagnostics.DiagnosticsService public string ToJson()
+member LX.Diagnostics.DiagnosticsService public string WriteSnapshot(string userPath = "user://lx-runtime.json")
+member LX.Features.FeatureDescriptor public FeatureDescriptor Validate()
+member LX.Features.FeatureHandle public FeatureId FeatureId { get; }
+member LX.Features.FeatureHandle public Node Node { get; }
+member LX.Features.FeatureHandle public ValueTask DisposeAsync()
+member LX.Features.FeatureHandle public bool IsDisposed { get; }
+member LX.Features.FeatureId public FeatureId(string value)
+member LX.Features.FeatureId public override string ToString()
+member LX.Features.FeatureId public string Value { get; }
+member LX.Features.FeatureService public FeatureService(AssetRegistry assets, LifetimeScope rootLifetime, MetricRegistry metrics, Func<LXContext> context)
+member LX.Features.FeatureService public IReadOnlyList<FeatureRecord> Snapshot()
+member LX.Features.FeatureService public ValueTask DisposeAsync()
+member LX.Features.FeatureService public ValueTask<FeatureHandle> SpawnAsync(FeatureId featureId, Node parent, LifetimeScope? parentLifetime = null, CancellationToken cancellationToken = default)
+member LX.Features.FeatureService public void Register(FeatureDescriptor descriptor)
+member LX.Features.FeatureService public void RegisterRange(IEnumerable<FeatureDescriptor> descriptors)
+member LX.Input.InputActionId public InputActionId(string value)
+member LX.Input.InputActionId public override string ToString()
+member LX.Input.InputActionId public string Value { get; }
+member LX.Input.InputContextDescriptor public InputContextDescriptor Validate()
+member LX.Input.InputContextHandle public bool IsDisposed { get; }
+member LX.Input.InputContextHandle public void Dispose()
+member LX.Input.InputRouteDescriptor public InputRouteDescriptor Validate()
+member LX.Input.InputRouter public IReadOnlyList<InputBindingConflict> FindBindingConflicts()
+member LX.Input.InputRouter public InputContextHandle PushContext(InputContextDescriptor descriptor)
+member LX.Input.InputRouter public InputModality CurrentModality { get; private set; }
+member LX.Input.InputRouter public InputPrompt Prompt(InputActionId action)
+member LX.Input.InputRouter public InputRouter(EventHub events)
+member LX.Input.InputRouter public InputRouter(EventHub events, IEnumerable<InputRouteDescriptor> routes)
+member LX.Input.InputRouter public InputSnapshot Snapshot()
+member LX.Input.InputRouter public Vector2 Direction(InputActionId negativeX, InputActionId positiveX, InputActionId negativeY, InputActionId positiveY)
+member LX.Input.InputRouter public bool HasGodotAction(StringName godotAction)
+member LX.Input.InputRouter public bool HasGodotAction(string godotAction)
+member LX.Input.InputRouter public bool IsPressed(InputActionId action)
+member LX.Input.InputRouter public float Strength(InputActionId action)
+member LX.Input.InputRouter public void Dispose()
+member LX.Input.InputRouter public void Handle(InputEvent inputEvent)
+member LX.Input.InputRouter public void Register(StringName godotAction, InputActionId action)
+member LX.Input.InputRouter public void ReplaceKeyBinding(StringName godotAction, Key physicalKey)
+member LX.Input.InputRouter public void ReplaceKeyBinding(string godotAction, Key physicalKey)
+member LX.Input.InputRouter public void RestoreDefaultKeyBinding(StringName godotAction)
+member LX.Input.InputRouter public void RestoreDefaultKeyBinding(string godotAction)
+member LX.Localization.LocalizationService public IReadOnlyList<string> LoadedLocales { get; }
+member LX.Localization.LocalizationService public IReadOnlyList<string> MissingKeys { get; }
+member LX.Localization.LocalizationService public LocalizationService(EventHub events)
+member LX.Localization.LocalizationService public LocalizationSnapshot Snapshot()
+member LX.Localization.LocalizationService public bool PseudoLocalizationEnabled { get; set; }
+member LX.Localization.LocalizationService public string CurrentLocale { get; }
+member LX.Localization.LocalizationService public string Plural(StringName singular, StringName plural, int count)
+member LX.Localization.LocalizationService public string Plural(StringName singular, StringName plural, int count, StringName context)
+member LX.Localization.LocalizationService public string ResolveVariant(IReadOnlyDictionary<string, string> variants, string? fallbackLocale = "en")
+member LX.Localization.LocalizationService public string Text(StringName key)
+member LX.Localization.LocalizationService public string Text(StringName key, StringName context)
+member LX.Localization.LocalizationService public void ClearMissingKeys()
+member LX.Localization.LocalizationService public void SetLocale(string locale)
+member LX.Pooling.NodePool public NodePool(Func<TNode> factory, Action<TNode>? reset = null, int maxRetained = 64, Action<TNode>? beforeDiscard = null)
+member LX.Pooling.NodePool public PoolStatistics Statistics { get; }
+member LX.Pooling.NodePool public PooledNode<TNode> RentLease(Node parent, Action<TNode> configure, LifetimeScope? lifetime = null)
+member LX.Pooling.NodePool public PooledNode<TNode> RentLease(Node parent, LifetimeScope? lifetime = null)
+member LX.Pooling.NodePool public TNode Rent(Node parent)
+member LX.Pooling.NodePool public TNode Rent(Node parent, Action<TNode>? configure)
+member LX.Pooling.NodePool public int RentedCount { get; }
+member LX.Pooling.NodePool public int RetainedCount { get; }
+member LX.Pooling.NodePool public void Dispose()
+member LX.Pooling.NodePool public void Return(TNode node)
+member LX.Pooling.PackedSceneNodePool public PoolStatistics Statistics { get; }
+member LX.Pooling.PackedSceneNodePool public PooledNode<TNode> RentLease(Node parent, Action<TNode> configure, LifetimeScope? lifetime = null)
+member LX.Pooling.PackedSceneNodePool public PooledNode<TNode> RentLease(Node parent, LifetimeScope? lifetime = null)
+member LX.Pooling.PackedSceneNodePool public TNode Rent(Node parent)
+member LX.Pooling.PackedSceneNodePool public TNode Rent(Node parent, Action<TNode>? configure)
+member LX.Pooling.PackedSceneNodePool public int RentedCount { get; }
+member LX.Pooling.PackedSceneNodePool public int RetainedCount { get; }
+member LX.Pooling.PackedSceneNodePool public static ValueTask<PackedSceneNodePool<TNode>> CreateAsync(LXContext context, AssetRef<PackedScene> scene, LifetimeScope ownerLifetime, Action<TNode>? reset = null, int maxRetained = 64, CancellationToken cancellationToken = default)
+member LX.Pooling.PackedSceneNodePool public static ValueTask<PackedSceneNodePool<TNode>> CreateAsync(LXContext context, string scenePath, LifetimeScope ownerLifetime, Action<TNode>? reset = null, int maxRetained = 64, CancellationToken cancellationToken = default)
+member LX.Pooling.PackedSceneNodePool public void Dispose()
+member LX.Pooling.PackedSceneNodePool public void Return(TNode node)
+member LX.Pooling.PooledNode public TNode Node { get; }
+member LX.Pooling.PooledNode public bool IsReturned { get; }
+member LX.Pooling.PooledNode public void Dispose()
+member LX.Res.AssetBatchLease public IEnumerable<string> Ids { get; }
+member LX.Res.AssetBatchLease public T this[string id] { get; }
+member LX.Res.AssetBatchLease public bool TryGet(string id, out T? resource)
+member LX.Res.AssetBatchLease public int Count { get; }
+member LX.Res.AssetBatchLease public void Dispose()
+member LX.Res.AssetBinding public T? Resource { get; }
+member LX.Res.AssetBinding public ValueTask<bool> SetAsync(AssetRef<T> asset, CancellationToken cancellationToken = default)
+member LX.Res.AssetBinding public bool HasValue { get; }
+member LX.Res.AssetBinding public bool IsDisposed { get; }
+member LX.Res.AssetBinding public static AssetBinding<T> Create(AssetRegistry assets, LifetimeScope lifetime, Action<T?> apply)
+member LX.Res.AssetBinding public void Clear()
+member LX.Res.AssetBinding public void Dispose()
+member LX.Res.AssetBinding public void Set(AssetRef<T> asset)
+member LX.Res.AssetDependencyAnalyzer public static AssetDependencyReport Analyze<T>(IEnumerable<AssetLoadRequest<T>> requests) where T : Resource
+member LX.Res.AssetDependencyReport public bool IsValid { get; }
+member LX.Res.AssetGroup public AssetGroup(params (string Id, AssetRef<T> Asset)[] assets)
+member LX.Res.AssetGroup public AssetRef<T> Get(string id)
+member LX.Res.AssetGroup public IEnumerable<string> Ids { get; }
+member LX.Res.AssetGroup public bool TryGet(string id, out AssetRef<T> asset)
+member LX.Res.AssetGroup public int Count { get; }
+member LX.Res.AssetLease public T Resource { get; }
+member LX.Res.AssetLease public bool IsDisposed { get; }
+member LX.Res.AssetLease public string Path { get; }
+member LX.Res.AssetLease public void Dispose()
+member LX.Res.AssetLoadProgress public float Ratio { get; }
+member LX.Res.AssetPreloadSet public AssetDependencyReport Analyze()
+member LX.Res.AssetRef public AssetCachePolicy CachePolicy { get; }
+member LX.Res.AssetRef public AssetRef(string path, AssetCachePolicy cachePolicy = AssetCachePolicy.Transient)
+member LX.Res.AssetRef public string Path { get; }
+member LX.Res.AssetRegistry public AssetLease<T> Acquire<T>(AssetRef<T> asset) where T : Resource
+member LX.Res.AssetRegistry public AssetLease<T> Acquire<T>(string path, AssetCachePolicy policy = AssetCachePolicy.Transient) where T : Resource
+member LX.Res.AssetRegistry public AssetLease<T> AcquireGenerated<T>(string key, Func<T> factory, AssetCachePolicy policy = AssetCachePolicy.Cached) where T : Resource
+member LX.Res.AssetRegistry public AssetRegistry(Node host, MetricRegistry metrics, int maxIdleCacheEntries = 32)
+member LX.Res.AssetRegistry public IReadOnlyList<AssetRecord> Snapshot()
+member LX.Res.AssetRegistry public ValueTask DisposeAsync()
+member LX.Res.AssetRegistry public ValueTask<AssetBatchLease<T>> AcquireBatchAsync<T>(IEnumerable<AssetLoadRequest<T>> requests, int maxConcurrency = 4, Action<AssetLoadProgress>? progress = null, CancellationToken cancellationToken = default) where T : Resource
+member LX.Res.AssetRegistry public ValueTask<AssetBatchLease<T>> PreloadAsync<T>(AssetPreloadSet<T> set, int maxConcurrency = 4, Action<AssetLoadProgress>? progress = null, CancellationToken cancellationToken = default) where T : Resource
+member LX.Res.AssetRegistry public ValueTask<AssetLease<T>> AcquireAsync<T>(AssetRef<T> asset, CancellationToken cancellationToken = default) where T : Resource
+member LX.Res.AssetRegistry public ValueTask<AssetLease<T>> AcquireAsync<T>(string path, AssetCachePolicy policy = AssetCachePolicy.Transient, CancellationToken cancellationToken = default) where T : Resource
+member LX.Res.AssetRegistry public ValueTask<AssetLease<T>> AcquireAsync<T>(string path, AssetCachePolicy policy, Action<float>? progress, CancellationToken cancellationToken = default) where T : Resource
+member LX.Res.AssetRegistry public int MaxIdleCacheEntries { get; set; }
+member LX.Res.AssetRegistry public void Dispose()
+member LX.Res.AssetRegistry public void PurgeIdleCache()
+member LX.Res.AssetRegistry public void TrimIdleCache()
+member LX.Res.PackedSceneInstance public LifetimeScope Lifetime { get; }
+member LX.Res.PackedSceneInstance public TNode Node { get; }
+member LX.Res.PackedSceneInstance public ValueTask DisposeAsync()
+member LX.Res.PackedSceneInstance public bool IsDisposed { get; }
+member LX.Res.PackedSceneInstance public static ValueTask<PackedSceneInstance<TNode>> CreateAsync(LXContext context, AssetRef<PackedScene> scene, Node parent, LifetimeScope ownerLifetime, CancellationToken cancellationToken = default)
+member LX.Res.PackedSceneInstance public void Dispose()
+member LX.Runtime.LXContextInjector public static int InitializeTree(Node root, LXContext context, LifetimeScope lifetime)
+member LX.Runtime.LXHost public LXContext LX { get; private set; }
+member LX.Runtime.LXHost public Task BootTask { get; }
+member LX.Runtime.LXHost public ValueTask ShutdownAsync(bool quit = true)
+member LX.Runtime.LXHost public bool IsBooted { get; private set; }
+member LX.Runtime.LXHost public bool ShowFrameworkStatus { get; set; }
+member LX.Runtime.LXHost public override void _ExitTree()
+member LX.Runtime.LXHost public override void _PhysicsProcess(double delta)
+member LX.Runtime.LXHost public override void _Process(double delta)
+member LX.Runtime.LXHost public override void _Ready()
+member LX.Runtime.LXHost public override void _UnhandledInput(InputEvent inputEvent)
+member LX.Runtime.LXHost public string InitialWorldId { get; set; }
+member LX.Runtime.LXHost public string InitialWorldScene { get; set; }
+member LX.Runtime.LXHost public string? BootError { get; private set; }
+member LX.Runtime.LXNode protected LXContext LX { get; }
+member LX.Runtime.LXNode protected LifetimeScope Lifetime { get; }
+member LX.Runtime.LXNode protected virtual void OnLXInitialized()
+member LX.Runtime.LXNode public bool IsLXInitialized { get; }
+member LX.Runtime.LXNode public void Initialize(LXContext context, LifetimeScope lifetime)
+member LX.Runtime.PauseService public PauseService(Node host, GameClock frameClock, GameClock physicsClock, EventHub events, MetricRegistry metrics)
+member LX.Runtime.PauseService public bool IsPaused { get; private set; }
+member LX.Runtime.PauseService public void SetPaused(bool paused)
+member LX.Runtime.PauseService public void Toggle()
+member LX.Scenes.ScenePreload public bool IsDisposed { get; }
+member LX.Scenes.ScenePreload public string ScenePath { get; }
+member LX.Scenes.ScenePreload public void Dispose()
+member LX.Scenes.SceneService public Node? ActiveNode { get; }
+member LX.Scenes.SceneService public SceneService(Node host, AssetRegistry assets, LifetimeScope rootLifetime, EventHub events, MetricRegistry metrics, Func<LXContext> context)
+member LX.Scenes.SceneService public ValueTask ChangeAsync(WorldId worldId, CancellationToken cancellationToken = default)
+member LX.Scenes.SceneService public ValueTask ChangeAsync(WorldId worldId, SceneTransitionMode mode, CancellationToken cancellationToken = default)
+member LX.Scenes.SceneService public ValueTask ChangeAsync(string scenePath, CancellationToken cancellationToken = default)
+member LX.Scenes.SceneService public ValueTask ChangeAsync(string scenePath, SceneTransitionMode mode, Action<SceneLoadProgress>? progress, CancellationToken cancellationToken = default)
+member LX.Scenes.SceneService public ValueTask ChangeAsync(string scenePath, SceneTransitionMode mode, CancellationToken cancellationToken = default)
+member LX.Scenes.SceneService public ValueTask DisposeAsync()
+member LX.Scenes.SceneService public ValueTask<ScenePreload> PreloadAsync(WorldId worldId, Action<SceneLoadProgress>? progress = null, CancellationToken cancellationToken = default)
+member LX.Scenes.SceneService public ValueTask<ScenePreload> PreloadAsync(string scenePath, Action<SceneLoadProgress>? progress = null, CancellationToken cancellationToken = default)
+member LX.Scenes.SceneService public string? ActivePath { get; }
+member LX.Scenes.SceneService public void Register(WorldDescriptor descriptor)
+member LX.Scenes.SceneService public void RegisterRange(IEnumerable<WorldDescriptor> descriptors)
+member LX.Scenes.WorldDescriptor public WorldDescriptor Validate()
+member LX.Scenes.WorldId public WorldId(string value)
+member LX.Scenes.WorldId public override string ToString()
+member LX.Scenes.WorldId public string Value { get; }
+member LX.Settings.SettingsService public SettingsService(Node host, EventHub events, MetricRegistry metrics, LocalizationService localization, InputRouter input)
+member LX.Settings.SettingsService public UserSettings Current { get; private set; }
+member LX.Settings.SettingsService public ValueTask SetAsync(UserSettings settings, CancellationToken cancellationToken = default)
+member LX.Settings.SettingsService public ValueTask SetKeyBindingAsync(string godotAction, Key physicalKey, CancellationToken cancellationToken = default)
+member LX.Settings.SettingsService public ValueTask UpdateAsync(Func<UserSettings, UserSettings> update, CancellationToken cancellationToken = default)
+member LX.Settings.SettingsService public ValueTask<Result<UserSettings>> InitializeAsync(CancellationToken cancellationToken = default)
+member LX.Settings.UserSettings public UserSettings Normalize()
+member LX.UI.Components.ConfirmDialogView public ValueTask<bool> ShowPromptAsync(string message, CancellationToken cancellationToken = default)
+member LX.UI.Components.ConfirmDialogView public override void _ExitTree()
+member LX.UI.Components.ConfirmDialogView public override void _Ready()
+member LX.UI.Components.ConfirmDialogView public void Preview(string message)
+member LX.UI.Components.LoadingView public override void _Ready()
+member LX.UI.Components.LoadingView public void HideLoading()
+member LX.UI.Components.LoadingView public void ShowLoading(string message, float? progress = null)
+member LX.UI.Components.ToastView public ValueTask ShowMessageAsync(string message, double? durationSeconds = null, CancellationToken cancellationToken = default)
+member LX.UI.Components.ToastView public double DefaultDurationSeconds { get; set; }
+member LX.UI.Components.ToastView public override void _Ready()
+member LX.UI.Components.ToastView public void ShowMessage(string message)
+member LX.UI.Components.TooltipView public override void _Ready()
+member LX.UI.Components.TooltipView public void HideTooltip()
+member LX.UI.Components.TooltipView public void ShowAt(string text, Vector2 canvasPosition)
+member LX.UI.Components.UIComponentsShowcase protected override void OnBindingsReady()
+member LX.UI.Components.UIExamplePalette public static StyleBoxFlat Card(Color? accent = null)
+member LX.UI.Components.UIExamplePalette public static readonly Color Border
+member LX.UI.Components.UIExamplePalette public static readonly Color MutedText
+member LX.UI.Components.UIExamplePalette public static readonly Color Primary
+member LX.UI.Components.UIExamplePalette public static readonly Color Success
+member LX.UI.Components.UIExamplePalette public static readonly Color Surface
+member LX.UI.Components.UIExamplePalette public static readonly Color Text
+member LX.UI.Components.UIExamplePalette public static readonly Color Warning
+member LX.UI.Components.VirtualListView public float ItemHeight { get; set; }
+member LX.UI.Components.VirtualListView public int BufferItems { get; set; }
+member LX.UI.Components.VirtualListView public override void _Notification(int what)
+member LX.UI.Components.VirtualListView public override void _Ready()
+member LX.UI.Components.VirtualListView public void Configure(int itemCount, Func<Control> factory, Action<Control, int> binder)
+member LX.UI.UICompletion public static UICompletion Cancelled { get; }
+member LX.UI.UIFadeOptions public TimeSpan FadeInDuration { get; init; }
+member LX.UI.UIFadeOptions public TimeSpan FadeOutDuration { get; init; }
+member LX.UI.UIFadeOptions public TimeSpan HoldDuration { get; init; }
+member LX.UI.UIFadeOptions public Tween.EaseType Ease { get; init; }
+member LX.UI.UIFadeOptions public Tween.TransitionType Transition { get; init; }
+member LX.UI.UIHandle public UIId UIId { get; }
+member LX.UI.UIHandle public ValueTask CloseAsync()
+member LX.UI.UIHandle public ValueTask DisposeAsync()
+member LX.UI.UIHandle public ValueTask<UIResult<TResult>> WaitForResultAsync<TResult>(CancellationToken cancellationToken = default)
+member LX.UI.UIHandle public bool IsClosed { get; }
+member LX.UI.UIId public UIId(string value)
+member LX.UI.UIId public override string ToString()
+member LX.UI.UIId public string Value { get; }
+member LX.UI.UIScreen protected LXContext LX { get; }
+member LX.UI.UIScreen protected LifetimeScope Activation { get; }
+member LX.UI.UIScreen protected LifetimeScope Lifetime { get; }
+member LX.UI.UIScreen protected UITextureBinding BindTexture(NinePatchRect target)
+member LX.UI.UIScreen protected UITextureBinding BindTexture(TextureButton target, TextureButtonSlot slot)
+member LX.UI.UIScreen protected UITextureBinding BindTexture(TextureRect target)
+member LX.UI.UIScreen protected internal virtual ValueTask OnHideAsync(CancellationToken cancellationToken)
+member LX.UI.UIScreen protected internal virtual ValueTask OnShowAsync(object? payload, CancellationToken cancellationToken)
+member LX.UI.UIScreen protected internal virtual ValueTask OnTransitionAsync(UITransitionPhase phase, CancellationToken cancellationToken)
+member LX.UI.UIScreen protected internal virtual ValueTask<bool> OnBackRequestedAsync(CancellationToken cancellationToken)
+member LX.UI.UIScreen protected virtual void BindGeneratedNodes()
+member LX.UI.UIScreen protected virtual void OnBindingsReady()
+member LX.UI.UIScreen protected virtual void OnLXInitialized()
+member LX.UI.UIScreen protected void RequestClose()
+member LX.UI.UIScreen protected void RequestClose<TResult>(TResult result)
+member LX.UI.UIScreen public bool IsLXInitialized { get; }
+member LX.UI.UIScreen public sealed override void _Ready()
+member LX.UI.UIScreen public void Initialize(LXContext context, LifetimeScope lifetime)
+member LX.UI.UIService public IReadOnlyList<UIRecord> Snapshot()
+member LX.UI.UIService public UIRecord? Top(UILayer layer)
+member LX.UI.UIService public UIService(Node host, AssetRegistry assets, LifetimeScope rootLifetime, MetricRegistry metrics, Func<LXContext> context)
+member LX.UI.UIService public ValueTask CloseAsync(Guid instanceId)
+member LX.UI.UIService public ValueTask DisposeAsync()
+member LX.UI.UIService public ValueTask PlayFadeAsync(UIFadeMode mode, UIFadeOptions? options = null, CancellationToken cancellationToken = default)
+member LX.UI.UIService public ValueTask<UIHandle> NavigateAsync(UIId uiId, object? payload = null, LifetimeScope? parentLifetime = null, CancellationToken cancellationToken = default)
+member LX.UI.UIService public ValueTask<UIHandle> OpenAsync(UIId uiId, object? payload = null, LifetimeScope? parentLifetime = null, CancellationToken cancellationToken = default)
+member LX.UI.UIService public ValueTask<UIResult<TResult>> OpenForResultAsync<TResult>(UIId uiId, object? payload = null, LifetimeScope? parentLifetime = null, CancellationToken cancellationToken = default)
+member LX.UI.UIService public ValueTask<bool> CloseTopAsync(UILayer layer)
+member LX.UI.UIService public ValueTask<bool> RequestBackAsync()
+member LX.UI.UIService public bool IsFadeBlackoutActive { get; }
+member LX.UI.UIService public bool IsOpen(UIId uiId)
+member LX.UI.UIService public void Register(UIDescriptor descriptor)
+member LX.UI.UIService public void RegisterRange(IEnumerable<UIDescriptor> descriptors)
+member LX.UI.UITextureBinding public Texture2D? Texture { get; }
+member LX.UI.UITextureBinding public ValueTask<bool> SetAsync<TTexture>(AssetRef<TTexture> asset, CancellationToken cancellationToken = default) where TTexture : Texture2D
+member LX.UI.UITextureBinding public bool IsDisposed { get; }
+member LX.UI.UITextureBinding public static UITextureBinding Create(AssetRegistry assets, LifetimeScope lifetime, NinePatchRect target)
+member LX.UI.UITextureBinding public static UITextureBinding Create(AssetRegistry assets, LifetimeScope lifetime, TextureButton target, TextureButtonSlot slot)
+member LX.UI.UITextureBinding public static UITextureBinding Create(AssetRegistry assets, LifetimeScope lifetime, TextureRect target)
+member LX.UI.UITextureBinding public void Clear()
+member LX.UI.UITextureBinding public void Dispose()
+member LX.UI.UITextureBinding public void Set<TTexture>(AssetRef<TTexture> asset) where TTexture : Texture2D
+member LX.Validation.ContextProbeNode protected override void OnLXInitialized()
+member LX.Validation.ContextProbeNode public CancellationToken LastPoolActivationToken { get; private set; }
+member LX.Validation.ContextProbeNode public ICollection<string>? InitializationOrder { get; set; }
+member LX.Validation.ContextProbeNode public bool ChildrenWereInitializedFirst { get; private set; }
+member LX.Validation.ContextProbeNode public bool ConfiguredBeforeTree { get; set; }
+member LX.Validation.ContextProbeNode public bool InitializationHookCalled { get; private set; }
+member LX.Validation.ContextProbeNode public bool PoolReturnObservedActiveToken { get; private set; }
+member LX.Validation.ContextProbeNode public int PoolRentCount { get; private set; }
+member LX.Validation.ContextProbeNode public int PoolReturnCount { get; private set; }
+member LX.Validation.ContextProbeNode public void OnRent(LifetimeScope activation)
+member LX.Validation.ContextProbeNode public void OnReturn()
+member LX.Validation.FrameworkStatusScreen protected internal override ValueTask OnHideAsync(CancellationToken cancellationToken)
+member LX.Validation.FrameworkStatusScreen protected internal override ValueTask OnShowAsync(object? payload, CancellationToken cancellationToken)
+member LX.Validation.FrameworkStatusScreen protected override void OnLXInitialized()
+member LX.Validation.UIResultProbeScreen protected internal override ValueTask OnHideAsync(CancellationToken cancellationToken)
+member LX.Validation.UIResultProbeScreen protected internal override ValueTask OnShowAsync(object? payload, CancellationToken cancellationToken)
+member LX.Validation.UIResultProbeScreen protected internal override ValueTask OnTransitionAsync(UITransitionPhase phase, CancellationToken cancellationToken)
+member LX.Validation.UIResultProbeScreen public bool HideSawDisposedActivation { get; private set; }
+member LX.Validation.UIResultProbeScreen public int EnterTransitions { get; private set; }
+member LX.Validation.UIResultProbeScreen public int ExitTransitions { get; private set; }
+member LX.Validation.UIResultProbeScreen public void Complete(string value)
+member LX.World.WorldChunkManifest public List<WorldChunkEntry> Chunks { get; init; }
+member LX.World.WorldChunkManifest public int ChunkHeight { get; init; }
+member LX.World.WorldChunkManifest public int ChunkWidth { get; init; }
+member LX.World.WorldChunkStreamer public ChunkCoordinate WorldToChunk(Vector2 worldPosition)
+member LX.World.WorldChunkStreamer public IReadOnlyCollection<ChunkCoordinate> ActiveChunks { get; }
+member LX.World.WorldChunkStreamer public ValueTask DisposeAsync()
+member LX.World.WorldChunkStreamer public ValueTask SetFocusAsync(ChunkCoordinate focus, WorldChunkStreamingOptions options, CancellationToken cancellationToken = default)
+member LX.World.WorldChunkStreamer public ValueTask SetFocusAsync(ChunkCoordinate focus, int radius = 1, CancellationToken cancellationToken = default)
+member LX.World.WorldChunkStreamer public WorldChunkStreamer(Node parent, AssetRegistry assets, LifetimeScope parentLifetime, MetricRegistry metrics, Func<LXContext> context, WorldChunkManifest manifest)
+member LX.World.WorldChunkStreamer public WorldChunkStreamer(Node parent, IWorldChunkSource source, LifetimeScope parentLifetime, MetricRegistry metrics, Func<LXContext> context)
+member LX.World.WorldChunkStreamingOptions public Action<int, int>? Progress { get; init; }
+member LX.World.WorldChunkStreamingOptions public int MaxLoadsPerFrame { get; init; }
+member LX.World.WorldChunkStreamingOptions public int MaxUnloadsPerFrame { get; init; }
+member LX.World.WorldChunkStreamingOptions public int Radius { get; init; }
+member LX.World.WorldEventTrigger2D public StringName RequiredBodyGroup { get; set; }
+member LX.World.WorldEventTrigger2D public bool IsLXInitialized { get; }
+member LX.World.WorldEventTrigger2D public bool OneShot { get; set; }
+member LX.World.WorldEventTrigger2D public bool TryTrigger(Node2D actor)
+member LX.World.WorldEventTrigger2D public override void _Ready()
+member LX.World.WorldEventTrigger2D public string EventId { get; set; }
+member LX.World.WorldEventTrigger2D public void Initialize(LXContext context, LifetimeScope lifetime)
+member LX.World.WorldEventTrigger2D public void ResetCompletion()
+member Luban.BeanBase public abstract int GetTypeId()
+member Luban.ByteBuf public ByteBuf(byte[] bytes)
+member Luban.ByteBuf public Complex ReadComplex()
+member Luban.ByteBuf public Matrix4x4 ReadMatrix4x4()
+member Luban.ByteBuf public Quaternion ReadQuaternion()
+member Luban.ByteBuf public Vector2 ReadVector2()
+member Luban.ByteBuf public Vector3 ReadVector3()
+member Luban.ByteBuf public Vector4 ReadVector4()
+member Luban.ByteBuf public bool Empty { get; }
+member Luban.ByteBuf public bool ReadBool()
+member Luban.ByteBuf public byte ReadByte()
+member Luban.ByteBuf public byte[] Bytes { get; }
+member Luban.ByteBuf public byte[] ReadBytes()
+member Luban.ByteBuf public double ReadDouble()
+member Luban.ByteBuf public double ReadLongAsNumber()
+member Luban.ByteBuf public float ReadFloat()
+member Luban.ByteBuf public int ReadFint()
+member Luban.ByteBuf public int ReadInt()
+member Luban.ByteBuf public int ReadSint()
+member Luban.ByteBuf public int ReadSize()
+member Luban.ByteBuf public int ReaderIndex { get; private set; }
+member Luban.ByteBuf public int Remaining { get; }
+member Luban.ByteBuf public int WriterIndex { get; }
+member Luban.ByteBuf public long ReadFlong()
+member Luban.ByteBuf public long ReadLong()
+member Luban.ByteBuf public long ReadSlong()
+member Luban.ByteBuf public short ReadFshort()
+member Luban.ByteBuf public short ReadShort()
+member Luban.ByteBuf public static ByteBuf Wrap(byte[] bytes)
+member Luban.ByteBuf public string ReadString()
+member Luban.ByteBuf public uint ReadUint()
+member Luban.ByteBuf public ulong ReadUlong()
+member Luban.SerializationException public SerializationException()
+member Luban.SerializationException public SerializationException(string? message)
+member Luban.SerializationException public SerializationException(string? message, Exception? innerException)
+member Luban.StringUtil public static string CollectionToString<T>(IEnumerable<T>? values)
+member Luban.StringUtil public static string CollectionToString<TKey, TValue>(IDictionary<TKey, TValue>? values) where TKey : notnull
+member Luban.StringUtil public static string ToStr(object? value)
+type LX.Audio.AudioGroupPolicy public sealed record AudioGroupPolicy(string Id, string Bus = "SFX", int MaxConcurrent = 8, AudioOverflowPolicy OverflowPolicy = AudioOverflowPolicy.StopOldest)
+type LX.Audio.AudioGroupRecord public sealed record AudioGroupRecord(string Id, string Bus, int Voices, int MaxConcurrent, AudioOverflowPolicy OverflowPolicy)
+type LX.Audio.AudioOverflowPolicy public enum AudioOverflowPolicy
+type LX.Audio.AudioPlayResult public enum AudioPlayResult
+type LX.Audio.AudioService public sealed class AudioService : IAsyncDisposable
+type LX.Audio.AudioStateRecord public sealed record AudioStateRecord(bool MusicPlaying, float MusicVolumeDb, int ActiveSfx, IReadOnlyList<AudioGroupRecord> Groups)
+type LX.Camera.Camera2DController public sealed class Camera2DController : Node
+type LX.Camera.Camera2DFollowOptions public sealed record Camera2DFollowOptions
+type LX.Content.ContentRef public readonly record struct ContentRef<T>
+type LX.Content.ContentService public sealed class ContentService
+type LX.Core.Actions.ActionNodeSnapshot public sealed record ActionNodeSnapshot(long Id, string Name, ActionNodeState State, DateTimeOffset CreatedAtUtc, DateTimeOffset? StartedAtUtc, DateTimeOffset? CompletedAtUtc, string? Error, IReadOnlyList<ActionNodeSnapshot> Children)
+type LX.Core.Actions.ActionNodeState public enum ActionNodeState
+type LX.Core.Actions.ActionRunner public sealed class ActionRunner : IDisposable, IAsyncDisposable
+type LX.Core.Actions.ActionRunnerSnapshot public sealed record ActionRunnerSnapshot(IReadOnlyList<ActionNodeSnapshot> Active, IReadOnlyList<ActionNodeSnapshot> Recent)
+type LX.Core.Actions.LXAction public abstract class LXAction
+type LX.Core.Actions.LXActions public static class LXActions
+type LX.Core.Audio.PcmWave public sealed record PcmWave(int SampleRate, int Channels, int BitsPerSample, byte[] Data)
+type LX.Core.Common.Error public readonly record struct Error(string Code, string Message, Exception? Exception = null)
+type LX.Core.Common.Result public readonly record struct Result
+type LX.Core.Common.Result public readonly record struct Result<T>
+type LX.Core.Common.StrongId public readonly record struct StrongId<TTag> : IComparable<StrongId<TTag>>
+type LX.Core.Data.DataCatalog public sealed class DataCatalog<TId, TValue>  where TId : notnull where TValue : IDataRecord<TId>
+type LX.Core.Data.IDataRecord public interface IDataRecord<out TId>
+type LX.Core.Data.LubanTableLoader public static class LubanTableLoader
+type LX.Core.Diagnostics.DiagnosticEntry public sealed record DiagnosticEntry(long Sequence, DateTimeOffset TimestampUtc, DiagnosticSeverity Severity, string Category, string Message, string? Exception, IReadOnlyDictionary<string, string> Fields)
+type LX.Core.Diagnostics.DiagnosticLog public sealed class DiagnosticLog
+type LX.Core.Diagnostics.DiagnosticSeverity public enum DiagnosticSeverity
+type LX.Core.Diagnostics.MetricRegistry public sealed class MetricRegistry
+type LX.Core.Diagnostics.MetricSnapshot public sealed record MetricSnapshot(IReadOnlyDictionary<string, double> Gauges, IReadOnlyDictionary<string, long> Counters)
+type LX.Core.Events.EventHub public sealed class EventHub : IDisposable
+type LX.Core.Events.EventHubSnapshot public sealed record EventHubSnapshot(int EventTypeCount, int SubscriptionCount, IReadOnlyDictionary<string, int> Subscriptions)
+type LX.Core.Flow.GameFlow public sealed class GameFlow<TState, TContext> : IAsyncDisposable where TState : notnull
+type LX.Core.Flow.GameFlowTransition public readonly record struct GameFlowTransition<TState>(TState? Previous, TState Current)
+type LX.Core.Flow.IGameFlowState public interface IGameFlowState<TContext>
+type LX.Core.Flow.IState public interface IState<TContext>
+type LX.Core.Flow.StateMachine public sealed class StateMachine<TState, TContext>  where TState : notnull
+type LX.Core.Lifetime.DelegateDisposable public sealed class DelegateDisposable : IDisposable
+type LX.Core.Lifetime.LifetimeScope public sealed class LifetimeScope : IDisposable, IAsyncDisposable
+type LX.Core.Persistence.ISaveMigration public interface ISaveMigration
+type LX.Core.Persistence.SaveLoadResult public sealed record SaveLoadResult<TState>(TState State, SaveSource Source, int StoredVersion, int LoadedVersion, DateTimeOffset SavedAtUtc)
+type LX.Core.Persistence.SaveSlotMetadata public sealed record SaveSlotMetadata(string Slot, SaveSource Source, int SchemaVersion, DateTimeOffset SavedAtUtc, long FileSizeBytes)
+type LX.Core.Persistence.SaveSource public enum SaveSource
+type LX.Core.Persistence.SaveStore public sealed class SaveStore<TState>
+type LX.Core.Pooling.ObjectPool public sealed class ObjectPool<T> : IDisposable where T : class
+type LX.Core.Pooling.PoolStatistics public readonly record struct PoolStatistics(long Created, long Reused, long Discarded, int Rented, int Retained)
+type LX.Core.Pooling.PooledObject public sealed class PooledObject<T> : IDisposable where T : class
+type LX.Core.Random.DeterministicRng public sealed class DeterministicRng
+type LX.Core.Random.RngState public readonly record struct RngState(ulong State, ulong Increment)
+type LX.Core.Time.ClockFrame public readonly record struct ClockFrame(ulong FrameIndex, double UnscaledDeltaSeconds, double DeltaSeconds, double UnscaledElapsedSeconds, double ElapsedSeconds)
+type LX.Core.Time.GameClock public sealed class GameClock
+type LX.Core.Time.GameScheduler public sealed class GameScheduler : IDisposable
+type LX.Core.Time.GameSchedulerSnapshot public sealed record GameSchedulerSnapshot(int PendingCount, int QueueCount, double ElapsedSeconds, bool IsDisposed)
+type LX.Core.World.ChunkCoordinate public readonly record struct ChunkCoordinate(int X, int Y)
+type LX.Core.World.ChunkPlanner public static class ChunkPlanner
+type LX.Core.World.WorldEventId public readonly record struct WorldEventId
+type LX.Core.World.WorldEventJournal public sealed class WorldEventJournal
+type LX.Core.World.WorldEventJournalSnapshot public sealed record WorldEventJournalSnapshot(IReadOnlyList<string> CompletedEventIds)
+type LX.Diagnostics.DiagnosticsService public sealed class DiagnosticsService
+type LX.Diagnostics.LifetimeRecord public sealed record LifetimeRecord(string Name, bool IsDisposed, int OwnedCount)
+type LX.Diagnostics.RuntimeSnapshot public sealed record RuntimeSnapshot(string Schema, int SchemaVersion, DateTimeOffset CapturedAtUtc, TimeSpan Uptime, LifetimeRecord Lifetime, SceneRecord Scene, EventHubSnapshot Events, GameSchedulerSnapshot Scheduler, GameSchedulerSnapshot PhysicsScheduler, ActionRunnerSnapshot Actions, MetricSnapshot Metrics, IReadOnlyList<AssetRecord> Assets, IReadOnlyList<UIRecord> UI, IReadOnlyList<FeatureRecord> Features, AudioStateRecord Audio, InputSnapshot Input, LocalizationSnapshot Localization, UserSettings Settings, IReadOnlyList<DiagnosticEntry> Logs)
+type LX.Diagnostics.SceneRecord public sealed record SceneRecord(string? Path, string? RootNodeName)
+type LX.Features.FeatureDescriptor public sealed record FeatureDescriptor(FeatureId Id, string ScenePath)
+type LX.Features.FeatureHandle public sealed class FeatureHandle : IAsyncDisposable
+type LX.Features.FeatureId public readonly record struct FeatureId
+type LX.Features.FeatureRecord public sealed record FeatureRecord(Guid InstanceId, string FeatureId, string NodeName)
+type LX.Features.FeatureService public sealed class FeatureService : IAsyncDisposable
+type LX.Input.GameActionTriggered public readonly record struct GameActionTriggered(InputActionId Action, bool Pressed, float Strength, InputModality Modality)
+type LX.Input.InputActionId public readonly record struct InputActionId
+type LX.Input.InputBindingChanged public readonly record struct InputBindingChanged(string GodotAction)
+type LX.Input.InputBindingConflict public sealed record InputBindingConflict(Key PhysicalKey, IReadOnlyList<string> GodotActions)
+type LX.Input.InputContextDescriptor public sealed record InputContextDescriptor(string Id, IReadOnlySet<InputActionId> Actions, InputContextMode Mode = InputContextMode.Exclusive)
+type LX.Input.InputContextHandle public sealed class InputContextHandle : IDisposable
+type LX.Input.InputContextMode public enum InputContextMode
+type LX.Input.InputContextRecord public sealed record InputContextRecord(string Id, InputContextMode Mode, IReadOnlyList<string> Actions, int Order)
+type LX.Input.InputModality public enum InputModality
+type LX.Input.InputModalityChanged public readonly record struct InputModalityChanged(InputModality Previous, InputModality Current)
+type LX.Input.InputPrompt public sealed record InputPrompt(InputActionId Action, InputModality Modality, string Text)
+type LX.Input.InputRouteDescriptor public sealed record InputRouteDescriptor(InputActionId Action, string GodotAction, Key? DefaultPhysicalKey = null)
+type LX.Input.InputRouter public sealed class InputRouter : IDisposable
+type LX.Input.InputSnapshot public sealed record InputSnapshot(InputModality Modality, IReadOnlyList<InputContextRecord> Contexts, IReadOnlyList<InputBindingConflict> Conflicts)
+type LX.Input.PointerInput public readonly record struct PointerInput(PointerPhase Phase, Vector2 ViewportPosition, MouseButton Button, float WheelDelta, bool Shift, bool Ctrl, bool Alt)
+type LX.Input.PointerPhase public enum PointerPhase
+type LX.Localization.LocaleChanged public readonly record struct LocaleChanged(string Previous, string Current)
+type LX.Localization.LocalizationService public sealed class LocalizationService
+type LX.Localization.LocalizationSnapshot public sealed record LocalizationSnapshot(string CurrentLocale, bool PseudoLocalizationEnabled, IReadOnlyList<string> MissingKeys)
+type LX.Pooling.IPooledNodeLifecycle public interface IPooledNodeLifecycle
+type LX.Pooling.NodePool public sealed class NodePool<TNode> : IDisposable where TNode : Node
+type LX.Pooling.PackedSceneNodePool public sealed class PackedSceneNodePool<TNode> : IDisposable where TNode : Node
+type LX.Pooling.PooledNode public sealed class PooledNode<TNode> : IDisposable where TNode : Node
+type LX.Res.AssetBatchLease public sealed class AssetBatchLease<T> : IDisposable where T : Resource
+type LX.Res.AssetBinding public sealed class AssetBinding<T> : IDisposable where T : Resource
+type LX.Res.AssetCachePolicy public enum AssetCachePolicy
+type LX.Res.AssetDependencyAnalyzer public static class AssetDependencyAnalyzer
+type LX.Res.AssetDependencyReport public sealed record AssetDependencyReport(AssetPlanStatus Status, IReadOnlyList<string> LoadOrder, IReadOnlyList<string> MissingDependencies, IReadOnlyList<string> CyclicAssets)
+type LX.Res.AssetGroup public sealed class AssetGroup<T>  where T : Resource
+type LX.Res.AssetLease public sealed class AssetLease<T> : IDisposable where T : Resource
+type LX.Res.AssetLoadProgress public sealed record AssetLoadProgress(int Completed, int Total, string? CurrentId)
+type LX.Res.AssetLoadRequest public sealed record AssetLoadRequest<T>(string Id, AssetRef<T> Asset, int Priority = 0, IReadOnlyList<string>? Dependencies = null)  where T : Resource
+type LX.Res.AssetPlanStatus public enum AssetPlanStatus
+type LX.Res.AssetPreloadSet public sealed record AssetPreloadSet<T>(string Id, IReadOnlyList<AssetLoadRequest<T>> Requests)  where T : Resource
+type LX.Res.AssetRecord public sealed record AssetRecord(string Path, string ResourceType, int LeaseCount, AssetCachePolicy Policy, bool RegistryOwned)
+type LX.Res.AssetRef public readonly record struct AssetRef<T>  where T : Resource
+type LX.Res.AssetRegistry public sealed class AssetRegistry : IDisposable, IAsyncDisposable
+type LX.Res.PackedSceneInstance public sealed class PackedSceneInstance<TNode> : IDisposable, IAsyncDisposable where TNode : Node
+type LX.Runtime.FrameworkBootCompleted public readonly record struct FrameworkBootCompleted(bool Success, string? Error)
+type LX.Runtime.ILXContextReceiver public interface ILXContextReceiver
+type LX.Runtime.LXContext public sealed record LXContext(LifetimeScope Lifetime, EventHub Events, GameClock Clock, GameScheduler Scheduler, GameClock PhysicsClock, GameScheduler PhysicsScheduler, ActionRunner Actions, PauseService Pause, DeterministicRng Random, MetricRegistry Metrics, InputRouter Input, LocalizationService Localization, ContentService Content, WorldEventJournal WorldEvents, SettingsService Settings, AssetRegistry Res, FeatureService Features, SceneService Scenes, AudioService Audio, UIService UI, DiagnosticsService Diagnostics)
+type LX.Runtime.LXContextInjector public static class LXContextInjector
+type LX.Runtime.LXHost public class LXHost : Node
+type LX.Runtime.LXNode public abstract class LXNode : Node, ILXContextReceiver
+type LX.Runtime.PauseChanged public readonly record struct PauseChanged(bool IsPaused)
+type LX.Runtime.PauseService public sealed class PauseService
+type LX.Scenes.SceneLoadProgress public sealed record SceneLoadProgress(string ScenePath, SceneLoadStage Stage, float Ratio)
+type LX.Scenes.SceneLoadStage public enum SceneLoadStage
+type LX.Scenes.ScenePreload public sealed class ScenePreload : IDisposable
+type LX.Scenes.SceneService public sealed class SceneService : IAsyncDisposable
+type LX.Scenes.SceneTransitionMode public enum SceneTransitionMode
+type LX.Scenes.WorldDescriptor public sealed record WorldDescriptor(WorldId Id, string ScenePath)
+type LX.Scenes.WorldId public readonly record struct WorldId
+type LX.Scenes.WorldSceneChangeFailed public readonly record struct WorldSceneChangeFailed(string? PreviousPath, string CurrentPath, SceneTransitionMode Mode, string Error)
+type LX.Scenes.WorldSceneChangeStarted public readonly record struct WorldSceneChangeStarted(string? PreviousPath, string CurrentPath, SceneTransitionMode Mode)
+type LX.Scenes.WorldSceneChanged public readonly record struct WorldSceneChanged(string? PreviousPath, string CurrentPath)
+type LX.Settings.SettingsService public sealed class SettingsService
+type LX.Settings.UserSettings public sealed record UserSettings(string Locale = "zh_CN", float MasterVolume = 1.0f, float MusicVolume = 0.8f, float SfxVolume = 0.8f, bool Fullscreen = false, float UiScale = 1.0f, Dictionary<string, string>? KeyBindings = null)
+type LX.Settings.UserSettingsChanged public readonly record struct UserSettingsChanged(UserSettings Previous, UserSettings Current)
+type LX.UI.Components.ConfirmDialogView public class ConfirmDialogView : PanelContainer
+type LX.UI.Components.LoadingView public class LoadingView : PanelContainer
+type LX.UI.Components.ToastView public class ToastView : PanelContainer
+type LX.UI.Components.TooltipView public class TooltipView : PanelContainer
+type LX.UI.Components.UIComponentsShowcase public class UIComponentsShowcase : UIScreen
+type LX.UI.Components.UIExamplePalette public static class UIExamplePalette
+type LX.UI.Components.VirtualListView public class VirtualListView : ScrollContainer
+type LX.UI.TextureButtonSlot public enum TextureButtonSlot
+type LX.UI.UICachePolicy public enum UICachePolicy
+type LX.UI.UICompletion public readonly record struct UICompletion(bool HasValue, object? Value)
+type LX.UI.UICoverPolicy public enum UICoverPolicy
+type LX.UI.UIDescriptor public sealed record UIDescriptor(UIId Id, string ScenePath, UILayer Layer = UILayer.Screen, UICachePolicy CachePolicy = UICachePolicy.Transient, UICoverPolicy CoverPolicy = UICoverPolicy.KeepVisible, UIInputPolicy InputPolicy = UIInputPolicy.Normal, UIFocusPolicy FocusPolicy = UIFocusPolicy.Preserve)
+type LX.UI.UIFadeMode public enum UIFadeMode
+type LX.UI.UIFadeOptions public sealed record UIFadeOptions
+type LX.UI.UIFadeTransitionScreen public class UIFadeTransitionScreen : UIScreen
+type LX.UI.UIFocusPolicy public enum UIFocusPolicy
+type LX.UI.UIHandle public sealed class UIHandle : IAsyncDisposable
+type LX.UI.UIId public readonly record struct UIId
+type LX.UI.UIInputPolicy public enum UIInputPolicy
+type LX.UI.UILayer public enum UILayer
+type LX.UI.UIRecord public sealed record UIRecord(Guid InstanceId, string UIId, UILayer Layer, UICachePolicy CachePolicy, UICoverPolicy CoverPolicy, UIInputPolicy InputPolicy, UIFocusPolicy FocusPolicy, UIVisualState State, long OpenSequence)
+type LX.UI.UIResult public readonly record struct UIResult<TResult>(bool HasValue, TResult? Value)
+type LX.UI.UIScreen public abstract class UIScreen : Control, ILXContextReceiver
+type LX.UI.UIService public sealed class UIService : IAsyncDisposable
+type LX.UI.UITextureBinding public sealed class UITextureBinding : IDisposable
+type LX.UI.UITransitionPhase public enum UITransitionPhase
+type LX.UI.UIVisualState public enum UIVisualState
+type LX.Validation.ContextProbeNode public class ContextProbeNode : LXNode, IPooledNodeLifecycle
+type LX.Validation.FrameworkStatusScreen public class FrameworkStatusScreen : UIScreen
+type LX.Validation.UIResultProbeScreen public class UIResultProbeScreen : UIScreen
+type LX.World.IWorldChunkSource public interface IWorldChunkSource : IAsyncDisposable
+type LX.World.WorldChunkEntry public sealed record WorldChunkEntry(int X, int Y, string ScenePath)
+type LX.World.WorldChunkLoaded public readonly record struct WorldChunkLoaded(ChunkCoordinate Coordinate, Node Node)
+type LX.World.WorldChunkManifest public sealed class WorldChunkManifest
+type LX.World.WorldChunkStreamer public sealed class WorldChunkStreamer : IAsyncDisposable
+type LX.World.WorldChunkStreamingOptions public sealed record WorldChunkStreamingOptions
+type LX.World.WorldChunkUnloaded public readonly record struct WorldChunkUnloaded(ChunkCoordinate Coordinate)
+type LX.World.WorldEventTrigger2D public class WorldEventTrigger2D : Area2D, ILXContextReceiver
+type LX.World.WorldEventTriggered public readonly record struct WorldEventTriggered(WorldEventId EventId, Node2D Actor, WorldEventTrigger2D Trigger)
+type Luban.BeanBase public abstract class BeanBase : ITypeId
+type Luban.ByteBuf public sealed class ByteBuf
+type Luban.ITypeId public interface ITypeId
+type Luban.SerializationException public sealed class SerializationException : Exception
+type Luban.StringUtil public static class StringUtil

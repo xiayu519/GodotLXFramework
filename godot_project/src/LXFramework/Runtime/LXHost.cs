@@ -2,6 +2,7 @@ using LX.Res;
 using LX.Audio;
 using LX.Content;
 using LX.Core.Diagnostics;
+using LX.Core.Actions;
 using LX.Core.Events;
 using LX.Core.Lifetime;
 using LX.Core.Random;
@@ -23,9 +24,12 @@ namespace LX.Runtime;
 [GlobalClass]
 public partial class LXHost : Node
 {
+    private readonly object _shutdownGate = new();
     private LifetimeScope? _lifetime;
+    private RuntimeBridgeService? _runtimeBridge;
     private Task? _bootTask;
-    private bool _shuttingDown;
+    private TaskCompletionSource<object?>? _shutdownCompletion;
+    private bool _quitRequested;
 
     public LXContext LX { get; private set; } = null!;
 
@@ -48,13 +52,20 @@ public partial class LXHost : Node
     {
         _lifetime = new LifetimeScope("LXFramework");
         var metrics = new MetricRegistry();
-        var events = _lifetime.Own(new EventHub());
+        var events = _lifetime.Own(new EventHub(
+            exception =>
+            {
+                metrics.Increment("events.handler_failures");
+                GD.PushError($"LXFramework event handler failed: {exception}");
+            },
+            isolateHandlerExceptions: true));
         var clock = new GameClock();
         var scheduler = _lifetime.Own(new GameScheduler(clock));
         var physicsClock = new GameClock();
         var physicsScheduler = _lifetime.Own(new GameScheduler(physicsClock));
+        var actions = _lifetime.Own(new ActionRunner(_lifetime));
         var random = new DeterministicRng(0x4C584652414D4557UL);
-        var input = new InputRouter(events);
+        var input = _lifetime.Own(new InputRouter(events));
         var localization = new LocalizationService(events);
         var content = new ContentService();
         var worldEvents = new WorldEventJournal();
@@ -70,6 +81,10 @@ public partial class LXHost : Node
         var diagnostics = new DiagnosticsService(
             metrics,
             _lifetime,
+            events,
+            scheduler,
+            physicsScheduler,
+            actions,
             assets,
             ui,
             features,
@@ -78,6 +93,7 @@ public partial class LXHost : Node
             input,
             localization,
             settings);
+        _runtimeBridge = _lifetime.Own(new RuntimeBridgeService(diagnostics));
         var pause = new PauseService(this, clock, physicsClock, events, metrics);
 
         LX = new LXContext(
@@ -87,6 +103,7 @@ public partial class LXHost : Node
             scheduler,
             physicsClock,
             physicsScheduler,
+            actions,
             pause,
             random,
             metrics,
@@ -124,6 +141,7 @@ public partial class LXHost : Node
         LX.Metrics.SetGauge("runtime.frame", frame.FrameIndex);
         LX.Metrics.SetGauge("runtime.delta_ms", frame.DeltaSeconds * 1000.0);
         LX.Metrics.SetGauge("lifetime.root_owned", LX.Lifetime.OwnedCount);
+        _runtimeBridge?.Pump();
     }
 
     public override void _PhysicsProcess(double delta)
@@ -141,6 +159,11 @@ public partial class LXHost : Node
 
     public override void _UnhandledInput(InputEvent inputEvent)
     {
+        if (_lifetime is null || _lifetime.IsDisposed)
+        {
+            return;
+        }
+
         LX.Input.Handle(inputEvent);
     }
 
@@ -151,30 +174,43 @@ public partial class LXHost : Node
             return;
         }
 
-        try
-        {
-            _lifetime.Dispose();
-        }
-        catch (Exception exception)
-        {
-            GD.PushError($"LXFramework shutdown reported cleanup errors: {exception}");
-        }
-        finally
-        {
-            _lifetime = null;
-        }
+        _lifetime.DisposeEmergency(exception =>
+            GD.PushError($"LXFramework emergency shutdown reported a cleanup error: {exception}"));
+        _lifetime = null;
+        _runtimeBridge = null;
     }
 
-    public async ValueTask ShutdownAsync(bool quit = true)
+    public ValueTask ShutdownAsync(bool quit = true)
     {
-        if (_shuttingDown)
+        TaskCompletionSource<object?>? starter = null;
+        TaskCompletionSource<object?> completion;
+        LifetimeScope? lifetime = null;
+        lock (_shutdownGate)
         {
-            return;
+            _quitRequested |= quit;
+            if (_shutdownCompletion is null)
+            {
+                starter = new TaskCompletionSource<object?>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                _shutdownCompletion = starter;
+                lifetime = _lifetime;
+                _lifetime = null;
+            }
+            completion = _shutdownCompletion!;
         }
 
-        _shuttingDown = true;
-        var lifetime = _lifetime;
-        _lifetime = null;
+        if (starter is not null)
+        {
+            _ = CompleteShutdownAsync(lifetime, starter);
+        }
+        return new ValueTask(completion.Task);
+    }
+
+    private async Task CompleteShutdownAsync(
+        LifetimeScope? lifetime,
+        TaskCompletionSource<object?> completion)
+    {
+        Exception? shutdownError = null;
         try
         {
             if (lifetime is not null)
@@ -182,11 +218,38 @@ public partial class LXHost : Node
                 await lifetime.DisposeAsync();
             }
         }
+        catch (Exception exception)
+        {
+            shutdownError = exception;
+        }
         finally
         {
-            if (quit && IsInsideTree())
+            bool quit;
+            lock (_shutdownGate)
             {
-                GetTree().Quit();
+                quit = _quitRequested;
+            }
+            try
+            {
+                if (quit && IsInsideTree())
+                {
+                    GetTree().Quit();
+                }
+            }
+            catch (Exception exception)
+            {
+                shutdownError = shutdownError is null
+                    ? exception
+                    : new AggregateException(shutdownError, exception);
+            }
+
+            if (shutdownError is null)
+            {
+                completion.TrySetResult(null);
+            }
+            else
+            {
+                completion.TrySetException(shutdownError);
             }
         }
     }
@@ -252,8 +315,18 @@ public partial class LXHost : Node
             if (isFrameworkSmoke)
             {
                 await new FrameworkSmokeRunner(this, LX).RunAsync(frameworkStatus, cancellationToken);
+                await (_runtimeBridge ?? throw new InvalidOperationException(
+                    "Runtime bridge was not composed.")).RunSelfTestAsync(this, cancellationToken);
+                GD.Print("LX_RUNTIME_BRIDGE_PASS");
                 GD.Print("LX_FRAMEWORK_SMOKE_PASS");
-                await ShutdownAsync(quit: false);
+                var firstShutdown = ShutdownAsync(quit: false).AsTask();
+                var secondShutdown = ShutdownAsync(quit: false).AsTask();
+                if (!ReferenceEquals(firstShutdown, secondShutdown))
+                {
+                    throw new InvalidOperationException(
+                        "Concurrent LXHost shutdown callers did not receive the same completion task.");
+                }
+                await firstShutdown;
                 GD.Print("LX_ASYNC_SHUTDOWN_PASS");
                 GetTree().Quit();
             }

@@ -1,5 +1,10 @@
 ; Engine configuration file.
-; Prefer editing non-obvious settings through the Godot editor.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
 
@@ -7,7 +12,7 @@ config_version=5
 
 config/name="LXFramework"
 run/main_scene="uid://s543p8mkoql5"
-config/features=PackedStringArray("4.6", "C#", "GL Compatibility")
+config/features=PackedStringArray("4.7", "C#", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [display]
@@ -17,7 +22,6 @@ window/size/viewport_height=600
 window/size/window_width_override=800
 window/size/window_height_override=600
 window/stretch/mode="canvas_items"
-window/stretch/aspect="keep"
 
 [dotnet]
 

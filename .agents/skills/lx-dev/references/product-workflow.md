@@ -27,24 +27,35 @@
 
 `create node` 用于不能继承 `LXNode` 的任意 Godot 原生节点，生成 C# `partial` 类、同类型场景和显式 `ILXContextReceiver` 实现；其余结构命令会更新对应事实源清单并刷新类型化目录。所有命令都会校验名称和重复路径。脚手架完成后，只编辑产品源码、场景和清单，不编辑生成目录或绑定文件。
 
-## Luban 策划数据
+命令的第二个可选参数是稳定 ID，也是场景文件名：`create feature HangarFeature hangar` 生成 `scene/features/hangar.tscn`，`create screen HangarScreen hangar` 生成 `scene/ui/hangar.tscn`。参数不确定时只运行 `./lx.ps1 create --help` 或子命令 `--help`，不读脚手架源码。成功返回的 `create` 已完成存在性和重复校验；除非后续需要编辑产物，不再用 `git status`、`rg --files` 或重读 manifest 反复确认。
 
-根规则指定的可调游戏数据使用外层 `game_design/`；只有无需策划维护的少量静态内容才使用普通 JSON。schema 使用可审查的 XML，源数据使用 JSON；工具版本和提交由 `game_design/toolchain.json` 固定。Windows 人工转表可双击 `game_design/build.bat`，命令行和 Codex 使用统一入口：
+参数已经由用户完整给出时直接走批量快路径：只读取各已知写入目标最近的局部 `AGENTS.md`，按请求顺序运行全部 `create` 命令，然后把命令回显的变更路径一次传给 `check`，最后运行 `validate`。此路径不需要 `inspect`、`--help`、预读现有 manifest/场景、生成后枚举或逐个重读产物；若用户只要求脚手架存在，也不补写空实现。
+
+### 注册并使用动态资源
+
+产品代码要求使用的资源，无论其 `res://` 路径是否位于框架目录，都直接用 `create res`；命令会添加 `Product` scope 并生成 `LX.Generated.ResCatalog` 的强类型属性，不手改 manifest 或生成目录。例如：
 
 ```powershell
-.\lx.ps1 data
+.\lx.ps1 create res framework_entry PackedScene res://scene/main.tscn Cached
 ```
 
-有产品层时，命令以 Luban `cs-bin` 生成强类型代码到产品根目录 `Generated/Luban/`，把 `.bytes` 二进制表写入 `content/data/luban/`。运行时只通过现有内容服务构造 Luban 表集合：
+在 `LXNode`/`UIScreen` 中只需读要编辑的产品文件，通过注入上下文取得并让 `Lifetime` 持有租约：
 
 ```csharp
-var tables = LX.Content.LoadLubanTables(loader => new GameData.Tables(loader));
-var probe = tables.TbDesignProbe.Get("lx_framework");
+using Godot;
+using LX.Generated;
+
+private PackedScene? _frameworkEntry;
+
+protected override void OnLXInitialized()
+{
+    _frameworkEntry = Lifetime.Own(LX.Res.Acquire(ResCatalog.FrameworkEntry)).Resource;
+}
 ```
 
-`LX.Content` 通过 Godot `FileAccess` 读取 `.bytes` 并交给 Luban `ByteBuf`。不手改 Luban 输出，不创建静态 `Tables` 单例。普通小型 JSON 表仍可使用 `lx create content`；两种入口共享 `LX.Content`，不建立第二套内容服务。
+`create res` 会直接回显生成的完整符号；`ResCatalog.<Property>` 由 snake_case ID 稳定转为 PascalCase，无需搜索或读取生成 catalog，也无需搜索 `AssetLease`、`LifetimeScope` 或验证场景源码来猜测用法。只有框架维护者在添加框架内建资源时才手动使用 `Framework` scope。
 
-`data` 必须生成两次并得到相同输出哈希、编译隔离的生成 C#，并确认缺失跨表引用 fixture 被 Luban 拒绝；验证事实记录在 `.lx/luban/report.json`。新增 schema 类型时至少覆盖相应字段形态和一个负向数据错误。
+当任务只是“注册一个已给出路径的资源，并让某个已知产品文件通过生成引用获取它”时，最短流程固定为：读取 `godot_project/AGENTS.md` 与该产品目录最近的 `AGENTS.md`，运行一次 `create res`，读取并修改目标产品文件，随后一次 `check` 和一次 `validate`。不运行 `inspect`、禁用 API 全目录扫描、产品目录枚举、`git status`，也不额外读取 `resource-lifecycle.md`；上面的 `Lifetime.Own(LX.Res.Acquire(...)).Resource` 已是该场景的完整所有权契约。
 
 ## 使用生成入口
 
@@ -67,7 +78,7 @@ var material = AssetBinding<Material>.Create(
 await material.SetAsync(ResCatalog.PlayerMaterial, Lifetime.Token);
 ```
 
-目录属性名由清单 ID 生成。需要准确名称时读取生成目录，或运行 `inspect` 后查看 `.lx/project-index.json`。
+目录属性名由清单 ID 生成。创建命令会回显新符号；需要跨模块概览时运行 `inspect`，它会直接输出产品根、服务名和 catalog 计数。只有摘要不足时才读命令回显的绝对 `project-index.json` 路径。
 
 根规则要求池化的节点直接使用 `NodePool<TNode>`。池由所属 Feature 或世界的 `Lifetime` 持有；短作用域优先使用 `RentLease`，动态集合在所属流程收口时逐一 `Return`。
 
@@ -84,6 +95,4 @@ await material.SetAsync(ResCatalog.PlayerMaterial, Lifetime.Token);
 .\lx.ps1 validate
 ```
 
-`check` 会在事实源需要时先运行 Luban 或现有生成器，再执行最小去重检查组合。`validate` 是最终门禁，覆盖固定版本 Luban 转表、架构与 API 注释边界、清单、生成漂移、编译、纯核心测试、Godot 无窗口场景矩阵和 UI 视觉基准。
-
-Godot 底部的 `LX 开发工具` 只提供中文的创建向导、Luban 生成、当前场景依赖和策划目录入口；`generate`、`check`、`validate` 与视觉基准仍由 Codex、CI 或框架维护者从外层 `lx.ps1` 调用。Windows 导出模板安装后用 `.\lx.ps1 export windows` 做 Release 产物 smoke；普通环境不会因没有模板而伪造导出成功。
+`check` 会在事实源需要时先运行 Luban 或现有生成器，再执行最小去重检查组合；冷启动工作区缺少忽略的 `.lx/luban/report.json` 时也会自动补建，不需要手工 `data` 后重试。`validate` 是最终门禁，覆盖固定版本 Luban 转表、架构与 API 注释边界、清单、生成漂移、编译、纯核心测试、Godot 无窗口场景矩阵和 UI 视觉基准。

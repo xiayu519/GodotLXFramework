@@ -30,6 +30,7 @@ public sealed class AudioService : IAsyncDisposable
     private AssetLease<AudioStream>? _musicLease;
     private bool _disposed;
     private int _activeSfx;
+    private long _musicRequestSequence;
     private long _voiceSequence;
 
     public AudioService(Node host, AssetRegistry assets, MetricRegistry metrics)
@@ -76,6 +77,7 @@ public sealed class AudioService : IAsyncDisposable
     {
         EnsureMainThread();
         ObjectDisposedException.ThrowIf(_disposed, this);
+        var requestSequence = ++_musicRequestSequence;
         var tracked = TrackOperation();
         try
         {
@@ -86,6 +88,10 @@ public sealed class AudioService : IAsyncDisposable
                 next = await _assets.AcquireAsync<AudioStream>(path, cachePolicy, operation.Token);
                 EnsureMainThread();
                 operation.Token.ThrowIfCancellationRequested();
+                if (requestSequence != _musicRequestSequence)
+                {
+                    return;
+                }
 
                 SetMusic(next, volumeDb);
                 next = null;
@@ -120,6 +126,7 @@ public sealed class AudioService : IAsyncDisposable
             throw new ArgumentOutOfRangeException(nameof(loopBegin), "Loop bounds must define a non-empty range inside the PCM stream.");
         }
 
+        _musicRequestSequence++;
         var key = $"generated://audio/{id}";
         var next = _assets.AcquireGenerated<AudioStream>(key, () => new AudioStreamWav
         {
@@ -138,6 +145,7 @@ public sealed class AudioService : IAsyncDisposable
     {
         EnsureMainThread();
         ObjectDisposedException.ThrowIf(_disposed, this);
+        _musicRequestSequence++;
         StopMusicCore();
     }
 
@@ -163,6 +171,7 @@ public sealed class AudioService : IAsyncDisposable
         try
         {
             using var operation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdown.Token);
+            _musicRequestSequence++;
             StopMusicCore();
             if (!_audioRoot.IsInsideTree())
             {
@@ -205,6 +214,7 @@ public sealed class AudioService : IAsyncDisposable
             return;
         }
 
+        var requestSequence = _musicRequestSequence;
         var tracked = TrackOperation();
         try
         {
@@ -224,8 +234,15 @@ public sealed class AudioService : IAsyncDisposable
                 _musicPlayer.VolumeDb = Mathf.Lerp(startVolume, targetVolumeDb, ratio);
                 await _audioRoot.ToSignal(_audioRoot.GetTree(), SceneTree.SignalName.ProcessFrame);
                 EnsureMainThread();
+                if (requestSequence != _musicRequestSequence)
+                {
+                    return;
+                }
             }
-            _musicPlayer.VolumeDb = targetVolumeDb;
+            if (requestSequence == _musicRequestSequence)
+            {
+                _musicPlayer.VolumeDb = targetVolumeDb;
+            }
         }
         finally
         {
@@ -421,6 +438,11 @@ public sealed class AudioService : IAsyncDisposable
         float pitchScale,
         CancellationToken cancellationToken)
     {
+        if (voice.Completion.Task.IsCompleted)
+        {
+            return await voice.Completion.Task;
+        }
+
         var player = _sfxPool.Rent(_sfxRoot);
         voice.Player = player;
         void Finish() => voice.Completion.TrySetResult(AudioPlayResult.Completed);
@@ -519,6 +541,7 @@ public sealed class AudioService : IAsyncDisposable
         }
 
         _disposed = true;
+        _musicRequestSequence++;
         _shutdown.Cancel();
         if (_audioRoot.IsInsideTree() && _operations.Count > 0)
         {
@@ -528,10 +551,10 @@ public sealed class AudioService : IAsyncDisposable
 
         StopMusicCore();
         _sfxPool.Dispose();
-        // LXHost is disposed from _ExitTree, after the scene-tree deletion
-        // queue has stopped being a reliable cleanup mechanism. Free the
-        // private audio subtree synchronously so AudioStreamPlayer releases
-        // its native playback object before AudioServer shuts down.
+        // Normal SceneTree finalization flushes queued deletion again after the
+        // root exits. Emergency async cleanup can nevertheless outlive that
+        // final flush, so release the private audio subtree synchronously before
+        // AudioServer teardown instead of depending on a later continuation.
         _audioRoot.Free();
         UpdateMetrics();
         _shutdown.Dispose();

@@ -13,6 +13,7 @@ public sealed class StateMachine<TState, TContext> where TState : notnull
 {
     private readonly Dictionary<TState, IState<TContext>> _states = [];
     private readonly SemaphoreSlim _transitionGate = new(1, 1);
+    private readonly AsyncLocal<int> _transitionDepth = new();
     private readonly TContext _context;
     private IState<TContext>? _currentState;
 
@@ -36,12 +37,18 @@ public sealed class StateMachine<TState, TContext> where TState : notnull
 
     public async ValueTask TransitionAsync(TState next, CancellationToken cancellationToken = default)
     {
+        if (_transitionDepth.Value != 0)
+        {
+            throw new InvalidOperationException(
+                "StateMachine transition cannot be re-entered from EnterAsync or ExitAsync callbacks.");
+        }
         if (!_states.TryGetValue(next, out var nextState))
         {
             throw new KeyNotFoundException($"State '{next}' is not registered.");
         }
 
         await _transitionGate.WaitAsync(cancellationToken);
+        _transitionDepth.Value++;
         try
         {
             if (EqualityComparer<TState>.Default.Equals(Current!, next) && _currentState is not null)
@@ -62,6 +69,7 @@ public sealed class StateMachine<TState, TContext> where TState : notnull
         }
         finally
         {
+            _transitionDepth.Value--;
             _transitionGate.Release();
         }
     }

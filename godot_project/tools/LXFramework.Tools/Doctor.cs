@@ -4,21 +4,37 @@ namespace LXFramework.Tools;
 
 internal static class Doctor
 {
-    public static int Run(string root)
+    public const string RequiredDotnetSdk = "8.0.416";
+
+    public static int Run(string root, IReadOnlyList<string> arguments)
+    {
+        if (arguments.Count > 0)
+        {
+            return MaintenancePlanner.Run(root, "doctor", arguments);
+        }
+
+        return Inspect(root);
+    }
+
+    private static int Inspect(string root)
     {
         var godot = GodotLocator.Find(root, preferConsole: true);
+        var godotVersion = godot is null ? null : GodotLocator.ReadVersion(godot);
+        var detectedDotnetSdk = ReadProcess("dotnet", "--version");
         var workspaceRoot = Directory.GetParent(root)?.FullName ?? root;
         var exportTemplates = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Godot",
             "export_templates",
-            "4.6.3.stable");
+            GodotLocator.RequiredTemplateVersion);
         var checks = new Dictionary<string, string?>(StringComparer.Ordinal)
         {
             ["projectRoot"] = root,
-            ["dotnetSdk"] = ReadProcess("dotnet", "--version"),
+            ["dotnetSdk"] = detectedDotnetSdk == RequiredDotnetSdk ? detectedDotnetSdk : null,
+            ["dotnetSdkDetected"] = detectedDotnetSdk ?? "none",
             ["git"] = ReadProcess("git", "--version"),
             ["godotDotnet"] = godot,
+            ["godotVersion"] = godotVersion,
             ["projectFile"] = File.Exists(Path.Combine(root, "project.godot")) ? "ok" : null,
             ["csharpProject"] = File.Exists(Path.Combine(root, "LXFramework.csproj")) ? "ok" : null,
             ["editorPlugin"] = File.Exists(Path.Combine(root, "addons", "lx_tools", "plugin.cfg"))
@@ -50,7 +66,7 @@ internal static class Doctor
         return missing.Length == 0 ? 0 : 1;
     }
 
-    private static string? ReadProcess(string fileName, string argument)
+    internal static string? ReadProcess(string fileName, string argument)
     {
         try
         {

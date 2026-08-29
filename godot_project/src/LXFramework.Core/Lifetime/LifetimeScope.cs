@@ -144,6 +144,63 @@ public sealed class LifetimeScope : IDisposable, IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// 取消生命周期并启动逆序清理，但不阻塞等待尚未完成的异步所有者。
+    /// 仅用于主线程已经不能安全等待异步 continuation 的紧急退出路径；
+    /// 常规关闭仍应使用 <see cref="DisposeAsync"/>。
+    /// </summary>
+    public void DisposeEmergency(Action<Exception>? failureSink = null)
+    {
+        var owned = BeginDispose(out var cancellationError);
+        if (owned is null)
+        {
+            return;
+        }
+
+        ReportEmergencyFailure(cancellationError, failureSink);
+        List<Task>? pending = null;
+        for (var index = owned.Count - 1; index >= 0; index--)
+        {
+            try
+            {
+                switch (owned[index])
+                {
+                    case LifetimeScope child:
+                        child.DisposeEmergency(failureSink);
+                        break;
+                    case IDisposable disposable:
+                        disposable.Dispose();
+                        break;
+                    case IAsyncDisposable asyncDisposable:
+                    {
+                        var disposal = asyncDisposable.DisposeAsync();
+                        if (disposal.IsCompletedSuccessfully)
+                        {
+                            disposal.GetAwaiter().GetResult();
+                        }
+                        else
+                        {
+                            (pending ??= []).Add(disposal.AsTask());
+                        }
+                        break;
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                ReportEmergencyFailure(exception, failureSink);
+            }
+        }
+
+        if (pending is null)
+        {
+            CompleteDispose();
+            return;
+        }
+
+        _ = CompleteEmergencyAsync(pending, failureSink);
+    }
+
     private List<object>? BeginDispose(out Exception? cancellationError)
     {
         cancellationError = null;
@@ -178,6 +235,50 @@ public sealed class LifetimeScope : IDisposable, IAsyncDisposable
         }
 
         ((IAsyncDisposable)owned).DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
+
+    private async Task CompleteEmergencyAsync(
+        IReadOnlyList<Task> pending,
+        Action<Exception>? failureSink)
+    {
+        foreach (var task in pending)
+        {
+            try
+            {
+                await task.ConfigureAwait(false);
+            }
+            catch (Exception exception)
+            {
+                ReportEmergencyFailure(exception, failureSink);
+            }
+        }
+
+        CompleteDispose();
+    }
+
+    private void CompleteDispose()
+    {
+        _cancellation.Dispose();
+        DetachFromParent();
+    }
+
+    private static void ReportEmergencyFailure(
+        Exception? exception,
+        Action<Exception>? failureSink)
+    {
+        if (exception is null || failureSink is null)
+        {
+            return;
+        }
+
+        try
+        {
+            failureSink(exception);
+        }
+        catch
+        {
+            // Emergency cleanup cannot allow its diagnostic path to fail teardown.
+        }
     }
 
     private void DetachFromParent()

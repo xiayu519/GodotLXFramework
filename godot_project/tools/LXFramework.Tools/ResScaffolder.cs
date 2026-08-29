@@ -55,6 +55,10 @@ internal static class ResScaffolder
         ToolFiles.WriteJson(manifestPath, manifest);
         ProjectGenerator.Run(root);
         Console.WriteLine($"registered resource '{id}' ({resourceType})");
+        Console.WriteLine(
+            $"typed reference      LX.Generated.ResCatalog.{CodeNames.ToPascalCase(id)}");
+        Console.WriteLine(
+            "generated catalog    src/LXFramework/Generated/ResCatalog.g.cs (do not inspect or edit)");
         return 0;
     }
 }

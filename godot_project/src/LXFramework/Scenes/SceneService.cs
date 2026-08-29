@@ -26,6 +26,7 @@ public sealed class SceneService : IAsyncDisposable
     private readonly Func<LXContext> _context;
     private readonly Dictionary<WorldId, WorldDescriptor> _catalog = [];
     private readonly SemaphoreSlim _transitionGate = new(1, 1);
+    private readonly CancellationTokenSource _shutdown = new();
     private readonly int _mainThreadId;
     private ActiveScene? _active;
     private bool _disposed;
@@ -116,7 +117,11 @@ public sealed class SceneService : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         EnsureMainThread();
+        ObjectDisposedException.ThrowIf(_disposed, this);
         ValidateScenePath(scenePath);
+        using var operation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            _shutdown.Token);
         progress?.Invoke(new SceneLoadProgress(scenePath, SceneLoadStage.LoadingResource, 0));
         var lease = await _assets.AcquireAsync<PackedScene>(
             scenePath,
@@ -125,9 +130,20 @@ public sealed class SceneService : IAsyncDisposable
                 scenePath,
                 SceneLoadStage.LoadingResource,
                 ratio * 0.95f)),
-            cancellationToken);
-        progress?.Invoke(new SceneLoadProgress(scenePath, SceneLoadStage.Ready, 1));
-        return new ScenePreload(scenePath, lease);
+            operation.Token);
+        try
+        {
+            EnsureMainThread();
+            operation.Token.ThrowIfCancellationRequested();
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            progress?.Invoke(new SceneLoadProgress(scenePath, SceneLoadStage.Ready, 1));
+            return new ScenePreload(scenePath, lease);
+        }
+        catch
+        {
+            lease.Dispose();
+            throw;
+        }
     }
 
     public ValueTask ChangeAsync(
@@ -168,7 +184,10 @@ public sealed class SceneService : IAsyncDisposable
         }
 
         ObjectDisposedException.ThrowIf(_disposed, this);
-        await _transitionGate.WaitAsync(cancellationToken);
+        using var operation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            _shutdown.Token);
+        await _transitionGate.WaitAsync(operation.Token);
         try
         {
             if (string.Equals(_active?.Path, scenePath, StringComparison.Ordinal))
@@ -192,8 +211,8 @@ public sealed class SceneService : IAsyncDisposable
                     _assets.PurgeIdleCache();
                 }
 
-                next = await PrepareAsync(scenePath, progress, cancellationToken);
-                cancellationToken.ThrowIfCancellationRequested();
+                next = await PrepareAsync(scenePath, progress, operation.Token);
+                operation.Token.ThrowIfCancellationRequested();
                 if (mode == SceneTransitionMode.KeepPreviousUntilReady)
                 {
                     await ReleaseActiveAsync();
@@ -235,25 +254,61 @@ public sealed class SceneService : IAsyncDisposable
         }
 
         _disposed = true;
+        _shutdown.Cancel();
         await _transitionGate.WaitAsync();
+        List<Exception>? errors = null;
         try
         {
             if (_active is not null)
             {
-                _active.Node.QueueFree();
-                await _active.Lifetime.DisposeAsync();
-                _active.Lease.Dispose();
+                var active = _active;
                 _active = null;
+                try
+                {
+                    active.Node.QueueFree();
+                }
+                catch (Exception exception)
+                {
+                    (errors ??= []).Add(exception);
+                }
+                try
+                {
+                    await active.Lifetime.DisposeAsync();
+                }
+                catch (Exception exception)
+                {
+                    (errors ??= []).Add(exception);
+                }
+                try
+                {
+                    active.Lease.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    (errors ??= []).Add(exception);
+                }
             }
 
-            _worldRoot.QueueFree();
+            try
+            {
+                _worldRoot.QueueFree();
+            }
+            catch (Exception exception)
+            {
+                (errors ??= []).Add(exception);
+            }
             _catalog.Clear();
             UpdateMetrics();
+            if (errors is not null)
+            {
+                throw new AggregateException("Scene service reported cleanup errors.", errors);
+            }
         }
         finally
         {
             _transitionGate.Release();
             _transitionGate.Dispose();
+            _shutdown.Dispose();
         }
     }
 
@@ -271,11 +326,13 @@ public sealed class SceneService : IAsyncDisposable
                 SceneLoadStage.LoadingResource,
                 ratio * 0.9f)),
             cancellationToken);
-        var lifetime = _rootLifetime.CreateChild($"Scene:{scenePath}");
+        LifetimeScope? lifetime = null;
         Node? node = null;
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            lifetime = _rootLifetime.CreateChild($"Scene:{scenePath}");
             progress?.Invoke(new SceneLoadProgress(scenePath, SceneLoadStage.Instantiating, 0.95f));
             node = lease.Resource.Instantiate();
             LXContextInjector.InitializeTree(node, _context(), lifetime);
@@ -291,7 +348,10 @@ public sealed class SceneService : IAsyncDisposable
         catch
         {
             node?.QueueFree();
-            await lifetime.DisposeAsync();
+            if (lifetime is not null)
+            {
+                await lifetime.DisposeAsync();
+            }
             lease.Dispose();
             throw;
         }
@@ -307,8 +367,14 @@ public sealed class SceneService : IAsyncDisposable
         var previous = _active;
         _active = null;
         previous.Node.QueueFree();
-        await previous.Lifetime.DisposeAsync();
-        previous.Lease.Dispose();
+        try
+        {
+            await previous.Lifetime.DisposeAsync();
+        }
+        finally
+        {
+            previous.Lease.Dispose();
+        }
         UpdateMetrics();
 
         // Let queued nodes leave the tree before loading the next potentially
@@ -320,8 +386,14 @@ public sealed class SceneService : IAsyncDisposable
     private static async ValueTask DisposePreparedAsync(ActiveScene scene)
     {
         scene.Node.QueueFree();
-        await scene.Lifetime.DisposeAsync();
-        scene.Lease.Dispose();
+        try
+        {
+            await scene.Lifetime.DisposeAsync();
+        }
+        finally
+        {
+            scene.Lease.Dispose();
+        }
     }
 
     private void UpdateMetrics() => _metrics.SetGauge("scene.active", _active is null ? 0 : 1);
@@ -336,9 +408,7 @@ public sealed class SceneService : IAsyncDisposable
 
     private static void ValidateScenePath(string scenePath)
     {
-        if (string.IsNullOrWhiteSpace(scenePath) ||
-            !scenePath.StartsWith("res://", StringComparison.Ordinal) ||
-            !scenePath.EndsWith(".tscn", StringComparison.OrdinalIgnoreCase))
+        if (!GodotResourcePath.IsCanonical(scenePath, ".tscn"))
         {
             throw new ArgumentException("Scene paths must be non-empty res:// .tscn paths.", nameof(scenePath));
         }

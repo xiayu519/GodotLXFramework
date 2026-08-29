@@ -29,7 +29,6 @@ $requiredFiles = @(
     "godot_project/AGENTS.md",
     "README.md",
     "Books/AI-Development-Workflow.md",
-    "Books/Model-Compatibility-Report.md",
     ".codex/config.toml",
     ".codex/memory/INDEX.md",
     "game_design/AGENTS.md",
@@ -43,6 +42,9 @@ $requiredFiles = @(
     "game_design/data/design_probe.json",
     ".agents/skills/lx-dev/SKILL.md",
     ".agents/skills/lx-dev/agents/openai.yaml",
+    ".agents/skills/lx-dev/references/data-workflow.md",
+    ".agents/skills/lx-dev/references/persistence-workflow.md",
+    ".agents/skills/lx-dev/references/tooling-workflow.md",
     ".agents/skills/lx-codex-workflow/SKILL.md",
     ".agents/skills/lx-codex-workflow/agents/openai.yaml",
     ".agents/skills/lx-codex-workflow/references/codex-native-workflow.md",
@@ -93,9 +95,9 @@ if ($errors.Count -eq 0) {
 
     $config = Read-WorkflowText ".codex/config.toml"
     foreach ($marker in @(
-        'model = "gpt-5.6-terra"',
+        'model = "gpt-5.6-sol"',
         'model_reasoning_effort = "high"',
-        'plan_mode_reasoning_effort = "xhigh"'
+        'plan_mode_reasoning_effort = "high"'
     )) {
         if ($config.IndexOf($marker, [System.StringComparison]::Ordinal) -lt 0) {
             Add-WorkflowError ".codex/config.toml is missing '$marker'."
@@ -104,10 +106,6 @@ if ($errors.Count -eq 0) {
 
     $rootAgents = Read-WorkflowText "AGENTS.md"
     foreach ($marker in @(
-        "gpt-5.6-terra",
-        "gpt-5.6-sol",
-        "lx-dev",
-        "lx-codex-workflow",
         "./lx.ps1 check <changed-path> [...]",
         "./lx.ps1 validate",
         "LX.UI.*",
@@ -117,9 +115,19 @@ if ($errors.Count -eq 0) {
             Add-WorkflowError "Root AGENTS.md is missing '$marker'."
         }
     }
-    foreach ($legacy in @("T0-T3", "Direct/Planned/Deep", ".codex/framework.json", ".codex/validation-map.json")) {
+    foreach ($legacy in @(
+        "T0-T3",
+        "Direct/Planned/Deep",
+        ".codex/framework.json",
+        ".codex/validation-map.json",
+        "gpt-5.6-sol",
+        "reasoning",
+        "lx-dev",
+        "lx-codex-workflow",
+        '修改目标前读取沿途最近的 `AGENTS.md`'
+    )) {
         if ($rootAgents.IndexOf($legacy, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
-            Add-WorkflowError "Root AGENTS.md still contains legacy routing '$legacy'."
+            Add-WorkflowError "Root AGENTS.md contains redundant or legacy routing '$legacy'."
         }
     }
 
@@ -131,7 +139,7 @@ if ($errors.Count -eq 0) {
     }
 
     $budgets = @{
-        "AGENTS.md" = 4096
+        "AGENTS.md" = 3072
         ".codex/memory/INDEX.md" = 1536
         ".agents/skills/lx-dev/SKILL.md" = 6144
         ".agents/skills/lx-codex-workflow/SKILL.md" = 6144
@@ -179,15 +187,13 @@ if ($errors.Count -eq 0) {
 
     try {
         $evals = Read-WorkflowText ".agents/skills/lx-codex-workflow/evals/evals.json" | ConvertFrom-Json
-        $profileKeys = @($evals.profiles | ForEach-Object { "$($_.model)/$($_.reasoning)" })
-        foreach ($requiredProfile in @(
-            "gpt-5.6-terra/high",
-            "gpt-5.6-terra/xhigh",
-            "gpt-5.6-sol/high"
-        )) {
-            if ($requiredProfile -notin $profileKeys) {
-                Add-WorkflowError "Model evaluation is missing '$requiredProfile'."
-            }
+        $profiles = @($evals.profiles)
+        if ($profiles.Count -ne 1 -or
+            $profiles[0].id -ne "sol-high" -or
+            $profiles[0].model -ne "gpt-5.6-sol" -or
+            $profiles[0].reasoning -ne "high" -or
+            $profiles[0].required -ne $true) {
+            Add-WorkflowError "Model evaluation must contain only the required sol-high profile."
         }
         foreach ($case in $evals.cases) {
             if ([string]::IsNullOrWhiteSpace($case.id) -or [string]::IsNullOrWhiteSpace($case.prompt)) {
@@ -207,5 +213,5 @@ if ($errors.Count -gt 0) {
     exit 1
 }
 
-Write-Host "Codex workflow check passed: native layering, skills, project knowledge, and Terra/Sol eval entries are valid."
+Write-Host "Codex workflow check passed: native layering, skills, project knowledge, and the Sol/high eval profile are valid."
 exit 0

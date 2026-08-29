@@ -5,7 +5,8 @@ namespace LX.Runtime;
 
 /// <summary>
 /// Initializes every LXFramework context receiver in an instantiated scene tree.
-/// Children are initialized before parents, mirroring Godot's _Ready ordering.
+/// Children are initialized before parents; siblings follow GetChildren insertion order.
+/// Godot _Ready guarantees the same child-before-parent relation but not sibling order.
 /// </summary>
 public static class LXContextInjector
 {
@@ -19,31 +20,29 @@ public static class LXContextInjector
         ArgumentNullException.ThrowIfNull(lifetime);
         lifetime.ThrowIfDisposed();
 
-        var nodes = new List<Node>();
-        CollectPreOrder(root, nodes);
-
+        var postOrder = new List<Node>();
+        CollectPostOrder(root, postOrder);
         var initialized = 0;
-        for (var index = nodes.Count - 1; index >= 0; index--)
+        foreach (var node in postOrder)
         {
-            if (nodes[index] is not ILXContextReceiver receiver ||
-                receiver.IsLXInitialized)
+            if (node is ILXContextReceiver receiver && !receiver.IsLXInitialized)
             {
-                continue;
+                receiver.Initialize(context, lifetime);
+                initialized++;
             }
-
-            receiver.Initialize(context, lifetime);
-            initialized++;
         }
 
         return initialized;
     }
 
-    private static void CollectPreOrder(Node node, ICollection<Node> result)
+    private static void CollectPostOrder(Node node, ICollection<Node> result)
     {
-        result.Add(node);
-        foreach (var child in node.GetChildren())
+        var childCount = node.GetChildCount();
+        for (var index = 0; index < childCount; index++)
         {
-            CollectPreOrder(child, result);
+            CollectPostOrder(node.GetChild(index), result);
         }
+
+        result.Add(node);
     }
 }

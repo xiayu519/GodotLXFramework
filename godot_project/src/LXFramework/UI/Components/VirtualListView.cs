@@ -52,15 +52,6 @@ public partial class VirtualListView : ScrollContainer
         _factory = factory;
         _binder = binder;
         _content.CustomMinimumSize = new Vector2(0, _itemCount * ItemHeight);
-        var poolSize = Math.Min(
-            itemCount,
-            Math.Max(8, Mathf.CeilToInt(Size.Y / Math.Max(1, ItemHeight)) + BufferItems * 2));
-        for (var index = 0; index < poolSize; index++)
-        {
-            var item = factory() ?? throw new InvalidOperationException("Virtual list factory returned null.");
-            _pool.Add(item);
-            _content.AddChild(item);
-        }
         RefreshVisibleItems();
     }
 
@@ -79,6 +70,7 @@ public partial class VirtualListView : ScrollContainer
         {
             return;
         }
+        EnsurePoolCapacity();
         var first = Math.Max(0, Mathf.FloorToInt((float)GetVScrollBar().Value / ItemHeight) - BufferItems);
         for (var poolIndex = 0; poolIndex < _pool.Count; poolIndex++)
         {
@@ -92,6 +84,20 @@ public partial class VirtualListView : ScrollContainer
             item.Position = new Vector2(0, itemIndex * ItemHeight);
             item.Size = new Vector2(Math.Max(0, Size.X - GetVScrollBar().Size.X), ItemHeight);
             _binder(item, itemIndex);
+        }
+    }
+
+    private void EnsurePoolCapacity()
+    {
+        var required = Math.Min(
+            _itemCount,
+            Math.Max(8, Mathf.CeilToInt(Size.Y / ItemHeight) + BufferItems * 2));
+        while (_pool.Count < required)
+        {
+            var item = _factory!() ??
+                throw new InvalidOperationException("Virtual list factory returned null.");
+            _pool.Add(item);
+            _content!.AddChild(item);
         }
     }
 }

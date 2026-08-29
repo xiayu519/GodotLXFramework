@@ -83,4 +83,39 @@ public sealed class LifetimeScopeTests
 
         Assert.True(scope.Token.IsCancellationRequested);
     }
+
+    [Fact]
+    public async Task DisposeEmergency_DoesNotBlockOnAsyncOwner()
+    {
+        var scope = new LifetimeScope("emergency");
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var owner = scope.Own(new AsyncProbeDisposable(release.Task));
+
+        scope.DisposeEmergency();
+
+        Assert.True(scope.IsDisposed);
+        Assert.True(scope.Token.IsCancellationRequested);
+        Assert.False(owner.Disposed);
+
+        release.SetResult();
+        await owner.Completion.WaitAsync(TimeSpan.FromSeconds(1));
+        Assert.True(owner.Disposed);
+    }
+
+    private sealed class AsyncProbeDisposable(Task release) : IAsyncDisposable
+    {
+        private readonly TaskCompletionSource _completion = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool Disposed { get; private set; }
+
+        public Task Completion => _completion.Task;
+
+        public async ValueTask DisposeAsync()
+        {
+            await release;
+            Disposed = true;
+            _completion.TrySetResult();
+        }
+    }
 }

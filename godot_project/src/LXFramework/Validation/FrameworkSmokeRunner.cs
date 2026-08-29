@@ -1,6 +1,8 @@
 using LX.Audio;
+using LX.Camera;
 using LX.Content;
 using LX.Core.Audio;
+using LX.Core.Actions;
 using LX.Core.Diagnostics;
 using LX.Core.Lifetime;
 using LX.Core.World;
@@ -14,6 +16,7 @@ using LX.Res;
 using LX.Runtime;
 using LX.Scenes;
 using LX.UI;
+using LX.UI.Components;
 using LX.World;
 using Godot;
 
@@ -28,14 +31,19 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
     {
         var LX = context;
         var probeLifetime = LX.Lifetime.CreateChild("Validation:ContextInjection");
-        var rootProbe = new ContextProbeNode { Name = "RootProbe" };
-        var childProbe = new ContextProbeNode { Name = "ChildProbe" };
+        var initializationOrder = new List<string>();
+        var rootProbe = new ContextProbeNode { Name = "RootProbe", InitializationOrder = initializationOrder };
+        var childProbe = new ContextProbeNode { Name = "ChildProbe", InitializationOrder = initializationOrder };
+        var siblingProbe = new ContextProbeNode { Name = "SiblingProbe", InitializationOrder = initializationOrder };
         rootProbe.AddChild(childProbe);
+        rootProbe.AddChild(siblingProbe);
         var initialized = LXContextInjector.InitializeTree(rootProbe, LX, probeLifetime);
-        if (initialized != 2 ||
+        if (initialized != 3 ||
             !rootProbe.InitializationHookCalled ||
             !childProbe.InitializationHookCalled ||
-            !rootProbe.ChildrenWereInitializedFirst)
+            !siblingProbe.InitializationHookCalled ||
+            !rootProbe.ChildrenWereInitializedFirst ||
+            !initializationOrder.SequenceEqual(["ChildProbe", "SiblingProbe", "RootProbe"]))
         {
             throw new InvalidOperationException("Recursive LXFramework context injection failed.");
         }
@@ -53,10 +61,11 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
         {
         }
 
+        using var collisionAction = new StringName("ui_cancel");
         try
         {
             LX.Input.Register(
-                new StringName("ui_cancel"),
+                collisionAction,
                 new InputActionId("framework_smoke_collision"));
             throw new InvalidOperationException("Input router accepted a conflicting Godot action mapping.");
         }
@@ -82,9 +91,56 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
             throw new InvalidOperationException("Pause service did not reject a background-thread call.");
         }
 
+        host.ProcessMode = Node.ProcessModeEnum.Disabled;
+        try
+        {
+            try
+            {
+                LX.Pause.SetPaused(true);
+                throw new InvalidOperationException("Pause service changed state while LXHost could not process.");
+            }
+            catch (InvalidOperationException exception) when (
+                exception.Message.Contains("suspended or disabled", StringComparison.Ordinal))
+            {
+            }
+        }
+        finally
+        {
+            host.ProcessMode = Node.ProcessModeEnum.Always;
+        }
+        if (LX.Pause.IsPaused || LX.Clock.IsPaused || LX.PhysicsClock.IsPaused || host.GetTree().Paused)
+        {
+            throw new InvalidOperationException("Rejected pause left framework clocks or SceneTree out of sync.");
+        }
+
+        LX.Pause.SetPaused(true);
+        host.GetTree().Paused = false;
+        LX.Pause.SetPaused(true);
+        if (!host.GetTree().Paused || !LX.Clock.IsPaused || !LX.PhysicsClock.IsPaused)
+        {
+            throw new InvalidOperationException("Pause service did not repair an external SceneTree pause write.");
+        }
+        LX.Pause.SetPaused(false);
+
         var usedJsonOptions = new System.Text.Json.JsonSerializerOptions();
         _ = System.Text.Json.JsonSerializer.Serialize(new { value = 1 }, usedJsonOptions);
         _ = new ContentService(usedJsonOptions);
+        try
+        {
+            _ = new AssetRef<Resource>("res://scene/../scene/main.tscn");
+            throw new InvalidOperationException("AssetRef accepted a non-canonical resource alias.");
+        }
+        catch (ArgumentException)
+        {
+        }
+        try
+        {
+            _ = new ContentRef<object>("res://content/../project.godot.json");
+            throw new InvalidOperationException("ContentRef accepted a path outside the content boundary.");
+        }
+        catch (ArgumentException)
+        {
+        }
         GD.Print("LX_RUNTIME_GUARDS_PASS");
 
         const string generatedAssetKey = "generated://validation/resource_lifetime";
@@ -128,6 +184,66 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
             throw new InvalidOperationException("Purging LX.Res disposed a ResourceLoader-owned shared resource.");
         }
         GD.Print("LX_RESOURCE_SHARED_CACHE_SAFETY_PASS");
+
+        var observerFailure = LX.Res.AcquireAsync<Texture2D>(
+            icon.Path,
+            icon.CachePolicy,
+            progress: _ => throw new InvalidOperationException("expected observer failure"),
+            cancellationToken: cancellationToken).AsTask();
+        var observerSurvivor = LX.Res.AcquireAsync(icon, cancellationToken).AsTask();
+        try
+        {
+            _ = await observerFailure;
+            throw new InvalidOperationException("A failing asset progress observer unexpectedly succeeded.");
+        }
+        catch (InvalidOperationException exception) when (
+            exception.Message.Contains("expected observer failure", StringComparison.Ordinal))
+        {
+        }
+        using (var survivorLease = await observerSurvivor)
+        {
+            if (survivorLease.Resource.GetWidth() <= 0)
+            {
+                throw new InvalidOperationException("A caller observer failure poisoned the shared asset load.");
+            }
+        }
+
+        using (var cancelledObserver = new CancellationTokenSource())
+        {
+            var cancelledAcquire = LX.Res.AcquireAsync<Texture2D>(
+                icon.Path,
+                icon.CachePolicy,
+                progress: _ => { },
+                cancellationToken: cancelledObserver.Token).AsTask();
+            var cancellationSurvivor = LX.Res.AcquireAsync(icon, cancellationToken).AsTask();
+            cancelledObserver.Cancel();
+            try
+            {
+                _ = await cancelledAcquire;
+                throw new InvalidOperationException("A cancelled asset observer unexpectedly acquired a lease.");
+            }
+            catch (OperationCanceledException) when (cancelledObserver.IsCancellationRequested)
+            {
+            }
+            using var survivorLease = await cancellationSurvivor;
+            if (survivorLease.Resource.GetWidth() <= 0)
+            {
+                throw new InvalidOperationException("A cancelled caller poisoned the shared asset load.");
+            }
+        }
+
+        using (var retryLease = await LX.Res.AcquireAsync(icon, cancellationToken))
+        {
+            if (retryLease.Resource.GetWidth() <= 0)
+            {
+                throw new InvalidOperationException("Asset retry failed after isolated observer termination.");
+            }
+        }
+        if (LX.Res.Snapshot().Any(record => record.Path == icon.Path))
+        {
+            throw new InvalidOperationException("Shared asset observer validation leaked a transient lease.");
+        }
+        GD.Print("LX_RESOURCE_INFLIGHT_OBSERVER_ISOLATION_PASS");
 
         using (var batch = await LX.Res.AcquireBatchAsync(
                    [
@@ -262,6 +378,25 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
         }
         GD.Print("LX_INPUT_CONTEXT_PASS");
 
+        using (var menuAction = new StringName("lx_menu"))
+        {
+            var defaultKeys = InputMap.ActionGetEvents(menuAction)
+                .OfType<InputEventKey>()
+                .Select(inputEvent => (inputEvent.Keycode, inputEvent.PhysicalKeycode))
+                .ToArray();
+            LX.Input.ReplaceKeyBinding(menuAction, Key.F12);
+            LX.Input.RestoreDefaultKeyBinding(menuAction);
+            var restoredKeys = InputMap.ActionGetEvents(menuAction)
+                .OfType<InputEventKey>()
+                .Select(inputEvent => (inputEvent.Keycode, inputEvent.PhysicalKeycode))
+                .ToArray();
+            if (!restoredKeys.SequenceEqual(defaultKeys))
+            {
+                throw new InvalidOperationException("Removing a custom key binding did not restore its default events.");
+            }
+        }
+        GD.Print("LX_INPUT_DEFAULT_BINDING_RESTORE_PASS");
+
         const string missingLocalizationKey = "__lx_framework_missing_probe__";
         LX.Localization.ClearMissingKeys();
         LX.Localization.PseudoLocalizationEnabled = true;
@@ -367,9 +502,24 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
             throw new InvalidOperationException("Feature spawn and recursive initialization failed.");
         }
         await feature.DisposeAsync();
-        if (LX.Features.Snapshot().Count != 0)
+        if (!feature.IsDisposed || LX.Features.Snapshot().Count != 0)
         {
-            throw new InvalidOperationException("Feature despawn did not release its active record.");
+            throw new InvalidOperationException("Feature despawn did not release its handle or active record.");
+        }
+
+        var featureOwner = LX.Lifetime.CreateChild("Validation:FeatureOwner");
+        var ownerBoundFeature = await LX.Features.SpawnAsync(
+            featureId,
+            host,
+            featureOwner,
+            cancellationToken);
+        await featureOwner.DisposeAsync();
+        await host.ToSignal(host.GetTree(), SceneTree.SignalName.ProcessFrame);
+        await host.ToSignal(host.GetTree(), SceneTree.SignalName.ProcessFrame);
+        if (!ownerBoundFeature.IsDisposed || LX.Features.Snapshot().Count != 0)
+        {
+            throw new InvalidOperationException(
+                "Feature owner lifetime did not update its handle or active record.");
         }
         GD.Print("LX_FEATURE_LIFECYCLE_PASS");
 
@@ -408,13 +558,21 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
             poolLifetime,
             maxRetained: 2,
             cancellationToken: cancellationToken);
-        var pooled = pool.RentLease(host);
-        if (!pooled.Node.IsLXInitialized || pool.RentedCount != 1)
+        var pooled = pool.RentLease(host, node => node.ConfiguredBeforeTree = !node.IsInsideTree());
+        var firstPooledNode = pooled.Node;
+        if (!firstPooledNode.IsLXInitialized ||
+            !firstPooledNode.ConfiguredBeforeTree ||
+            firstPooledNode.PoolRentCount != 1 ||
+            firstPooledNode.LastPoolActivationToken.IsCancellationRequested ||
+            pool.RentedCount != 1)
         {
-            throw new InvalidOperationException("Packed-scene pool did not inject context or track its rented node.");
+            throw new InvalidOperationException("Packed-scene pool did not configure, activate or track its rented node.");
         }
         pooled.Dispose();
-        if (pool.RentedCount != 0 || pool.RetainedCount != 1)
+        if (firstPooledNode.PoolReturnCount != 1 ||
+            !firstPooledNode.LastPoolActivationToken.IsCancellationRequested ||
+            pool.RentedCount != 0 ||
+            pool.RetainedCount != 1)
         {
             throw new InvalidOperationException("Packed-scene pool did not retain the returned node.");
         }
@@ -429,8 +587,93 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
         {
             throw new InvalidOperationException("Lifetime disposal did not return and retain the pooled node.");
         }
+
+        var activeDuringOwnerShutdown = pool.Rent(host);
         await poolLifetime.DisposeAsync();
+        if (activeDuringOwnerShutdown.PoolReturnCount < 1 ||
+            !activeDuringOwnerShutdown.PoolReturnObservedActiveToken ||
+            !activeDuringOwnerShutdown.LastPoolActivationToken.IsCancellationRequested)
+        {
+            throw new InvalidOperationException(
+                "Pool owner shutdown did not call OnReturn before cancelling the active rental lifetime.");
+        }
+
+        using (var invalidNodePool = new NodePool<Node>(() => new Node(), maxRetained: 1))
+        {
+            var invalidPooledNode = invalidNodePool.Rent(host);
+            invalidPooledNode.QueueFree();
+            await host.ToSignal(host.GetTree(), SceneTree.SignalName.ProcessFrame);
+            try
+            {
+                invalidNodePool.Return(invalidPooledNode);
+                throw new InvalidOperationException("Node pool retained a freed node.");
+            }
+            catch (InvalidOperationException exception) when (
+                exception.Message.Contains("cannot be retained", StringComparison.Ordinal))
+            {
+            }
+            if (invalidNodePool.RentedCount != 0 || invalidNodePool.RetainedCount != 0)
+            {
+                throw new InvalidOperationException("Node pool accounting retained a freed node.");
+            }
+        }
         GD.Print("LX_PACKED_SCENE_POOL_PASS");
+
+        var cameraLifetime = LX.Lifetime.CreateChild("Validation:Camera2DController");
+        var camera = new Camera2D { Name = "ValidationCamera", Enabled = false };
+        var secondCamera = new Camera2D { Name = "ValidationCameraSecond", Enabled = false };
+        var cameraTarget = new Node2D { Name = "ValidationCameraTarget" };
+        host.AddChild(camera);
+        host.AddChild(secondCamera);
+        host.AddChild(cameraTarget);
+        camera.GlobalPosition = new Vector2(10, 10);
+        secondCamera.GlobalPosition = new Vector2(20, 20);
+        cameraTarget.GlobalPosition = new Vector2(120, 50);
+        var cameraController = Camera2DController.Attach(camera, cameraLifetime);
+        _ = Camera2DController.Attach(secondCamera, cameraLifetime);
+        cameraController.Follow(cameraTarget, new Camera2DFollowOptions
+        {
+            DeadZoneSize = new Vector2(10, 10),
+            SmoothingSpeed = 0,
+        });
+        cameraController.SetCenterBounds(new Rect2(0, 0, 100, 100));
+        cameraController._Process(1.0 / 60.0);
+        if (!camera.GlobalPosition.IsEqualApprox(new Vector2(100, 45)) ||
+            !secondCamera.GlobalPosition.IsEqualApprox(new Vector2(20, 20)))
+        {
+            throw new InvalidOperationException(
+                "Camera2D controller follow, dead-zone, bounds or per-camera isolation failed.");
+        }
+        try
+        {
+            _ = Camera2DController.Attach(camera, cameraLifetime);
+            throw new InvalidOperationException("Camera2D accepted two controllers for the same camera.");
+        }
+        catch (InvalidOperationException exception) when (
+            exception.Message.Contains("already has", StringComparison.Ordinal))
+        {
+        }
+        cameraController.Shake(4, TimeSpan.FromSeconds(1), 8);
+        cameraController._Process(0.1);
+        if (camera.Offset.IsEqualApprox(Vector2.Zero))
+        {
+            throw new InvalidOperationException("Camera2D controller shake did not affect Camera2D.Offset.");
+        }
+        cameraController.StopShake();
+        if (!camera.Offset.IsEqualApprox(Vector2.Zero))
+        {
+            throw new InvalidOperationException("Camera2D controller did not restore its base offset.");
+        }
+        await cameraLifetime.DisposeAsync();
+        await host.ToSignal(host.GetTree(), SceneTree.SignalName.ProcessFrame);
+        if (GodotObject.IsInstanceValid(cameraController))
+        {
+            throw new InvalidOperationException("Camera2D controller outlived its owning lifetime.");
+        }
+        camera.Free();
+        secondCamera.Free();
+        cameraTarget.Free();
+        GD.Print("LX_CAMERA_2D_CONTROLLER_PASS");
 
         var chunkParent = new Node2D { Name = "ValidationChunks" };
         host.AddChild(chunkParent);
@@ -506,6 +749,30 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
         }
         await invalidChunkStreamer.DisposeAsync();
         await chunkOwner.DisposeAsync();
+
+        var autoOwnedChunkOwner = LX.Lifetime.CreateChild("Validation:AutoOwnedWorldChunkStreaming");
+        var autoOwnedChunkSource = new ValidationWorldChunkSource(
+            [new ChunkCoordinate(0, 0)],
+            _ => new Node2D { Name = "AutoOwnedValidationChunk" });
+        var autoOwnedChunkStreamer = new WorldChunkStreamer(
+            chunkParent,
+            autoOwnedChunkSource,
+            autoOwnedChunkOwner,
+            LX.Metrics,
+            () => LX);
+        await autoOwnedChunkStreamer.SetFocusAsync(
+            new ChunkCoordinate(0, 0),
+            radius: 0,
+            cancellationToken);
+        await autoOwnedChunkOwner.DisposeAsync();
+        if (!autoOwnedChunkSource.IsDisposed ||
+            autoOwnedChunkSource.LastCreated is null ||
+            GodotObject.IsInstanceValid(autoOwnedChunkSource.LastCreated) ||
+            LX.Metrics.Snapshot().Gauges.GetValueOrDefault("world.chunks_active") != 0)
+        {
+            throw new InvalidOperationException(
+                "World chunk streamer was not closed by its declared parent lifetime.");
+        }
         chunkParent.Free();
         GD.Print("LX_WORLD_CHUNK_STREAMING_PROGRESS_PASS");
 
@@ -616,11 +883,180 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
         var resultTask = resultHandle.WaitForResultAsync<string>(cancellationToken).AsTask();
         resultScreen.Complete("accepted");
         var result = await resultTask;
-        if (!result.HasValue || result.Value != "accepted" || resultScreen.ExitTransitions != 1)
+        if (!result.HasValue ||
+            result.Value != "accepted" ||
+            resultScreen.ExitTransitions != 1 ||
+            !resultHandle.IsClosed)
         {
-            throw new InvalidOperationException("UI strong-type result or exit transition did not complete.");
+            throw new InvalidOperationException(
+                "UI strong-type result, exit transition, or handle closure did not complete.");
         }
         GD.Print("LX_UI_RESULT_TRANSITION_PASS");
+
+        var resultOwner = LX.Lifetime.CreateChild("Validation:UIActivationOwner");
+        var ownerBoundHandle = await LX.UI.OpenAsync(
+            resultUiId,
+            parentLifetime: resultOwner,
+            cancellationToken: cancellationToken);
+        var ownerBoundCompletion = ownerBoundHandle.WaitForResultAsync<string>(cancellationToken).AsTask();
+        await resultOwner.DisposeAsync();
+        await host.ToSignal(host.GetTree(), SceneTree.SignalName.ProcessFrame);
+        await host.ToSignal(host.GetTree(), SceneTree.SignalName.ProcessFrame);
+        _ = await ownerBoundCompletion;
+        if (resultScreen.HideSawDisposedActivation ||
+            LX.UI.IsOpen(resultUiId) ||
+            !ownerBoundHandle.IsClosed)
+        {
+            throw new InvalidOperationException(
+                "UI parent cancellation disposed activation before OnHideAsync completed.");
+        }
+        GD.Print("LX_UI_ACTIVATION_OWNERSHIP_PASS");
+
+        var instantFade = new UIFadeOptions
+        {
+            FadeOutDuration = TimeSpan.Zero,
+            HoldDuration = TimeSpan.Zero,
+            FadeInDuration = TimeSpan.Zero,
+            Transition = Tween.TransitionType.Quad,
+            Ease = Tween.EaseType.Out,
+        };
+        await LX.UI.PlayFadeAsync(UIFadeMode.FadeOut, instantFade, cancellationToken);
+        var fadeScreen = uiCanvas.FindChild("UIFadeTransition", recursive: true, owned: false)
+            as UIFadeTransitionScreen ??
+            throw new InvalidOperationException("UI fade transition prefab was not instanced.");
+        var blackout = fadeScreen.GetNode<ColorRect>("%Blackout");
+        if (!LX.UI.IsFadeBlackoutActive ||
+            !LX.UI.IsOpen(UICatalog.UIFadeTransition.Id) ||
+            blackout.Color != Colors.Black ||
+            blackout.AnchorRight != 1f ||
+            blackout.AnchorBottom != 1f)
+        {
+            throw new InvalidOperationException("UI FadeOut did not retain a full-screen black overlay.");
+        }
+
+        await LX.UI.PlayFadeAsync(UIFadeMode.FadeIn, instantFade, cancellationToken);
+        if (LX.UI.IsFadeBlackoutActive || LX.UI.IsOpen(UICatalog.UIFadeTransition.Id))
+        {
+            throw new InvalidOperationException("UI FadeIn did not release the retained black overlay.");
+        }
+
+        await LX.UI.PlayFadeAsync(UIFadeMode.FadeOutIn, instantFade, cancellationToken);
+        if (LX.UI.IsFadeBlackoutActive || LX.UI.IsOpen(UICatalog.UIFadeTransition.Id))
+        {
+            throw new InvalidOperationException("Complete UI fade did not close after returning to transparent.");
+        }
+
+        var animatedFade = instantFade with
+        {
+            FadeOutDuration = TimeSpan.FromMilliseconds(40),
+            FadeInDuration = TimeSpan.FromMilliseconds(40),
+            Transition = Tween.TransitionType.Sine,
+            Ease = Tween.EaseType.InOut,
+        };
+        var queuedFadeOut = LX.UI.PlayFadeAsync(
+            UIFadeMode.FadeOut,
+            animatedFade,
+            cancellationToken).AsTask();
+        var queuedFadeIn = LX.UI.PlayFadeAsync(
+            UIFadeMode.FadeIn,
+            animatedFade,
+            cancellationToken).AsTask();
+        await Task.WhenAll(queuedFadeOut, queuedFadeIn);
+        if (LX.UI.IsFadeBlackoutActive || LX.UI.IsOpen(UICatalog.UIFadeTransition.Id))
+        {
+            throw new InvalidOperationException("Queued UI fade requests did not execute serially.");
+        }
+
+        using (var fadeCancellation = new CancellationTokenSource())
+        {
+            var cancelledFade = LX.UI.PlayFadeAsync(
+                UIFadeMode.FadeOut,
+                animatedFade with { FadeOutDuration = TimeSpan.FromSeconds(1) },
+                fadeCancellation.Token).AsTask();
+            await host.ToSignal(host.GetTree(), SceneTree.SignalName.ProcessFrame);
+            fadeCancellation.Cancel();
+            try
+            {
+                await cancelledFade;
+                throw new InvalidOperationException("UI fade ignored cancellation.");
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+        if (LX.UI.IsFadeBlackoutActive || LX.UI.IsOpen(UICatalog.UIFadeTransition.Id))
+        {
+            throw new InvalidOperationException("Cancelled UI fade did not roll back its new overlay.");
+        }
+
+        try
+        {
+            await LX.UI.PlayFadeAsync(
+                UIFadeMode.FadeOut,
+                instantFade with { FadeOutDuration = TimeSpan.FromMilliseconds(-1) },
+                cancellationToken);
+            throw new InvalidOperationException("UI fade accepted a negative duration.");
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+        }
+        GD.Print("LX_UI_FADE_TRANSITION_PASS");
+
+        var virtualList = new VirtualListView
+        {
+            Name = "ValidationVirtualList",
+            Size = new Vector2(240, 80),
+        };
+        host.AddChild(virtualList);
+        virtualList.Configure(100, () => new Control(), (_, _) => { });
+        var virtualContent = virtualList.GetNode<Control>("VirtualContent");
+        var compactPoolSize = virtualContent.GetChildCount();
+        virtualList.Size = new Vector2(240, 480);
+        await host.ToSignal(host.GetTree(), SceneTree.SignalName.ProcessFrame);
+        if (virtualContent.GetChildCount() <= compactPoolSize)
+        {
+            throw new InvalidOperationException("Virtual list did not grow its item pool after resizing.");
+        }
+        virtualList.QueueFree();
+
+        var toast = new ToastView { Name = "ValidationToast" };
+        host.AddChild(toast);
+        using (var toastCancellation = new CancellationTokenSource())
+        {
+            var toastTask = toast.ShowMessageAsync(
+                "cancel",
+                durationSeconds: 10,
+                toastCancellation.Token).AsTask();
+            toastCancellation.Cancel();
+            try
+            {
+                await toastTask.WaitAsync(TimeSpan.FromMilliseconds(200));
+                throw new InvalidOperationException("Toast timer ignored cancellation.");
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+        if (toast.Visible)
+        {
+            throw new InvalidOperationException("Cancelled toast remained visible.");
+        }
+        toast.QueueFree();
+
+        var confirm = new ConfirmDialogView { Name = "ValidationConfirm" };
+        host.AddChild(confirm);
+        var confirmTask = confirm.ShowPromptAsync("exit", cancellationToken).AsTask();
+        confirm.QueueFree();
+        await host.ToSignal(host.GetTree(), SceneTree.SignalName.ProcessFrame);
+        try
+        {
+            await confirmTask.WaitAsync(TimeSpan.FromMilliseconds(200));
+            throw new InvalidOperationException("Confirm dialog tree exit left its prompt pending.");
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        GD.Print("LX_UI_COMPONENT_LIFECYCLE_PASS");
 
         var metrics = LX.Metrics.Snapshot();
         if (!metrics.Counters.TryGetValue("validation.ui_context_injected", out var injections) ||
@@ -629,6 +1065,25 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
             throw new InvalidOperationException("UI context injection was not observed during smoke validation.");
         }
         GD.Print("LX_UI_LIFECYCLE_PASS");
+
+        var actionOwner = LX.Lifetime.CreateChild("Validation:Actions");
+        var actionOrder = new List<int>();
+        await LX.Actions.RunAsync(
+            LXActions.Sequence(
+                LXActions.Invoke(() => actionOrder.Add(1), "first"),
+                LXActions.Delay(TimeSpan.Zero, "yield"),
+                LXActions.Invoke(() => actionOrder.Add(2), "second")),
+            actionOwner,
+            cancellationToken);
+        await actionOwner.DisposeAsync();
+        var actionSnapshot = LX.Actions.Snapshot();
+        if (!actionOrder.SequenceEqual([1, 2]) ||
+            actionSnapshot.Active.Count != 0 ||
+            actionSnapshot.Recent.LastOrDefault()?.State != ActionNodeState.Completed)
+        {
+            throw new InvalidOperationException("LX.Actions execution or diagnostics were incomplete.");
+        }
+        GD.Print("LX_ACTIONS_LIFETIME_PASS");
 
         LX.Diagnostics.Log(
             DiagnosticSeverity.Information,
@@ -659,6 +1114,8 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
 
         public Node? LastCreated { get; private set; }
 
+        public bool IsDisposed { get; private set; }
+
         public ValueTask<Node> InstantiateAsync(
             ChunkCoordinate coordinate,
             LifetimeScope lifetime,
@@ -670,6 +1127,10 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
             return ValueTask.FromResult(node);
         }
 
-        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+        public ValueTask DisposeAsync()
+        {
+            IsDisposed = true;
+            return ValueTask.CompletedTask;
+        }
     }
 }

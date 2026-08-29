@@ -73,10 +73,22 @@ internal static partial class ProjectInspector
             files.Count(path => path.EndsWith(".tres", StringComparison.OrdinalIgnoreCase)));
         var output = Path.Combine(root, ".lx", "project-index.json");
         ToolFiles.WriteJson(output, index);
+        CapabilityCatalog.Write(root);
+        var productSummary = string.IsNullOrWhiteSpace(index.Product.Name)
+            ? "none (run 'lx create game <Name>')"
+            : $"{index.Product.Name} | namespace={index.Product.RootNamespace} | source={index.Product.SourceRoot}";
         Console.WriteLine(
             $"inspect passed ({(includeFiles ? "full" : "compact")}): " +
             $"{files.Length} files, {scenes.Length} scenes, " +
-            $"{index.ContextServices.Count} services -> {ToolFiles.Relative(root, output)}");
+            $"{index.ContextServices.Count} services");
+        Console.WriteLine($"product              {productSummary}");
+        Console.WriteLine(
+            $"context services     {string.Join(", ", index.ContextServices.Select(service => service.Name))}");
+        Console.WriteLine(
+            $"catalog counts       worlds={index.Product.Worlds.Count}, ui={index.Catalogs.Ui.Count}, " +
+            $"resources={index.Catalogs.Resources.Count}, input={index.Catalogs.Input.Count}, " +
+            $"content={index.Catalogs.Content.Count}, features={index.Catalogs.Features.Count}");
+        Console.WriteLine($"index                {Path.GetFullPath(output)}");
         return 0;
     }
 

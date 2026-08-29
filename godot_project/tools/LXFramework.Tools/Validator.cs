@@ -13,9 +13,18 @@ internal static class Validator
         ValidateRegistrations(root, errors);
         ValidateArchitecture(root, errors);
         ValidatePublicApiDocumentation(root, errors);
+        if (PublicApiBaseline.Validate(root) is { } apiError)
+        {
+            errors.Add(apiError);
+        }
         ValidateBrandAndApi(root, errors);
         ValidateHumanTooling(root, errors);
         ValidateGenerated(root, errors);
+        ValidateCapabilities(root, errors);
+        if (MaintenancePlanner.ValidateTransactionEngine() is { } transactionError)
+        {
+            errors.Add(transactionError);
+        }
 
         var report = new ValidationReport(DateTimeOffset.UtcNow, errors.Count == 0, errors);
         var output = Path.Combine(root, ".lx", "validation.json");
@@ -70,7 +79,15 @@ internal static class Validator
         if (File.Exists(buildPropsPath) &&
             !File.ReadAllText(buildPropsPath).Contains("<LangVersion>12.0</LangVersion>", StringComparison.Ordinal))
         {
-            errors.Add("Directory.Build.props must pin C# 12.0 for the Godot 4.6 / .NET 8 baseline.");
+            errors.Add("Directory.Build.props must pin C# 12.0 for the Godot 4.7 / .NET 8 baseline.");
+        }
+
+        var csharpProjectPath = Path.Combine(root, "LXFramework.csproj");
+        if (File.Exists(csharpProjectPath) &&
+            !File.ReadAllText(csharpProjectPath)
+                .Contains("Godot.NET.Sdk/4.7.2", StringComparison.Ordinal))
+        {
+            errors.Add("LXFramework.csproj must pin Godot.NET.Sdk/4.7.2.");
         }
 
         var editorConfigPath = Path.Combine(root, ".editorconfig");
@@ -93,6 +110,10 @@ internal static class Validator
 
         var project = File.ReadAllText(projectPath);
         var main = File.ReadAllText(mainPath);
+        if (!project.Contains("config/features=PackedStringArray(\"4.7\"", StringComparison.Ordinal))
+        {
+            errors.Add("project.godot must declare the Godot 4.7 feature baseline.");
+        }
         const string mainUid = "uid://s543p8mkoql5";
         if (!project.Contains($"run/main_scene=\"{mainUid}\"", StringComparison.Ordinal))
         {
@@ -779,6 +800,69 @@ internal static class Validator
     private static bool IsUnderGeneratedDirectory(string path) =>
         path.Split(Path.DirectorySeparatorChar)
             .Contains("Generated", StringComparer.OrdinalIgnoreCase);
+
+    private static void ValidateCapabilities(string root, ICollection<string> errors)
+    {
+        var catalog = CapabilityCatalog.Build(root);
+        foreach (var duplicate in catalog.Capabilities
+                     .GroupBy(capability => capability.Id, StringComparer.Ordinal)
+                     .Where(group => group.Count() > 1))
+        {
+            errors.Add($"Capability ID '{duplicate.Key}' is duplicated.");
+        }
+
+        var recipes = catalog.VerifyRecipes.Select(recipe => recipe.Id).ToHashSet(StringComparer.Ordinal);
+        var program = File.ReadAllText(Path.Combine(root, "tools", "LXFramework.Tools", "Program.cs"));
+        var wrapper = File.ReadAllText(Path.Combine(root, "lx.ps1"));
+        foreach (var duplicate in catalog.Capabilities
+                     .SelectMany(capability => capability.Commands)
+                     .GroupBy(command => command.Invocation, StringComparer.Ordinal)
+                     .Where(group => group.Count() > 1))
+        {
+            errors.Add($"Capability invocation '{duplicate.Key}' is duplicated.");
+        }
+        foreach (var command in catalog.Capabilities.SelectMany(capability => capability.Commands))
+        {
+            if (!recipes.Contains(command.VerifyRecipe))
+            {
+                errors.Add(
+                    $"Capability command '{command.Invocation}' references missing verify recipe " +
+                    $"'{command.VerifyRecipe}'.");
+            }
+            if (!program.Contains($"\"{command.RootCommand}\" =>", StringComparison.Ordinal) &&
+                !wrapper.Contains($"\"{command.RootCommand}\" {{", StringComparison.Ordinal))
+            {
+                errors.Add(
+                    $"Capability command '{command.Invocation}' has no Program command route.");
+            }
+
+            var localArtifactEffects = command.SideEffects
+                .Where(effect => effect.Contains(".lx-", StringComparison.Ordinal))
+                .ToArray();
+            if (command.Kind == CapabilityCommandKind.ReadOnly && command.SideEffects.Count != 0)
+            {
+                errors.Add(
+                    $"Read-only capability '{command.Invocation}' must declare no side effects.");
+            }
+            if (localArtifactEffects.Length != 0 && command.Kind == CapabilityCommandKind.ReadOnly)
+            {
+                errors.Add(
+                    $"Capability '{command.Invocation}' writes .lx artifacts but is classified ReadOnly.");
+            }
+            if (command.Kind == CapabilityCommandKind.LocalArtifact &&
+                (command.SideEffects.Count == 0 || localArtifactEffects.Length != command.SideEffects.Count))
+            {
+                errors.Add(
+                    $"LocalArtifact capability '{command.Invocation}' may only declare .lx side effects.");
+            }
+            if (command.Kind == CapabilityCommandKind.ProjectMutation &&
+                command.SideEffects.All(effect => effect.Contains(".lx-", StringComparison.Ordinal)))
+            {
+                errors.Add(
+                    $"ProjectMutation capability '{command.Invocation}' must declare a project-side effect.");
+            }
+        }
+    }
 }
 
 internal sealed record ValidationReport(

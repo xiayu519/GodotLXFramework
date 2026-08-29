@@ -17,8 +17,10 @@
 | 父子协作 | 直接方法/属性调用或 Godot 信号 | 隐藏所有权的全局事件 |
 | 启动、菜单、游玩、结束等产品状态 | `GameFlow<TState,TContext>` | 把状态散落到无关节点 |
 | 暂停游戏 | `LX.Pause` | 分别修改时钟和 `SceneTree.Paused` |
+| 单个 2D 相机的跟随、边界和震动 | `Camera2DController.Attach(camera, lifetime)` | 只有一个“当前相机”的全局相机管理器 |
 | 画面帧时序 | `LX.Clock` / `LX.Scheduler` | 用可变渲染帧模拟确定性物理 |
 | 固定模拟时序 | `LX.PhysicsClock` / `LX.PhysicsScheduler` | 把渲染帧当确定性 Tick |
+| 顺序、并行、竞速、超时或重试流程 | `LX.Actions` 与 `LXActions` 组合 | 再建一套状态机、时钟或无 owner 的异步任务 |
 
 ## 层级放置
 

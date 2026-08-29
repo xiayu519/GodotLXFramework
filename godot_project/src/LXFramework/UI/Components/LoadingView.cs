@@ -31,6 +31,10 @@ public partial class LoadingView : PanelContainer
         _progress!.Visible = progress is not null;
         if (progress is not null)
         {
+            if (!float.IsFinite(progress.Value))
+            {
+                throw new ArgumentOutOfRangeException(nameof(progress));
+            }
             _progress.Value = Math.Clamp(progress.Value, 0, 1) * 100;
         }
         Show();

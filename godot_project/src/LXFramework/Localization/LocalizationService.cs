@@ -5,6 +5,7 @@ namespace LX.Localization;
 
 public sealed class LocalizationService
 {
+    private static readonly StringName EmptyContext = new();
     private readonly EventHub _events;
     private readonly HashSet<string> _missingKeys = new(StringComparer.Ordinal);
     private readonly int _mainThreadId;
@@ -66,8 +67,7 @@ public sealed class LocalizationService
     public string Text(StringName key)
     {
         EnsureMainThread();
-        using var emptyContext = new StringName();
-        return FinalizeTranslation(key.ToString(), TranslationServer.Translate(key, emptyContext).ToString());
+        return FinalizeTranslation(key.ToString(), TranslationServer.Translate(key, EmptyContext).ToString());
     }
 
     public string Text(StringName key, StringName context)
@@ -82,8 +82,7 @@ public sealed class LocalizationService
         int count)
     {
         EnsureMainThread();
-        using var emptyContext = new StringName();
-        var translated = TranslationServer.TranslatePlural(singular, plural, count, emptyContext).ToString();
+        var translated = TranslationServer.TranslatePlural(singular, plural, count, EmptyContext).ToString();
         return FinalizeTranslation(count == 1 ? singular.ToString() : plural.ToString(), translated);
     }
 

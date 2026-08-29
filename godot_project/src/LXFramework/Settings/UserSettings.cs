@@ -12,12 +12,15 @@ public sealed record UserSettings(
     public UserSettings Normalize() => this with
     {
         Locale = string.IsNullOrWhiteSpace(Locale) ? "zh_CN" : Locale.Trim(),
-        MasterVolume = Math.Clamp(MasterVolume, 0, 1),
-        MusicVolume = Math.Clamp(MusicVolume, 0, 1),
-        SfxVolume = Math.Clamp(SfxVolume, 0, 1),
-        UiScale = Math.Clamp(UiScale, 0.75f, 2.0f),
+        MasterVolume = ClampFinite(MasterVolume, 0, 1, 1.0f),
+        MusicVolume = ClampFinite(MusicVolume, 0, 1, 0.8f),
+        SfxVolume = ClampFinite(SfxVolume, 0, 1, 0.8f),
+        UiScale = ClampFinite(UiScale, 0.75f, 2.0f, 1.0f),
         KeyBindings = NormalizeBindings(KeyBindings),
     };
+
+    private static float ClampFinite(float value, float minimum, float maximum, float fallback) =>
+        float.IsFinite(value) ? Math.Clamp(value, minimum, maximum) : fallback;
 
     private static Dictionary<string, string> NormalizeBindings(
         IReadOnlyDictionary<string, string>? bindings)

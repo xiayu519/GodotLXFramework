@@ -52,7 +52,7 @@ internal sealed class VisualCaptureRunner
                 await _host.ToSignal(_host.GetTree(), SceneTree.SignalName.ProcessFrame);
             }
 
-            var actual = RenderSemanticSnapshot(instance);
+            using var actual = RenderSemanticSnapshot(instance);
             var saveError = actual.SavePng(actualPath);
             if (saveError != Error.Ok)
             {
@@ -93,7 +93,7 @@ internal sealed class VisualCaptureRunner
                     diffPath);
             }
 
-            var baseline = Image.LoadFromFile(baselinePath);
+            using var baseline = Image.LoadFromFile(baselinePath);
             if (baseline.GetWidth() != actual.GetWidth() || baseline.GetHeight() != actual.GetHeight())
             {
                 return new VisualComparisonReport(
@@ -111,7 +111,7 @@ internal sealed class VisualCaptureRunner
                     diffPath);
             }
 
-            var diff = Image.CreateEmpty(actual.GetWidth(), actual.GetHeight(), false, Image.Format.Rgba8);
+            using var diff = Image.CreateEmpty(actual.GetWidth(), actual.GetHeight(), false, Image.Format.Rgba8);
             long changedPixels = 0;
             for (var y = 0; y < actual.GetHeight(); y++)
             {
@@ -213,9 +213,10 @@ internal sealed class VisualCaptureRunner
             }
         }
 
-        foreach (var child in node.GetChildren())
+        var childCount = node.GetChildCount();
+        for (var index = 0; index < childCount; index++)
         {
-            DrawNode(child, image);
+            DrawNode(node.GetChild(index), image);
         }
     }
 

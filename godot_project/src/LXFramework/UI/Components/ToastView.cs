@@ -47,11 +47,27 @@ public partial class ToastView : PanelContainer
             throw new ArgumentOutOfRangeException(nameof(durationSeconds));
         }
         cancellationToken.ThrowIfCancellationRequested();
-        await ToSignal(GetTree().CreateTimer(duration, processAlways: true), SceneTreeTimer.SignalName.Timeout);
-        cancellationToken.ThrowIfCancellationRequested();
-        if (sequence == _showSequence)
+        using var timer = GetTree().CreateTimer(
+            duration,
+            processAlways: true,
+            processInPhysics: false,
+            ignoreTimeScale: true);
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        void Complete() => completion.TrySetResult();
+        timer.Timeout += Complete;
+        using var cancellation = cancellationToken.Register(() =>
+            completion.TrySetCanceled(cancellationToken));
+        try
         {
-            Hide();
+            await completion.Task;
+        }
+        finally
+        {
+            timer.Timeout -= Complete;
+            if (sequence == _showSequence)
+            {
+                Hide();
+            }
         }
     }
 

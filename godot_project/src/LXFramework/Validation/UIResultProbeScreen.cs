@@ -11,6 +11,25 @@ public partial class UIResultProbeScreen : UIScreen
     /// <summary>退出过渡实际执行的次数。</summary>
     public int ExitTransitions { get; private set; }
 
+    /// <summary>最近一次隐藏回调是否观察到了已 Dispose 的 activation。</summary>
+    public bool HideSawDisposedActivation { get; private set; }
+
+    /// <inheritdoc />
+    protected internal override ValueTask OnShowAsync(
+        object? payload,
+        CancellationToken cancellationToken)
+    {
+        HideSawDisposedActivation = false;
+        return ValueTask.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    protected internal override ValueTask OnHideAsync(CancellationToken cancellationToken)
+    {
+        HideSawDisposedActivation = Activation.IsDisposed;
+        return ValueTask.CompletedTask;
+    }
+
     /// <inheritdoc />
     protected internal override ValueTask OnTransitionAsync(
         UITransitionPhase phase,

@@ -16,12 +16,14 @@ public interface IGameFlowState<TContext>
 
 /// <summary>
 /// A lifecycle-aware state flow for product-level boot, menu, play, pause and
-/// game-over states. Every active state owns a child LifetimeScope.
+/// game-over states. Every active state owns a child LifetimeScope. The caller
+/// must own or dispose the GameFlow itself when ExitAsync is required at teardown.
 /// </summary>
 public sealed class GameFlow<TState, TContext> : IAsyncDisposable where TState : notnull
 {
     private readonly Dictionary<TState, IGameFlowState<TContext>> _states = [];
     private readonly SemaphoreSlim _transitionGate = new(1, 1);
+    private readonly AsyncLocal<int> _transitionDepth = new();
     private readonly LifetimeScope _lifetime;
     private readonly TContext _context;
     private IGameFlowState<TContext>? _currentState;
@@ -41,6 +43,9 @@ public sealed class GameFlow<TState, TContext> : IAsyncDisposable where TState :
 
     public event Action<GameFlowTransition<TState>>? Transitioned;
 
+    /// <summary>报告被隔离的 Transitioned 观察者异常；该事件自身的异常也会被隔离。</summary>
+    public event Action<Exception>? TransitionObserverFailed;
+
     public void Register(TState key, IGameFlowState<TContext> state)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -54,12 +59,18 @@ public sealed class GameFlow<TState, TContext> : IAsyncDisposable where TState :
     public async ValueTask TransitionAsync(TState next, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_transitionDepth.Value != 0)
+        {
+            throw new InvalidOperationException(
+                "GameFlow transition cannot be re-entered from EnterAsync, ExitAsync, or Transitioned callbacks.");
+        }
         if (!_states.TryGetValue(next, out var nextState))
         {
             throw new KeyNotFoundException($"Game flow state '{next}' is not registered.");
         }
 
         await _transitionGate.WaitAsync(cancellationToken);
+        _transitionDepth.Value++;
         try
         {
             if (_currentState is not null && EqualityComparer<TState>.Default.Equals(Current!, next))
@@ -71,11 +82,14 @@ public sealed class GameFlow<TState, TContext> : IAsyncDisposable where TState :
             if (_currentState is not null)
             {
                 await _currentState.ExitAsync(_context, cancellationToken);
-            }
-            if (_stateLifetime is not null)
-            {
-                await _stateLifetime.DisposeAsync();
+                var previousLifetime = _stateLifetime;
+                _currentState = null;
+                Current = default;
                 _stateLifetime = null;
+                if (previousLifetime is not null)
+                {
+                    await previousLifetime.DisposeAsync();
+                }
             }
 
             var nextLifetime = _lifetime.CreateChild($"State:{next}");
@@ -83,21 +97,32 @@ public sealed class GameFlow<TState, TContext> : IAsyncDisposable where TState :
             {
                 await nextState.EnterAsync(_context, nextLifetime, cancellationToken);
             }
-            catch
+            catch (Exception enterError)
             {
-                await nextLifetime.DisposeAsync();
                 _currentState = null;
                 Current = default;
+                try
+                {
+                    await nextLifetime.DisposeAsync();
+                }
+                catch (Exception cleanupError)
+                {
+                    throw new AggregateException(
+                        "Game flow state entry and attempted-state cleanup both failed.",
+                        enterError,
+                        cleanupError);
+                }
                 throw;
             }
 
             _stateLifetime = nextLifetime;
             _currentState = nextState;
             Current = next;
-            Transitioned?.Invoke(new GameFlowTransition<TState>(previous, next));
+            NotifyTransitioned(new GameFlowTransition<TState>(previous, next));
         }
         finally
         {
+            _transitionDepth.Value--;
             _transitionGate.Release();
         }
     }
@@ -166,6 +191,7 @@ public sealed class GameFlow<TState, TContext> : IAsyncDisposable where TState :
             }
             _states.Clear();
             Transitioned = null;
+            TransitionObserverFailed = null;
         }
         finally
         {
@@ -176,6 +202,46 @@ public sealed class GameFlow<TState, TContext> : IAsyncDisposable where TState :
         if (errors is not null)
         {
             throw new AggregateException("Game flow cleanup reported one or more errors.", errors);
+        }
+    }
+
+    private void NotifyTransitioned(GameFlowTransition<TState> transition)
+    {
+        if (Transitioned is not { } observers)
+        {
+            return;
+        }
+
+        foreach (Action<GameFlowTransition<TState>> observer in observers.GetInvocationList())
+        {
+            try
+            {
+                observer(transition);
+            }
+            catch (Exception exception)
+            {
+                NotifyTransitionObserverFailure(exception);
+            }
+        }
+    }
+
+    private void NotifyTransitionObserverFailure(Exception exception)
+    {
+        if (TransitionObserverFailed is not { } observers)
+        {
+            return;
+        }
+
+        foreach (Action<Exception> observer in observers.GetInvocationList())
+        {
+            try
+            {
+                observer(exception);
+            }
+            catch
+            {
+                // Diagnostic observers cannot change a committed flow transition.
+            }
         }
     }
 }

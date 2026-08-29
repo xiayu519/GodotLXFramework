@@ -6,11 +6,18 @@ public sealed class FeatureHandle : IAsyncDisposable
 {
     private FeatureService? _owner;
     private readonly Guid _instanceId;
+    private readonly CancellationToken _instanceToken;
 
-    internal FeatureHandle(FeatureService owner, Guid instanceId, FeatureId featureId, Node node)
+    internal FeatureHandle(
+        FeatureService owner,
+        Guid instanceId,
+        FeatureId featureId,
+        Node node,
+        CancellationToken instanceToken)
     {
         _owner = owner;
         _instanceId = instanceId;
+        _instanceToken = instanceToken;
         FeatureId = featureId;
         Node = node;
     }
@@ -19,7 +26,8 @@ public sealed class FeatureHandle : IAsyncDisposable
 
     public Node Node { get; }
 
-    public bool IsDisposed => _owner is null;
+    /// <summary>实例是否已由句柄、FeatureService 或所属生命周期释放。</summary>
+    public bool IsDisposed => _owner is null || _instanceToken.IsCancellationRequested;
 
     public async ValueTask DisposeAsync()
     {

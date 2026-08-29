@@ -87,7 +87,7 @@ public sealed class PackedSceneInstance<TNode> : IDisposable, IAsyncDisposable w
             return new PackedSceneInstance<TNode>(
                 context.Res,
                 instanceLifetime,
-                parent.GetTree(),
+                parent.IsInsideTree() ? parent.GetTree() : null,
                 typed);
         }
         catch

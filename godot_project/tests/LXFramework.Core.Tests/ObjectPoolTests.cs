@@ -87,4 +87,26 @@ public sealed class ObjectPoolTests
         Assert.Equal(1, pool.Statistics.Reused);
         pool.Return(reused);
     }
+
+    [Fact]
+    public void Dispose_AttemptsEveryRetainedDiscardBeforeReportingFailures()
+    {
+        var attempts = 0;
+        var pool = new ObjectPool<object>(
+            () => new object(),
+            discard: _ =>
+            {
+                attempts++;
+                throw new InvalidOperationException("discard");
+            });
+        var first = pool.Rent();
+        var second = pool.Rent();
+        pool.Return(first);
+        pool.Return(second);
+
+        var error = Assert.Throws<AggregateException>(() => pool.Dispose());
+
+        Assert.Equal(2, attempts);
+        Assert.Equal(2, error.InnerExceptions.Count);
+    }
 }

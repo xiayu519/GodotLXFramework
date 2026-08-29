@@ -1,3 +1,5 @@
+using LX.Res;
+
 namespace LX.Features;
 
 public readonly record struct FeatureId
@@ -22,9 +24,7 @@ public sealed record FeatureDescriptor(FeatureId Id, string ScenePath)
         {
             throw new ArgumentException("Feature IDs cannot be empty.", nameof(Id));
         }
-        if (string.IsNullOrWhiteSpace(ScenePath) ||
-            !ScenePath.StartsWith("res://", StringComparison.Ordinal) ||
-            !ScenePath.EndsWith(".tscn", StringComparison.OrdinalIgnoreCase))
+        if (!GodotResourcePath.IsCanonical(ScenePath, ".tscn"))
         {
             throw new ArgumentException(
                 $"Feature '{Id}' must reference a res:// .tscn scene.",

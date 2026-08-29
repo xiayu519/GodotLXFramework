@@ -59,7 +59,7 @@ horizontal_alignment = 1
 
 [node name="Description" type="Label" parent="Center/Panel/Margin/Content"]
 layout_mode = 2
-text = "Godot 4.6 .NET / C# / AI 优先框架"
+text = "Godot 4.7.2 .NET / C# / AI 优先框架"
 horizontal_alignment = 1
 
 [node name="NameInput" type="LineEdit" parent="Center/Panel/Margin/Content"]
@@ -81,4 +81,3 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 32)
 layout_mode = 2
 horizontal_alignment = 1
-

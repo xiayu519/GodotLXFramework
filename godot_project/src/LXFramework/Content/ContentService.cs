@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using LX.Core.Data;
+using LX.Res;
 using Luban;
 using Godot;
 
@@ -64,9 +65,8 @@ public sealed class ContentService
 
     private static void ValidateJsonPath(string resourcePath)
     {
-        if (string.IsNullOrWhiteSpace(resourcePath) ||
-            !resourcePath.StartsWith("res://content/", StringComparison.Ordinal) ||
-            !resourcePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+        if (!GodotResourcePath.IsCanonical(resourcePath, ".json") ||
+            !resourcePath.StartsWith("res://content/", StringComparison.Ordinal))
         {
             throw new ArgumentException(
                 "Runtime JSON content must use a res://content/*.json path.",
@@ -76,9 +76,16 @@ public sealed class ContentService
 
     private static void ValidateContentDirectory(string resourceDirectory)
     {
-        if (string.IsNullOrWhiteSpace(resourceDirectory) ||
-            !resourceDirectory.StartsWith("res://content/", StringComparison.Ordinal) ||
-            resourceDirectory.Contains("..", StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(resourceDirectory))
+        {
+            throw new ArgumentException(
+                "Luban content directory must be a res://content/* path without traversal segments.",
+                nameof(resourceDirectory));
+        }
+
+        var normalizedDirectory = resourceDirectory.TrimEnd('/');
+        if (!GodotResourcePath.IsCanonical(normalizedDirectory) ||
+            !normalizedDirectory.StartsWith("res://content/", StringComparison.Ordinal))
         {
             throw new ArgumentException(
                 "Luban content directory must be a res://content/* path without traversal segments.",

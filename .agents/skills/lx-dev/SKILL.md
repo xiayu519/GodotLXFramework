@@ -1,13 +1,15 @@
 ---
 name: lx-dev
-description: 开发、审查、诊断或扩展 LXFramework Godot 4.6 C# 框架及其 Game 产品层。用于 LX/LX.Core API、场景、UI、资源、输入、内容、Feature、世界、生命周期、生成清单与脚手架。纯 Codex 工作流、AGENTS、Skill、模型配置、Project Knowledge 或 eval 改动改用 lx-codex-workflow；泛泛 C# 或非本仓库 Godot 问题不触发。
+description: 开发、审查、诊断或扩展 LXFramework Godot 4.7.2 C# 框架及其 Game 产品层。用于 LX/LX.Core API、场景、UI、资源、输入、内容、Feature、世界、游戏运行时与生命周期、生成清单和脚手架。Codex 工作流、Capability、runtime CLI/.lx 诊断桥、AGENTS、Skill、模型配置、Project Knowledge 或 eval 改用 lx-codex-workflow；泛泛 C# 或非本仓库 Godot 问题不触发。
 ---
 
 # LXFramework 开发
 
 本 Skill 只负责 LXFramework 领域路由和非显而易见的工程约束；仓库级授权、红线和最终门禁以根 `AGENTS.md` 为准。
 
-根与目标目录的 `AGENTS.md` 已由 Codex 自动加载，不要再用 shell 重读。
+根 `AGENTS.md` 已自动加载；Codex 只加载到当前工作目录。准备修改更深目录时按根规则读取最近的局部 `AGENTS.md` 一次；只读 API 审查不枚举或重读指令文件。
+
+询问 Codex 如何发现运行时能力、调用 `runtime snapshot`、处理 `.lx/runtime` 会话或维护 Capability 时，立即转用 `lx-codex-workflow`；这些是 AI 控制面，不是游戏运行时 API 审查。
 
 ## 开始
 
@@ -24,12 +26,16 @@ description: 开发、审查、诊断或扩展 LXFramework Godot 4.6 C# 框架�
 | 层级、模块、API 定位 | `references/architecture.md` 或 `references/modules.md` | `references/design-decisions.md` |
 | 运行时、线程、注入、生命周期、关闭 | `references/runtime-contracts.md` | `references/memory-safety.md` |
 | 新抽象、通信或资源所有权取舍 | `references/design-decisions.md` | 对应实现源码 |
-| 动态资源、Prefab、图集或释放闭环 | `references/resource-lifecycle.md` | `references/runtime-contracts.md` |
-| 创建游戏、世界、Feature、UI、内容、输入或资源 | `references/product-workflow.md` | 对应清单和生成目录 |
+| 自定义资源所有权、Prefab/图集绑定或释放闭环设计 | `references/resource-lifecycle.md` | `references/runtime-contracts.md` |
+| 创建游戏、世界、Feature、UI、普通内容、输入或资源；注册资源并在产品代码使用 | `references/product-workflow.md` | 对应产品源码；只有契约不足才读生命周期 reference |
+| Luban schema、数据、生成或运行时读取 | `references/data-workflow.md` | 无 |
+| Godot 编辑器人工入口与等价 CLI | `references/tooling-workflow.md` | 无 |
+| 存档、迁移、备份、槽位或删除 | `references/persistence-workflow.md` | 无 |
 
 ## 实施
 
 - 结构单元使用 `lx create`；修改清单和非生成源码，让 `check` 负责必要生成。
+- 用户已经给出合法的 `create` 类型、名称、ID 和参数时走脚手架快路径：读取已知目标最近的局部 `AGENTS.md` 后直接运行命令；不先运行 `inspect`、`--help`、目录枚举或禁用 API 搜索，也不重读命令已确认的清单和生成产物。
 - 动态资源只使用 `LX.Res` 及其生命周期句柄；具体选型和闭环验证读取 `references/resource-lifecycle.md`。
 - 只同步本次行为变化直接影响的 reference；只读审查发现过期内容时报告，不擅自写文档。
 

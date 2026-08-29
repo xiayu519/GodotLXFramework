@@ -6,7 +6,22 @@ public sealed class EventHub : IDisposable
 {
     private readonly object _gate = new();
     private readonly Dictionary<Type, List<Delegate>> _handlers = [];
+    private readonly Dictionary<Type, Delegate[]> _snapshots = [];
+    private readonly Action<Exception>? _handlerFailureSink;
+    private readonly bool _isolateHandlerExceptions;
     private bool _disposed;
+
+    /// <summary>
+    /// 创建事件中心。启用异常隔离时，一个订阅者失败不会阻止其余订阅者，
+    /// 异常会逐个报告给 <paramref name="handlerFailureSink"/>。
+    /// </summary>
+    public EventHub(
+        Action<Exception>? handlerFailureSink = null,
+        bool isolateHandlerExceptions = false)
+    {
+        _handlerFailureSink = handlerFailureSink;
+        _isolateHandlerExceptions = isolateHandlerExceptions;
+    }
 
     public IDisposable Subscribe<TEvent>(Action<TEvent> handler, LifetimeScope? lifetime = null)
     {
@@ -22,6 +37,7 @@ public sealed class EventHub : IDisposable
             }
 
             handlers.Add(handler);
+            _snapshots[typeof(TEvent)] = handlers.ToArray();
         }
 
         var subscription = new DelegateDisposable(() => Unsubscribe(handler));
@@ -35,13 +51,50 @@ public sealed class EventHub : IDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             snapshot = _handlers.TryGetValue(typeof(TEvent), out var handlers)
-                ? [.. handlers]
-                : [];
+                ? _snapshots[typeof(TEvent)]
+                : Array.Empty<Delegate>();
         }
 
         foreach (var handler in snapshot)
         {
-            ((Action<TEvent>)handler)(message);
+            if (!_isolateHandlerExceptions)
+            {
+                ((Action<TEvent>)handler)(message);
+                continue;
+            }
+
+            try
+            {
+                ((Action<TEvent>)handler)(message);
+            }
+            catch (Exception exception)
+            {
+                try
+                {
+                    _handlerFailureSink?.Invoke(exception);
+                }
+                catch
+                {
+                    // The diagnostic path must not reintroduce dispatch failure.
+                }
+            }
+        }
+    }
+
+    /// <summary>返回事件类型和订阅数量的不可变诊断快照。</summary>
+    public EventHubSnapshot Snapshot()
+    {
+        lock (_gate)
+        {
+            return new EventHubSnapshot(
+                _handlers.Count,
+                _handlers.Values.Sum(handlers => handlers.Count),
+                _handlers
+                    .OrderBy(pair => pair.Key.FullName, StringComparer.Ordinal)
+                    .ToDictionary(
+                        pair => pair.Key.FullName ?? pair.Key.Name,
+                        pair => pair.Value.Count,
+                        StringComparer.Ordinal));
         }
     }
 
@@ -56,6 +109,7 @@ public sealed class EventHub : IDisposable
 
             _disposed = true;
             _handlers.Clear();
+            _snapshots.Clear();
         }
     }
 
@@ -72,7 +126,18 @@ public sealed class EventHub : IDisposable
             if (handlers.Count == 0)
             {
                 _handlers.Remove(typeof(TEvent));
+                _snapshots.Remove(typeof(TEvent));
+            }
+            else
+            {
+                _snapshots[typeof(TEvent)] = handlers.ToArray();
             }
         }
     }
 }
+
+/// <summary>事件中心当前事件类型和订阅数量的诊断快照。</summary>
+public sealed record EventHubSnapshot(
+    int EventTypeCount,
+    int SubscriptionCount,
+    IReadOnlyDictionary<string, int> Subscriptions);

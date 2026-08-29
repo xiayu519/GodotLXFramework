@@ -1,3 +1,5 @@
+using LX.Res;
+
 namespace LX.Scenes;
 
 public readonly record struct WorldId
@@ -22,9 +24,7 @@ public sealed record WorldDescriptor(WorldId Id, string ScenePath)
         {
             throw new ArgumentException("World IDs cannot be empty.", nameof(Id));
         }
-        if (string.IsNullOrWhiteSpace(ScenePath) ||
-            !ScenePath.StartsWith("res://", StringComparison.Ordinal) ||
-            !ScenePath.EndsWith(".tscn", StringComparison.OrdinalIgnoreCase))
+        if (!GodotResourcePath.IsCanonical(ScenePath, ".tscn"))
         {
             throw new ArgumentException(
                 $"World '{Id}' must reference a res:// .tscn scene.",

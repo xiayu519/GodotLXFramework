@@ -32,6 +32,12 @@ public partial class ConfirmDialogView : PanelContainer
         _cancel.Pressed += () => Complete(false);
     }
 
+    /// <inheritdoc />
+    public override void _ExitTree()
+    {
+        _pending?.TrySetCanceled();
+    }
+
     /// <summary>只更新展示内容，不等待用户输入；用于编辑器预览和视觉基准。</summary>
     public void Preview(string message)
     {
@@ -53,16 +59,23 @@ public partial class ConfirmDialogView : PanelContainer
 
         Preview(message);
         _confirm!.GrabFocus();
-        _pending = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        using var registration = cancellationToken.Register(() => _pending.TrySetCanceled(cancellationToken));
+        var pending = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _pending = pending;
+        using var registration = cancellationToken.Register(() => pending.TrySetCanceled(cancellationToken));
         try
         {
-            return await _pending.Task;
+            return await pending.Task;
         }
         finally
         {
-            _pending = null;
-            Hide();
+            if (ReferenceEquals(_pending, pending))
+            {
+                _pending = null;
+            }
+            if (GodotObject.IsInstanceValid(this))
+            {
+                Hide();
+            }
         }
     }
 

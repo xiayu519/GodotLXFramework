@@ -20,6 +20,11 @@ public sealed class NodePool<TNode> : IDisposable where TNode : Node
             factory,
             node =>
             {
+                if (!GodotObject.IsInstanceValid(node) || node.IsQueuedForDeletion())
+                {
+                    throw new InvalidOperationException(
+                        "A freed or queued-for-deletion node cannot be retained by a pool.");
+                }
                 if (node.GetParent() is not null)
                 {
                     node.GetParent().RemoveChild(node);
@@ -29,14 +34,24 @@ public sealed class NodePool<TNode> : IDisposable where TNode : Node
             },
             node =>
             {
-                if (node.GetParent() is not null)
+                if (!GodotObject.IsInstanceValid(node))
                 {
-                    node.GetParent().RemoveChild(node);
+                    return;
                 }
-                beforeDiscard?.Invoke(node);
-                if (GodotObject.IsInstanceValid(node) && !node.IsQueuedForDeletion())
+                try
                 {
-                    node.QueueFree();
+                    if (node.GetParent() is not null)
+                    {
+                        node.GetParent().RemoveChild(node);
+                    }
+                    beforeDiscard?.Invoke(node);
+                }
+                finally
+                {
+                    if (GodotObject.IsInstanceValid(node) && !node.IsQueuedForDeletion())
+                    {
+                        node.QueueFree();
+                    }
                 }
             },
             maxRetained);
@@ -70,17 +85,41 @@ public sealed class NodePool<TNode> : IDisposable where TNode : Node
     }
 
     public TNode Rent(Node parent)
+        => Rent(parent, configure: null);
+
+    /// <summary>在节点加入场景树、触发 EnterTree 之前完成本次租用配置。</summary>
+    public TNode Rent(Node parent, Action<TNode>? configure)
     {
         EnsureMainThread();
         ArgumentNullException.ThrowIfNull(parent);
         var node = _pool.Rent();
-        parent.AddChild(node);
-        return node;
+        try
+        {
+            configure?.Invoke(node);
+            parent.AddChild(node);
+            return node;
+        }
+        catch
+        {
+            _pool.Return(node);
+            throw;
+        }
     }
 
     public PooledNode<TNode> RentLease(Node parent, LifetimeScope? lifetime = null)
     {
         var lease = new PooledNode<TNode>(this, Rent(parent));
+        return lifetime is null ? lease : lifetime.Own(lease);
+    }
+
+    /// <summary>配置节点后再入树，并把归还句柄绑定到指定生命周期。</summary>
+    public PooledNode<TNode> RentLease(
+        Node parent,
+        Action<TNode> configure,
+        LifetimeScope? lifetime = null)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        var lease = new PooledNode<TNode>(this, Rent(parent, configure));
         return lifetime is null ? lease : lifetime.Own(lease);
     }
 

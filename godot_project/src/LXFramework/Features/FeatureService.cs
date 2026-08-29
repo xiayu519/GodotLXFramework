@@ -20,6 +20,7 @@ public sealed class FeatureService : IAsyncDisposable
     private readonly Func<LXContext> _context;
     private readonly Dictionary<FeatureId, FeatureDescriptor> _catalog = [];
     private readonly Dictionary<Guid, FeatureInstance> _active = [];
+    private readonly CancellationTokenSource _shutdown = new();
     private readonly int _mainThreadId;
     private bool _disposed;
 
@@ -86,18 +87,29 @@ public sealed class FeatureService : IAsyncDisposable
             throw new KeyNotFoundException($"Feature '{featureId}' is not registered.");
         }
 
-        var lease = await _assets.AcquireAsync<PackedScene>(
-            descriptor.ScenePath,
-            AssetCachePolicy.Transient,
-            cancellationToken);
         var instanceId = Guid.NewGuid();
         var ownerLifetime = parentLifetime ?? _rootLifetime;
-        var lifetime = ownerLifetime.CreateChild($"Feature:{featureId.Value}:{instanceId:N}");
+        using var operation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            ownerLifetime.Token,
+            _shutdown.Token);
+        AssetLease<PackedScene>? lease = null;
+        LifetimeScope? lifetime = null;
         Node? node = null;
         try
         {
+            lease = await _assets.AcquireAsync<PackedScene>(
+                descriptor.ScenePath,
+                AssetCachePolicy.Transient,
+                operation.Token);
+            EnsureMainThread();
+            operation.Token.ThrowIfCancellationRequested();
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            lifetime = ownerLifetime.CreateChild($"Feature:{featureId.Value}:{instanceId:N}");
+            var scene = lease.Resource;
             lifetime.Own(lease);
-            node = lease.Resource.Instantiate();
+            lease = null;
+            node = scene.Instantiate();
             var capturedNode = node;
             lifetime.Defer(() =>
             {
@@ -115,11 +127,15 @@ public sealed class FeatureService : IAsyncDisposable
                 Callable.From((Action)(() => _ = DespawnSafelyAsync(instanceId))).CallDeferred());
             lifetime.Own(cancelWithOwner);
             UpdateMetrics();
-            return new FeatureHandle(this, instanceId, featureId, node);
+            return new FeatureHandle(this, instanceId, featureId, node, lifetime.Token);
         }
         catch
         {
-            await lifetime.DisposeAsync();
+            lease?.Dispose();
+            if (lifetime is not null)
+            {
+                await lifetime.DisposeAsync();
+            }
             throw;
         }
     }
@@ -143,12 +159,26 @@ public sealed class FeatureService : IAsyncDisposable
         }
 
         _disposed = true;
+        _shutdown.Cancel();
+        List<Exception>? errors = null;
         foreach (var instanceId in _active.Keys.ToArray())
         {
-            await DespawnAsync(instanceId);
+            try
+            {
+                await DespawnAsync(instanceId);
+            }
+            catch (Exception exception)
+            {
+                (errors ??= []).Add(exception);
+            }
         }
         _catalog.Clear();
         UpdateMetrics();
+        _shutdown.Dispose();
+        if (errors is not null)
+        {
+            throw new AggregateException("One or more features could not be disposed.", errors);
+        }
     }
 
     private async Task DespawnSafelyAsync(Guid instanceId)

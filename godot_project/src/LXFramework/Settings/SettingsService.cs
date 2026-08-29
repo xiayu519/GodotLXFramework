@@ -17,6 +17,7 @@ public sealed class SettingsService
     private readonly LocalizationService _localization;
     private readonly InputRouter _input;
     private readonly SaveStore<UserSettings> _store;
+    private readonly HashSet<string> _appliedKeyBindings = new(StringComparer.Ordinal);
     private readonly int _mainThreadId;
 
     public SettingsService(
@@ -123,6 +124,7 @@ public sealed class SettingsService
             ? DisplayServer.WindowMode.Fullscreen
             : DisplayServer.WindowMode.Windowed);
         _host.GetWindow().ContentScaleFactor = settings.UiScale;
+        var appliedNow = new HashSet<string>(StringComparer.Ordinal);
         foreach (var binding in settings.KeyBindings ?? [])
         {
             if (!Enum.TryParse<Key>(binding.Value, ignoreCase: false, out var key) ||
@@ -132,7 +134,17 @@ public sealed class SettingsService
                 continue;
             }
             _input.ReplaceKeyBinding(binding.Key, key);
+            appliedNow.Add(binding.Key);
         }
+        foreach (var removed in _appliedKeyBindings.Except(appliedNow).ToArray())
+        {
+            if (_input.HasGodotAction(removed))
+            {
+                _input.RestoreDefaultKeyBinding(removed);
+            }
+        }
+        _appliedKeyBindings.Clear();
+        _appliedKeyBindings.UnionWith(appliedNow);
         _metrics.SetGauge("settings.ui_scale", settings.UiScale);
         _metrics.SetGauge("settings.fullscreen", settings.Fullscreen ? 1 : 0);
     }

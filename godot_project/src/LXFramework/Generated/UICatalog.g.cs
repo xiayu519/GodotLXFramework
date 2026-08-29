@@ -25,5 +25,14 @@ public static class UICatalog
         UIInputPolicy.Normal,
         UIFocusPolicy.GrabFirst);
 
-    public static IReadOnlyList<UIDescriptor> All { get; } = [FrameworkStatus, UIComponentsShowcase];
+    public static readonly UIDescriptor UIFadeTransition = new(
+        new UIId("ui_fade_transition"),
+        "res://scene/ui/ui_fade_transition.tscn",
+        UILayer.Overlay,
+        UICachePolicy.CachedSingleton,
+        UICoverPolicy.KeepVisible,
+        UIInputPolicy.Modal,
+        UIFocusPolicy.Preserve);
+
+    public static IReadOnlyList<UIDescriptor> All { get; } = [FrameworkStatus, UIComponentsShowcase, UIFadeTransition];
 }

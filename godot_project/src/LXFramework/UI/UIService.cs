@@ -1,6 +1,7 @@
 using LX.Res;
 using LX.Core.Diagnostics;
 using LX.Core.Lifetime;
+using LX.Generated;
 using LX.Runtime;
 using Godot;
 
@@ -22,7 +23,7 @@ public sealed class UIService : IAsyncDisposable
     }
 
     private readonly AssetRegistry _assets;
-    private readonly LifetimeScope _rootLifetime;
+    private readonly LifetimeScope _serviceLifetime;
     private readonly MetricRegistry _metrics;
     private readonly Func<LXContext> _context;
     private readonly int _mainThreadId;
@@ -32,6 +33,9 @@ public sealed class UIService : IAsyncDisposable
     private readonly Dictionary<Guid, UIInstance> _active = [];
     private readonly Dictionary<UIId, UIInstance> _cache = [];
     private readonly HashSet<UIId> _openingSingletons = [];
+    private readonly CancellationTokenSource _shutdown = new();
+    private readonly SemaphoreSlim _fadeGate = new(1, 1);
+    private UIHandle? _fadeHandle;
     private long _openSequence;
     private bool _disposed;
 
@@ -44,7 +48,8 @@ public sealed class UIService : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(host);
         _assets = assets ?? throw new ArgumentNullException(nameof(assets));
-        _rootLifetime = rootLifetime ?? throw new ArgumentNullException(nameof(rootLifetime));
+        ArgumentNullException.ThrowIfNull(rootLifetime);
+        _serviceLifetime = rootLifetime.CreateChild("UIService");
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _mainThreadId = System.Environment.CurrentManagedThreadId;
@@ -72,9 +77,7 @@ public sealed class UIService : IAsyncDisposable
         {
             throw new ArgumentException("UI IDs cannot be empty.", nameof(descriptor));
         }
-        if (string.IsNullOrWhiteSpace(descriptor.ScenePath) ||
-            !descriptor.ScenePath.StartsWith("res://", StringComparison.Ordinal) ||
-            !descriptor.ScenePath.EndsWith(".tscn", StringComparison.OrdinalIgnoreCase))
+        if (!GodotResourcePath.IsCanonical(descriptor.ScenePath, ".tscn"))
         {
             throw new ArgumentException("UI scenes must use a res:// .tscn path.", nameof(descriptor));
         }
@@ -114,6 +117,12 @@ public sealed class UIService : IAsyncDisposable
             throw new KeyNotFoundException($"UI '{uiId}' is not registered.");
         }
 
+        var parent = parentLifetime ?? _serviceLifetime;
+        using var operation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            parent.Token,
+            _shutdown.Token,
+            _serviceLifetime.Token);
         var isSingleton = descriptor.CachePolicy == UICachePolicy.CachedSingleton;
         if (isSingleton &&
             (_active.Values.Any(instance => instance.Descriptor.Id == uiId) || !_openingSingletons.Add(uiId)))
@@ -121,6 +130,8 @@ public sealed class UIService : IAsyncDisposable
             throw new InvalidOperationException($"Cached singleton UI '{uiId}' is already open or opening.");
         }
 
+        UIInstance? openingInstance = null;
+        var registered = false;
         try
         {
             UIInstance instance;
@@ -134,40 +145,50 @@ public sealed class UIService : IAsyncDisposable
                 var sceneLease = await _assets.AcquireAsync<PackedScene>(
                     descriptor.ScenePath,
                     assetPolicy,
-                    cancellationToken);
-                var node = sceneLease.Resource.Instantiate();
-                if (node is not UIScreen screen)
-                {
-                    node.QueueFree();
-                    sceneLease.Dispose();
-                    throw new InvalidOperationException(
-                        $"UI scene '{descriptor.ScenePath}' must have a UIScreen-derived root, but produced {node.GetType().Name}.");
-                }
-
-                var instanceId = Guid.NewGuid();
-                var instanceLifetime = _rootLifetime.CreateChild($"UIInstance:{uiId.Value}:{instanceId:N}");
+                    operation.Token);
+                Node? node = null;
+                LifetimeScope? instanceLifetime = null;
                 try
                 {
+                    EnsureMainThread();
+                    operation.Token.ThrowIfCancellationRequested();
+                    ObjectDisposedException.ThrowIf(_disposed, this);
+                    node = sceneLease.Resource.Instantiate();
+                    if (node is not UIScreen screen)
+                    {
+                        var actualType = node?.GetType().Name ?? "<null>";
+                        throw new InvalidOperationException(
+                            $"UI scene '{descriptor.ScenePath}' must have a UIScreen-derived root, but produced {actualType}.");
+                    }
+
+                    var instanceId = Guid.NewGuid();
+                    instanceLifetime = _serviceLifetime.CreateChild($"UIInstance:{uiId.Value}:{instanceId:N}");
                     LXContextInjector.InitializeTree(screen, _context(), instanceLifetime);
+                    instance = new UIInstance
+                    {
+                        InstanceId = instanceId,
+                        Descriptor = descriptor,
+                        Screen = screen,
+                        SceneLease = sceneLease,
+                        Lifetime = instanceLifetime,
+                        State = UIVisualState.Visible,
+                    };
                 }
                 catch
                 {
-                    await instanceLifetime.DisposeAsync();
-                    node.QueueFree();
+                    if (instanceLifetime is not null)
+                    {
+                        await instanceLifetime.DisposeAsync();
+                    }
+                    if (node is not null && GodotObject.IsInstanceValid(node))
+                    {
+                        node.QueueFree();
+                    }
                     sceneLease.Dispose();
                     throw;
                 }
-
-                instance = new UIInstance
-                {
-                    InstanceId = instanceId,
-                    Descriptor = descriptor,
-                    Screen = screen,
-                    SceneLease = sceneLease,
-                    Lifetime = instanceLifetime,
-                    State = UIVisualState.Visible,
-                };
             }
+            openingInstance = instance;
 
             if (descriptor.CoverPolicy == UICoverPolicy.ClosePrevious)
             {
@@ -181,8 +202,7 @@ public sealed class UIService : IAsyncDisposable
                 }
             }
 
-            var parent = parentLifetime ?? _rootLifetime;
-            var activation = parent.CreateChild($"UI:{uiId.Value}:{instance.InstanceId:N}");
+            var activation = instance.Lifetime.CreateChild($"Activation:{uiId.Value}:{instance.InstanceId:N}");
             var completion = new TaskCompletionSource<UICompletion>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             instance.Completion = completion;
@@ -211,20 +231,28 @@ public sealed class UIService : IAsyncDisposable
             instance.Screen.Show();
             instance.OpenSequence = ++_openSequence;
             _active.Add(instance.InstanceId, instance);
+            registered = true;
             RefreshLayerPresentation(descriptor.Layer);
             UpdateMetrics();
-            try
+            await instance.Screen.OnShowAsync(payload, operation.Token);
+            await instance.Screen.OnTransitionAsync(UITransitionPhase.Entering, operation.Token);
+            ApplyFocus(instance);
+            return new UIHandle(this, instance.InstanceId, uiId, completion.Task);
+        }
+        catch
+        {
+            if (openingInstance is not null)
             {
-                await instance.Screen.OnShowAsync(payload, activation.Token);
-                await instance.Screen.OnTransitionAsync(UITransitionPhase.Entering, activation.Token);
-                ApplyFocus(instance);
-                return new UIHandle(this, instance.InstanceId, uiId, completion.Task);
+                if (registered && _active.ContainsKey(openingInstance.InstanceId))
+                {
+                    await CloseAsync(openingInstance.InstanceId);
+                }
+                else if (!registered)
+                {
+                    await DisposeUnopenedInstanceAsync(openingInstance);
+                }
             }
-            catch
-            {
-                await CloseAsync(instance.InstanceId);
-                throw;
-            }
+            throw;
         }
         finally
         {
@@ -248,6 +276,113 @@ public sealed class UIService : IAsyncDisposable
     {
         EnsureMainThread();
         return _active.Values.Any(instance => instance.Descriptor.Id == uiId);
+    }
+
+    /// <summary>当前是否由 FadeOut 留下了不透明全屏黑幕。</summary>
+    public bool IsFadeBlackoutActive
+    {
+        get
+        {
+            EnsureMainThread();
+            return TryGetFadeScreen() is { Opacity: >= 1f };
+        }
+    }
+
+    /// <summary>
+    /// 执行全屏黑幕过场。FadeOut 完成后保持黑幕，FadeIn 完成后移除黑幕，
+    /// FadeOutIn 自动执行完整往返；并发调用按照请求顺序串行执行。
+    /// </summary>
+    public async ValueTask PlayFadeAsync(
+        UIFadeMode mode,
+        UIFadeOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureMainThread();
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (!Enum.IsDefined(mode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(mode), mode, "Fade mode must be defined.");
+        }
+
+        options ??= new UIFadeOptions();
+        options.Validate();
+        using var operation = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            _shutdown.Token,
+            _serviceLifetime.Token);
+        var enteredGate = false;
+        try
+        {
+            await _fadeGate.WaitAsync(operation.Token);
+            enteredGate = true;
+            EnsureMainThread();
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            var retainedAtStart = TryGetFadeScreen() is not null;
+            try
+            {
+                var screen = await GetOrOpenFadeScreenAsync(operation.Token);
+                switch (mode)
+                {
+                    case UIFadeMode.FadeOut:
+                        if (!retainedAtStart)
+                        {
+                            screen.SetOpacity(0f);
+                        }
+                        await screen.AnimateOpacityAsync(
+                            1f,
+                            options.FadeOutDuration,
+                            options.Transition,
+                            options.Ease,
+                            operation.Token);
+                        break;
+
+                    case UIFadeMode.FadeIn:
+                        if (!retainedAtStart)
+                        {
+                            screen.SetOpacity(1f);
+                        }
+                        await screen.AnimateOpacityAsync(
+                            0f,
+                            options.FadeInDuration,
+                            options.Transition,
+                            options.Ease,
+                            operation.Token);
+                        await CloseFadeAsync();
+                        break;
+
+                    case UIFadeMode.FadeOutIn:
+                        screen.SetOpacity(0f);
+                        await screen.AnimateOpacityAsync(
+                            1f,
+                            options.FadeOutDuration,
+                            options.Transition,
+                            options.Ease,
+                            operation.Token);
+                        await screen.HoldAsync(options.HoldDuration, operation.Token);
+                        await screen.AnimateOpacityAsync(
+                            0f,
+                            options.FadeInDuration,
+                            options.Transition,
+                            options.Ease,
+                            operation.Token);
+                        await CloseFadeAsync();
+                        break;
+                }
+            }
+            catch
+            {
+                await RestoreFadeStateAsync(retainedAtStart);
+                throw;
+            }
+        }
+        finally
+        {
+            if (enteredGate)
+            {
+                _fadeGate.Release();
+            }
+        }
     }
 
     public UIRecord? Top(UILayer layer)
@@ -277,7 +412,7 @@ public sealed class UIService : IAsyncDisposable
         LifetimeScope? parentLifetime = null,
         CancellationToken cancellationToken = default)
     {
-        var handle = await OpenAsync(uiId, payload, parentLifetime, cancellationToken);
+        await using var handle = await OpenAsync(uiId, payload, parentLifetime, cancellationToken);
         return await handle.WaitForResultAsync<TResult>(cancellationToken);
     }
 
@@ -328,48 +463,102 @@ public sealed class UIService : IAsyncDisposable
             return;
         }
 
-        try
+        List<Exception>? errors = null;
+        if (instance.Activation is not null)
         {
-            if (instance.Activation is not null)
+            try
             {
                 await instance.Screen.OnTransitionAsync(
                     UITransitionPhase.Exiting,
                     instance.Activation.Token);
+            }
+            catch (Exception exception)
+            {
+                (errors ??= []).Add(exception);
+            }
+            try
+            {
                 await instance.Screen.OnHideAsync(instance.Activation.Token);
             }
+            catch (Exception exception)
+            {
+                (errors ??= []).Add(exception);
+            }
+            try
+            {
+                await instance.Activation.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                (errors ??= []).Add(exception);
+            }
+            instance.Activation = null;
+            instance.Screen.SetActivation(null);
         }
-        finally
+
+        var cached = false;
+        if (instance.Descriptor.CachePolicy == UICachePolicy.CachedSingleton && !_disposed)
         {
             try
             {
-                if (instance.Activation is not null)
-                {
-                    await instance.Activation.DisposeAsync();
-                    instance.Activation = null;
-                    instance.Screen.SetActivation(null);
-                }
-
-                if (instance.Descriptor.CachePolicy == UICachePolicy.CachedSingleton && !_disposed)
-                {
-                    instance.Screen.Hide();
-                    instance.Screen.ProcessMode = Node.ProcessModeEnum.Disabled;
-                    _cache[instance.Descriptor.Id] = instance;
-                }
-                else
-                {
-                    await instance.Lifetime.DisposeAsync();
-                    instance.Screen.QueueFree();
-                    instance.SceneLease.Dispose();
-                }
-                RefreshLayerPresentation(instance.Descriptor.Layer);
-                UpdateMetrics();
+                instance.Screen.Hide();
+                instance.Screen.ProcessMode = Node.ProcessModeEnum.Disabled;
+                _cache[instance.Descriptor.Id] = instance;
+                cached = true;
             }
-            finally
+            catch (Exception exception)
             {
-                // A result waiter must never hang even if user cleanup or a transition throws.
-                instance.Completion?.TrySetResult(completion);
-                instance.Completion = null;
+                (errors ??= []).Add(exception);
             }
+        }
+
+        if (!cached)
+        {
+            try
+            {
+                await instance.Lifetime.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                (errors ??= []).Add(exception);
+            }
+            try
+            {
+                instance.Screen.QueueFree();
+            }
+            catch (Exception exception)
+            {
+                (errors ??= []).Add(exception);
+            }
+            try
+            {
+                instance.SceneLease.Dispose();
+            }
+            catch (Exception exception)
+            {
+                (errors ??= []).Add(exception);
+            }
+        }
+
+        try
+        {
+            RefreshLayerPresentation(instance.Descriptor.Layer);
+            UpdateMetrics();
+        }
+        catch (Exception exception)
+        {
+            (errors ??= []).Add(exception);
+        }
+        finally
+        {
+            // A result waiter must never hang even if user cleanup or a transition throws.
+            instance.Completion?.TrySetResult(completion);
+            instance.Completion = null;
+        }
+
+        if (errors is not null)
+        {
+            throw new AggregateException($"UI instance '{instance.Descriptor.Id}' reported cleanup errors.", errors);
         }
     }
 
@@ -382,22 +571,209 @@ public sealed class UIService : IAsyncDisposable
         }
 
         _disposed = true;
-        foreach (var instanceId in _active.Keys.ToArray())
+        _shutdown.Cancel();
+        await _fadeGate.WaitAsync();
+        try
         {
-            await CloseAsync(instanceId);
+            _fadeHandle = null;
+            List<Exception>? errors = null;
+            foreach (var instanceId in _active.Keys.ToArray())
+            {
+                try
+                {
+                    await CloseAsync(instanceId);
+                }
+                catch (Exception exception)
+                {
+                    (errors ??= []).Add(exception);
+                }
+            }
+            foreach (var instance in _cache.Values)
+            {
+                try
+                {
+                    await instance.Lifetime.DisposeAsync();
+                }
+                catch (Exception exception)
+                {
+                    (errors ??= []).Add(exception);
+                }
+                try
+                {
+                    instance.Screen.QueueFree();
+                }
+                catch (Exception exception)
+                {
+                    (errors ??= []).Add(exception);
+                }
+                try
+                {
+                    instance.SceneLease.Dispose();
+                }
+                catch (Exception exception)
+                {
+                    (errors ??= []).Add(exception);
+                }
+            }
+
+            _cache.Clear();
+            _openingSingletons.Clear();
+            _catalog.Clear();
+            _canvas.QueueFree();
+            UpdateMetrics();
+            try
+            {
+                await _serviceLifetime.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                (errors ??= []).Add(exception);
+            }
+            if (errors is not null)
+            {
+                throw new AggregateException("One or more UI instances could not be disposed.", errors);
+            }
         }
-        foreach (var instance in _cache.Values)
+        finally
         {
-            await instance.Lifetime.DisposeAsync();
-            instance.Screen.QueueFree();
-            instance.SceneLease.Dispose();
+            _fadeGate.Release();
+            _fadeGate.Dispose();
+            _shutdown.Dispose();
+        }
+    }
+
+    private async ValueTask DisposeUnopenedInstanceAsync(UIInstance instance)
+    {
+        List<Exception>? errors = null;
+        if (instance.Activation is not null)
+        {
+            try
+            {
+                await instance.Activation.DisposeAsync();
+            }
+            catch (Exception exception)
+            {
+                (errors ??= []).Add(exception);
+            }
+            instance.Activation = null;
+            try
+            {
+                instance.Screen.SetActivation(null);
+            }
+            catch (Exception exception)
+            {
+                (errors ??= []).Add(exception);
+            }
         }
 
-        _cache.Clear();
-        _openingSingletons.Clear();
-        _catalog.Clear();
-        _canvas.QueueFree();
+        instance.Completion?.TrySetResult(UICompletion.Cancelled);
+        instance.Completion = null;
+        if (instance.Descriptor.CachePolicy == UICachePolicy.CachedSingleton && !_disposed)
+        {
+            try
+            {
+                instance.Screen.Hide();
+                instance.Screen.ProcessMode = Node.ProcessModeEnum.Disabled;
+                _cache[instance.Descriptor.Id] = instance;
+                UpdateMetrics();
+                if (errors is not null)
+                {
+                    throw new AggregateException(
+                        $"Unopened UI instance '{instance.Descriptor.Id}' reported cleanup errors.",
+                        errors);
+                }
+                return;
+            }
+            catch (Exception exception) when (exception is not AggregateException)
+            {
+                (errors ??= []).Add(exception);
+            }
+        }
+
+        try
+        {
+            await instance.Lifetime.DisposeAsync();
+        }
+        catch (Exception exception)
+        {
+            (errors ??= []).Add(exception);
+        }
+        try
+        {
+            instance.Screen.QueueFree();
+        }
+        catch (Exception exception)
+        {
+            (errors ??= []).Add(exception);
+        }
+        try
+        {
+            instance.SceneLease.Dispose();
+        }
+        catch (Exception exception)
+        {
+            (errors ??= []).Add(exception);
+        }
         UpdateMetrics();
+        if (errors is not null)
+        {
+            throw new AggregateException(
+                $"Unopened UI instance '{instance.Descriptor.Id}' reported cleanup errors.",
+                errors);
+        }
+    }
+
+    private UIFadeTransitionScreen? TryGetFadeScreen()
+    {
+        if (_fadeHandle is null ||
+            !_active.TryGetValue(_fadeHandle.InstanceId, out var instance))
+        {
+            _fadeHandle = null;
+            return null;
+        }
+
+        return instance.Screen as UIFadeTransitionScreen ??
+            throw new InvalidOperationException(
+                $"Built-in UI '{UICatalog.UIFadeTransition.Id}' must use {nameof(UIFadeTransitionScreen)}.");
+    }
+
+    private async ValueTask<UIFadeTransitionScreen> GetOrOpenFadeScreenAsync(
+        CancellationToken cancellationToken)
+    {
+        var existing = TryGetFadeScreen();
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var handle = await OpenAsync(
+            UICatalog.UIFadeTransition.Id,
+            parentLifetime: _serviceLifetime,
+            cancellationToken: cancellationToken);
+        _fadeHandle = handle;
+        return TryGetFadeScreen() ??
+            throw new InvalidOperationException("Fade transition UI opened without an active screen instance.");
+    }
+
+    private async ValueTask CloseFadeAsync()
+    {
+        var handle = _fadeHandle;
+        _fadeHandle = null;
+        if (handle is not null)
+        {
+            await handle.CloseAsync();
+        }
+    }
+
+    private async ValueTask RestoreFadeStateAsync(bool retainedAtStart)
+    {
+        if (retainedAtStart)
+        {
+            TryGetFadeScreen()?.SetOpacity(1f);
+            return;
+        }
+
+        await CloseFadeAsync();
     }
 
     private Control CreateLayerRoot(string name, int zIndex)
@@ -445,9 +821,10 @@ public sealed class UIService : IAsyncDisposable
                 control.GrabFocus();
                 return;
             }
-            foreach (var child in node.GetChildren())
+            var childCount = node.GetChildCount();
+            for (var index = 0; index < childCount; index++)
             {
-                pending.Enqueue(child);
+                pending.Enqueue(node.GetChild(index));
             }
         }
     }

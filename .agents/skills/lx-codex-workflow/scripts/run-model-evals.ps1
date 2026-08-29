@@ -2,8 +2,6 @@ param(
     [ValidateSet("smoke", "full")]
     [string]$Suite = "full",
 
-    [string[]]$ProfileId = @(),
-
     [string[]]$CaseId = @(),
 
     [int]$TimeoutMinutes = 20,
@@ -17,15 +15,15 @@ $projectDirectory = "godot_project"
 $evalPath = Join-Path $repoRoot ".agents\skills\lx-codex-workflow\evals\evals.json"
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 $evals = $utf8.GetString([System.IO.File]::ReadAllBytes($evalPath)) | ConvertFrom-Json
-$profiles = @($evals.profiles | Where-Object { $_.required })
-if ($ProfileId.Count -gt 0) {
-    $profiles = @($profiles | Where-Object { $_.id -in $ProfileId })
-    foreach ($requested in $ProfileId) {
-        if ($requested -notin @($profiles.id)) {
-            throw "Unknown required profile '$requested'."
-        }
-    }
+$profiles = @($evals.profiles)
+if ($profiles.Count -ne 1 -or
+    $profiles[0].id -ne "sol-high" -or
+    $profiles[0].model -ne "gpt-5.6-sol" -or
+    $profiles[0].reasoning -ne "high" -or
+    $profiles[0].required -ne $true) {
+    throw "Evaluation schema must contain only the required sol-high profile."
 }
+$profile = $profiles[0]
 $cases = if ($Suite -eq "smoke") {
     @($evals.cases | Where-Object { $_.suite -eq "smoke" })
 }
@@ -40,15 +38,16 @@ if ($CaseId.Count -gt 0) {
         }
     }
 }
-if ($profiles.Count -eq 0 -or $cases.Count -eq 0) {
-    throw "No profiles or cases selected."
+if ($cases.Count -eq 0) {
+    throw "No cases selected."
 }
 
 $codexCommand = Get-Command codex -ErrorAction Stop
-$nodeCommand = Get-Command node.exe -ErrorAction Stop
-$codexEntry = Join-Path (Split-Path -Parent $codexCommand.Source) "node_modules\@openai\codex\bin\codex.js"
-if (-not (Test-Path -LiteralPath $codexEntry -PathType Leaf)) {
-    throw "Codex CLI entry was not found at '$codexEntry'."
+$codexExecutable = [string]$codexCommand.Source
+if ($codexCommand.CommandType -ne [System.Management.Automation.CommandTypes]::Application -or
+    [string]::IsNullOrWhiteSpace($codexExecutable) -or
+    -not (Test-Path -LiteralPath $codexExecutable -PathType Leaf)) {
+    throw "Codex CLI must resolve to an executable application, got '$($codexCommand.CommandType)' at '$codexExecutable'."
 }
 $hostExe = (Get-Process -Id $PID).Path
 $runId = (Get-Date).ToUniversalTime().ToString("yyyyMMdd-HHmmss")
@@ -412,19 +411,18 @@ if ($PreflightOnly) {
 }
 
 $results = [System.Collections.Generic.List[object]]::new()
-$totalRuns = $profiles.Count * $cases.Count
+$totalRuns = $cases.Count
 $runNumber = 0
-foreach ($profile in $profiles) {
-    foreach ($case in $cases) {
+foreach ($case in $cases) {
         $runNumber++
         $caseKey = "$($profile.id)-$($case.id)"
         $fixture = Join-Path $fixtureRoot $caseKey
         $artifacts = Join-Path $artifactRoot $caseKey
         New-Item -ItemType Directory -Path $artifacts -Force | Out-Null
         Write-Host "[$runNumber/$totalRuns] $($profile.model)/$($profile.reasoning) :: $($case.id)"
+        try {
         $started = Get-Date
         $failures = [System.Collections.Generic.List[string]]::new()
-        $budgetWarnings = [System.Collections.Generic.List[string]]::new()
         $exitCode = -1
         $validateExitCode = $null
         $changedFiles = @()
@@ -465,7 +463,6 @@ foreach ($profile in $profiles) {
             Write-Utf8 $promptPath ([string]$case.prompt)
 
             $codexArgs = @(
-                $codexEntry,
                 "exec",
                 "--ephemeral",
                 "--ignore-user-config",
@@ -491,7 +488,7 @@ foreach ($profile in $profiles) {
                 '"' + ([string]$_).Replace('"', '\"') + '"'
             }) -join ' '
             $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-            $startInfo.FileName = $nodeCommand.Source
+            $startInfo.FileName = $codexExecutable
             $startInfo.Arguments = $quotedArgs
             $startInfo.UseShellExecute = $false
             $startInfo.CreateNoWindow = $true
@@ -611,7 +608,10 @@ foreach ($profile in $profiles) {
         }).Count
         $retries = @($events | Where-Object {
             $_.type -in @("turn.failed", "error") -or
-            ($_.type -eq "item.completed" -and $_.item.type -eq "command_execution" -and $_.item.status -eq "failed")
+            ($_.type -eq "item.completed" -and
+                $_.item.type -eq "command_execution" -and
+                $_.item.status -eq "failed" -and
+                -not ($_.item.exit_code -eq 1 -and $_.item.command -match '(?i)\brg(?:\.exe)?\s'))
         }).Count
         $inputTokens = if ($null -ne $usage) { [long]$usage.input_tokens } else { 0 }
         $cachedInputTokens = if ($null -ne $usage) { [long]$usage.cached_input_tokens } else { 0 }
@@ -628,12 +628,7 @@ foreach ($profile in $profiles) {
                 $limit = $case.budgets.($budget.Name)
                 if ($null -ne $limit -and [long]$budget.Actual -gt [long]$limit) {
                     $budgetMessage = "$($budget.Name) budget exceeded: $($budget.Actual) > $limit."
-                    if ($profile.id -eq "terra-high") {
-                        $failures.Add($budgetMessage)
-                    }
-                    else {
-                        $budgetWarnings.Add($budgetMessage)
-                    }
+                    $failures.Add($budgetMessage)
                 }
             }
         }
@@ -645,9 +640,8 @@ foreach ($profile in $profiles) {
             case = [string]$case.id
             passed = ($failures.Count -eq 0)
             failures = @($failures)
-            efficiency_budget_passed = ($budgetWarnings.Count -eq 0 -and
-                -not @($failures | Where-Object { $_ -like "* budget exceeded:*" }).Count)
-            efficiency_warnings = @($budgetWarnings)
+            efficiency_budget_passed = (-not @($failures | Where-Object { $_ -like "* budget exceeded:*" }).Count)
+            efficiency_warnings = @()
             exit_code = $exitCode
             validation_exit_code = $validateExitCode
             changed_file_count = $changedFiles.Count
@@ -668,17 +662,14 @@ foreach ($profile in $profiles) {
                 Write-Host "    $failure"
             }
         }
-        foreach ($warning in $budgetWarnings) {
-            Write-Host "    WARN: $warning"
         }
-        Remove-EvalFixture $fixture
-    }
+        finally {
+            Remove-EvalFixture $fixture
+        }
 }
 
-$profileSummary = @($profiles | ForEach-Object {
-    $profile = $_
-    $profileResults = @($results | Where-Object { $_.profile -eq $profile.id })
-    [pscustomobject][ordered]@{
+$profileResults = @($results)
+$profileSummary = [pscustomobject][ordered]@{
         profile = [string]$profile.id
         model = [string]$profile.model
         reasoning = [string]$profile.reasoning
@@ -695,15 +686,14 @@ $profileSummary = @($profiles | ForEach-Object {
         retries = ($profileResults | Measure-Object retries -Sum).Sum
         duration_seconds = [math]::Round(($profileResults | Measure-Object duration_seconds -Sum).Sum, 2)
     }
-})
 $summary = [pscustomobject][ordered]@{
     schema_version = 1
     run_id = $runId
     generated_at_utc = (Get-Date).ToUniversalTime().ToString("o")
-    codex_cli = (& codex --version)
+    codex_cli = (& $codexExecutable --version)
     suite = $Suite
     all_passed = (@($results | Where-Object { -not $_.passed }).Count -eq 0)
-    profiles = $profileSummary
+    profiles = @($profileSummary)
     results = @($results)
 }
 $summaryJson = $summary | ConvertTo-Json -Depth 10
@@ -711,9 +701,7 @@ $summaryPath = Join-Path $runRoot "summary.json"
 Write-Utf8 $summaryPath $summaryJson
 Write-Utf8 (Join-Path $outputRoot "latest.json") $summaryJson
 Write-Host "Summary: $summaryPath"
-foreach ($profile in $profileSummary) {
-    Write-Host "  $($profile.profile): $($profile.passed)/$($profile.total), tokens=$($profile.input_tokens + $profile.output_tokens), tools=$($profile.tool_calls), seconds=$($profile.duration_seconds)"
-}
+Write-Host "  $($profileSummary.profile): $($profileSummary.passed)/$($profileSummary.total), tokens=$($profileSummary.input_tokens + $profileSummary.output_tokens), tools=$($profileSummary.tool_calls), seconds=$($profileSummary.duration_seconds)"
 if (-not $summary.all_passed) {
     exit 1
 }

@@ -20,7 +20,10 @@ public sealed class UIHandle : IAsyncDisposable
 
     public UIId UIId { get; }
 
-    public bool IsClosed => _owner is null;
+    internal Guid InstanceId => _instanceId;
+
+    /// <summary>页面是否已由句柄、UIService 或所属生命周期关闭。</summary>
+    public bool IsClosed => _owner is null || _completion.IsCompleted;
 
     /// <summary>等待页面关闭并把结果转换为调用方指定类型。</summary>
     public async ValueTask<UIResult<TResult>> WaitForResultAsync<TResult>(
