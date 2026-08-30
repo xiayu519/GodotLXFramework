@@ -15,7 +15,9 @@ Windows 可直接双击 `build.bat`。脚本从自身目录定位工作区，首
 - 有产品层时：必须在 `content/game/game-manifest.json` 显式声明 `sourceRoot`；代码写入 `<sourceRoot>/Generated/Luban/`，二进制表写入 `godot_project/content/data/luban/*.bytes`。工具不扫描或猜测 `script/` 下的文件夹。
 - 干净框架基线没有产品层时：代码与数据只写入 `godot_project/.lx/luban/generated/`，用于验证工具链，不污染框架运行时内容。
 
-当前示例包含 `design_probe`、`design_category` 和 `design_item`。它覆盖 int/float/double/long/bool/string、enum、嵌套 bean、list、set、map、nullable 和跨表引用；产品启动时通过 `LX.Content.LoadLubanTables` 实际读取三张 `.bytes`，不是只验证文件存在。`fixtures/invalid/missing_reference.json` 必须被 Luban 拒绝，用于证明跨表引用约束没有退化。产品可通过可选的 `validation.json` 声明自己的非法数据 fixture、目标文件和期望错误词，框架脚本不写死产品表名或字段名。
+`sample` 分支包含 PlaneFight 第一关真实配置表，以及 `design_probe`、`design_category` 和 `design_item` 工具链兼容性表。它们覆盖玩家、敌人、Boss、掉落配置，以及 int/float/double/long/bool/string、enum、嵌套 bean、list、set、map、nullable 和跨表引用；产品启动时通过 `LX.Content.LoadLubanTables` 实际读取生成的 `.bytes`，不是只验证文件存在。
+
+`fixtures/invalid/missing_reference.json` 必须被 Luban 拒绝，用于证明跨表引用约束没有退化；`validation.json` 还把 `fixtures/invalid/plane_fight_level.json` 声明为 PlaneFight 产品负例。验证器根据清单读取 fixture、目标数据文件和期望错误词，框架脚本不写死产品名、表名或字段名。
 
 每次构建会执行两轮生成并比较输出哈希，然后在隔离 `.csproj` 编译生成代码。`.lx/luban/report.json` 的 `generatedCodeCompiled`、`negativeReferenceRejected`、`negativeProductDataRejected` 和 `outputHash` 是验证器读取的机器事实，任一缺失都会使 `validate` 失败。
 
