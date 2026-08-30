@@ -1,0 +1,6 @@
+interface:
+  display_name: "LX 游戏存档"
+  short_description: "处理存档版本迁移、备份、槽位与删除契约"
+  default_prompt: "使用 $lx-persistence 完成这个 LXFramework 存档任务。"
+policy:
+  allow_implicit_invocation: true

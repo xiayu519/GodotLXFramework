@@ -1,0 +1,6 @@
+interface:
+  display_name: "LX 产品 UI"
+  short_description: "开发页面、导航、payload 与视觉证据"
+  default_prompt: "使用 $lx-ui 完成这个 LXFramework 产品 UI 任务。"
+policy:
+  allow_implicit_invocation: true

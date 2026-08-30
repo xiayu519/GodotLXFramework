@@ -5,8 +5,8 @@ status: superseded
 verified: 2026-08-30
 sources:
   - .codex/config.toml
-  - .agents/skills/lx-codex-workflow/evals/evals.json
-  - .agents/skills/lx-codex-workflow/references/model-evaluation.md
+  - .agents/skills/lx-model-eval/evals/evals.json
+  - .agents/skills/lx-model-eval/references/model-evaluation.md
 ---
 
 LXFramework 只保证 `gpt-5.6-sol/high`，普通任务与 Plan mode 使用同一配置；其他模型或 reasoning 不参与兼容承诺、提示词折中或发布门禁。模型选择只保存在配置与工作流说明中，不进入根 `AGENTS.md`。
@@ -15,4 +15,4 @@ Codex CLI `0.151.0-alpha.7.1` 下，2026-08-30 完整 11 项 outcome eval 通过
 
 根 `AGENTS.md` 只保留 LX 仓库结构、不变量、命令和验证门禁；Skill 完全依赖 description 语义发现。修改根/嵌套 AGENTS、Skill description/路由/reference、模型配置、eval schema/runner，或升级 Codex CLI 的行为版本后，先跑静态/preflight，再重新建立完整 11/11 基线。
 
-该 11 项基线已被 13 项产品生命周期 schema 替代，仅保留为历史证据；不能外推为新 schema 通过。
+该 11 项基线已被[语义隔离 Skill 的 19/19 基线](2026-08-30-semantic-skill-sol-high-baseline.md)替代，仅保留为历史证据；不能外推为新 schema 通过。

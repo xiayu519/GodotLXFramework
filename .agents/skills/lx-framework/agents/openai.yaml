@@ -1,0 +1,6 @@
+interface:
+  display_name: "LXFramework 内核"
+  short_description: "开发框架内核、公开 API 与运行时契约"
+  default_prompt: "使用 $lx-framework 完成这个 LXFramework 内核开发任务。"
+policy:
+  allow_implicit_invocation: true

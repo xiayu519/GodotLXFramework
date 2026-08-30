@@ -1,0 +1,6 @@
+interface:
+  display_name: "LX Capability 目录"
+  short_description: "维护命令元数据、副作用与验收 recipe"
+  default_prompt: "使用 $lx-capabilities 维护这个 LXFramework Capability 目录任务。"
+policy:
+  allow_implicit_invocation: true

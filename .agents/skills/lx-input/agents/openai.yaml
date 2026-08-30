@@ -1,0 +1,6 @@
+interface:
+  display_name: "LX 产品输入"
+  short_description: "维护输入清单、动作绑定与生成入口"
+  default_prompt: "使用 $lx-input 完成这个 LXFramework 产品输入任务。"
+policy:
+  allow_implicit_invocation: true

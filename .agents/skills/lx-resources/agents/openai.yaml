@@ -1,0 +1,6 @@
+interface:
+  display_name: "LX 资源生命周期"
+  short_description: "处理资源租约、动态绑定、Prefab 与节点池闭环"
+  default_prompt: "使用 $lx-resources 审查这个 LXFramework 资源生命周期任务。"
+policy:
+  allow_implicit_invocation: true

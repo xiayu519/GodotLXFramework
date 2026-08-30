@@ -1,0 +1,6 @@
+interface:
+  display_name: "LX 事务维护"
+  short_description: "维护 doctor/upgrade 计划、回滚与恢复"
+  default_prompt: "使用 $lx-maintenance 处理这个 LXFramework 事务维护任务。"
+policy:
+  allow_implicit_invocation: true

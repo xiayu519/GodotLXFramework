@@ -4,7 +4,7 @@ kind: feedback
 status: active
 verified: 2026-08-30
 sources:
-  - .agents/skills/lx-dev/references/migration-workflow.md
+  - .agents/skills/lx-migrate/references/migration-workflow.md
   - godot_project/tools/LXFramework.Tools/MigrationPlanner.cs
 ---
 

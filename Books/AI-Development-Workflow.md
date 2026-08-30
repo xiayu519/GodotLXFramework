@@ -10,8 +10,7 @@ lx.ps1                           外层稳定命令入口
 game_design/                     Luban XML schema、JSON 源数据、双击转表与固定工具链
 godot_project/                   唯一 Godot 工程与 res:// 根
 godot_project/**/AGENTS.md       工程及目录职责与依赖边界
-.agents/skills/lx-dev/           LX/Godot C# 开发入口与按需知识
-.agents/skills/lx-codex-workflow Codex 工作流维护与模型评测入口
+.agents/skills/                  按框架、玩法、UI、输入、内容、资源、数据和 Codex 控制面分开的语义 Skill
 .codex/config.toml               默认模型与 reasoning
 .codex/memory/                   可版本化 Project Knowledge
 .codex/work/                     未完成的跨会话临时状态
@@ -22,7 +21,7 @@ godot_project/**/AGENTS.md       工程及目录职责与依赖边界
 ## 开发路径
 
 1. Codex 根据请求与目标目录自动获得根规则和最近的局部规则。
-2. LX/Godot C# 任务触发 `$lx-dev`；工作流、提示、记忆或模型评测任务触发 `$lx-codex-workflow`。
+2. Codex 激活完成请求所需的最小充分 Skill 集合，而不是强制每个任务只能有一个 Skill：框架内核、玩法/产品结构、产品 UI、产品输入、普通内容/静态资源登记分别使用 `$lx-framework`、`$lx-game`、`$lx-ui`、`$lx-input`、`$lx-content`；资源生命周期、Luban、存档、迁移和编辑器工具分别使用 `$lx-resources`、`$lx-data`、`$lx-persistence`、`$lx-migrate`、`$lx-editor-tools`。真实跨域任务组合全部必要 Skill，同时不加载无关 Skill。Capability 目录、运行时观测、doctor/upgrade 事务、Codex 指令架构、模型评测和 Project Knowledge 也各自使用独立 Skill。
 3. 跨模块且需要结构概览时运行 `./lx.ps1 inspect`；新结构统一使用 `./lx.ps1 create ...`。
 4. 修改事实源和非生成代码；生成目录由工具维护。
 5. 迭代时把本次明确变更路径一次传给 `./lx.ps1 check`。
@@ -52,6 +51,6 @@ Project Knowledge 不是源码索引。能够从源码、清单或 `inspect` 重
 
 ## 模型兼容验证
 
-工作流静态检查负责发现文件缺失、错误默认模型、超长常驻提示、失效链接和旧入口残留；真实模型评测只运行 Sol/high。通过与否由仓库状态和 `./lx.ps1 validate` 决定，同时记录 token、工具调用、重试和延迟，不能用模型自评代替。当前 schema 有 13 个用例，包含旧 LX 升级与跨引擎复刻规划；完整套件消耗外部模型额度，未确认时只运行 `-PreflightOnly`。
+工作流静态检查负责发现文件缺失、错误默认模型、超长常驻提示、失效链接、Skill 描述预算和旧入口残留；真实模型评测只运行 Sol/high。通过与否由仓库状态和 `./lx.ps1 validate` 决定，同时记录 Skill 正负路由、token、工具调用、重试和延迟，不能用模型自评代替。当前 schema 有 19 个用例并覆盖全部语义 Skill；完整套件消耗外部模型额度，未确认时只运行 `-PreflightOnly`。
 
-内部细节由 `$lx-codex-workflow` 的 references 与 eval schema 维护，本书只解释公开使用方式，避免形成第二套指令源。
+Skill 分层由 `$lx-codex-workflow` 维护，模型 eval 由 `$lx-model-eval` 维护；本书只解释公开使用方式，避免形成第二套指令源。

@@ -1,0 +1,6 @@
+interface:
+  display_name: "LX 运行时观测"
+  short_description: "维护会话校验和有界运行时快照"
+  default_prompt: "使用 $lx-runtime-observe 处理这个 LXFramework 运行时观测任务。"
+policy:
+  allow_implicit_invocation: true

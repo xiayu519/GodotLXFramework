@@ -1,0 +1,6 @@
+interface:
+  display_name: "LX 产品内容登记"
+  short_description: "维护普通 JSON 内容与静态资源 Catalog"
+  default_prompt: "使用 $lx-content 完成这个 LXFramework 产品内容登记任务。"
+policy:
+  allow_implicit_invocation: true
