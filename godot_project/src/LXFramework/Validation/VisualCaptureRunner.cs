@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
 using LX.Res;
+using LX.Runtime;
 using Godot;
 
 namespace LX.Validation;
@@ -8,19 +9,20 @@ namespace LX.Validation;
 /// <summary>在固定 SubViewport 中捕获和比较框架视觉基准。</summary>
 internal sealed class VisualCaptureRunner
 {
-    private const string ShowcaseScene = "res://scene/ui/examples/ui_components_showcase.tscn";
-    private static readonly Vector2I CaptureSize = new(1280, 720);
     private readonly Node _host;
-    private readonly AssetRegistry _assets;
+    private readonly LXContext _context;
 
-    public VisualCaptureRunner(Node host, AssetRegistry assets)
+    public VisualCaptureRunner(Node host, LXContext context)
     {
         _host = host;
-        _assets = assets;
+        _context = context;
     }
 
     public async ValueTask<VisualComparisonReport> RunAsync(
         string mode,
+        string target,
+        string scenePath,
+        Vector2I captureSize,
         string actualPath,
         string? baselinePath,
         string? diffPath,
@@ -32,17 +34,23 @@ internal sealed class VisualCaptureRunner
         }
 
         Directory.CreateDirectory(Path.GetDirectoryName(actualPath)!);
-        using var lease = _assets.Acquire<PackedScene>(ShowcaseScene, AssetCachePolicy.Cached);
+        if (captureSize.X is < 64 or > 4096 || captureSize.Y is < 64 or > 4096)
+        {
+            throw new ArgumentOutOfRangeException(nameof(captureSize));
+        }
+        using var lease = _context.Res.Acquire<PackedScene>(scenePath, AssetCachePolicy.Cached);
+        using var visualLifetime = _context.Lifetime.CreateChild($"VisualCapture:{target}");
         var viewport = new SubViewport
         {
             Name = "LXVisualCapture",
-            Size = CaptureSize,
+            Size = captureSize,
             RenderTargetUpdateMode = SubViewport.UpdateMode.Always,
             TransparentBg = false,
         };
         viewport.World2D = new World2D();
         _host.AddChild(viewport);
         var instance = lease.Resource.Instantiate();
+        LXContextInjector.InitializeTree(instance, _context, visualLifetime);
         viewport.AddChild(instance);
         try
         {
@@ -52,7 +60,7 @@ internal sealed class VisualCaptureRunner
                 await _host.ToSignal(_host.GetTree(), SceneTree.SignalName.ProcessFrame);
             }
 
-            using var actual = RenderSemanticSnapshot(instance);
+            using var actual = RenderSemanticSnapshot(instance, captureSize);
             var saveError = actual.SavePng(actualPath);
             if (saveError != Error.Ok)
             {
@@ -64,10 +72,10 @@ internal sealed class VisualCaptureRunner
                 return new VisualComparisonReport(
                     "lx.visual-report",
                     1,
-                    "ui_components",
+                    target,
                     true,
-                    CaptureSize.X,
-                    CaptureSize.Y,
+                    captureSize.X,
+                    captureSize.Y,
                     0,
                     ComputeHash(actualPath),
                     null,
@@ -81,10 +89,10 @@ internal sealed class VisualCaptureRunner
                 return new VisualComparisonReport(
                     "lx.visual-report",
                     1,
-                    "ui_components",
+                    target,
                     false,
-                    CaptureSize.X,
-                    CaptureSize.Y,
+                    captureSize.X,
+                    captureSize.Y,
                     -1,
                     ComputeHash(actualPath),
                     null,
@@ -99,7 +107,7 @@ internal sealed class VisualCaptureRunner
                 return new VisualComparisonReport(
                     "lx.visual-report",
                     1,
-                    "ui_components",
+                    target,
                     false,
                     actual.GetWidth(),
                     actual.GetHeight(),
@@ -143,7 +151,7 @@ internal sealed class VisualCaptureRunner
             return new VisualComparisonReport(
                 "lx.visual-report",
                 1,
-                "ui_components",
+                target,
                 changedPixels == 0,
                 actual.GetWidth(),
                 actual.GetHeight(),
@@ -171,9 +179,9 @@ internal sealed class VisualCaptureRunner
         }));
     }
 
-    private static Image RenderSemanticSnapshot(Node root)
+    private static Image RenderSemanticSnapshot(Node root, Vector2I captureSize)
     {
-        var image = Image.CreateEmpty(CaptureSize.X, CaptureSize.Y, false, Image.Format.Rgba8);
+        var image = Image.CreateEmpty(captureSize.X, captureSize.Y, false, Image.Format.Rgba8);
         image.Fill(Color.FromHtml("#EFF6FF"));
         DrawNode(root, image);
         return image;

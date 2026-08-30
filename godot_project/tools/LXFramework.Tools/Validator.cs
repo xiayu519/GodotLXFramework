@@ -25,6 +25,10 @@ internal static class Validator
         {
             errors.Add(transactionError);
         }
+        if (MigrationPlanner.ValidateClassifier() is { } migrationError)
+        {
+            errors.Add(migrationError);
+        }
 
         var report = new ValidationReport(DateTimeOffset.UtcNow, errors.Count == 0, errors);
         var output = Path.Combine(root, ".lx", "validation.json");

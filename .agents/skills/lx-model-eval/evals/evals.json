@@ -1,0 +1,430 @@
+{
+  "schema_version": 1,
+  "profiles": [
+    {
+      "id": "sol-high",
+      "model": "gpt-5.6-sol",
+      "reasoning": "high",
+      "required": true
+    }
+  ],
+  "cases": [
+    {
+      "id": "readonly-res-audit",
+      "suite": "smoke",
+      "setup": "clean",
+      "prompt": "只读审查当前 LXFramework：定位游戏代码获取动态资源的公开入口，并说明资源租约应由谁持有。不得修改任何文件。只给最少的直接仓库路径证据，最终答复不超过 8 行；证据充分后立即停止。",
+      "expected_write": false,
+      "expected_skills": ["lx-resources"],
+      "forbidden_skills": ["lx-game", "lx-ui", "lx-framework"],
+      "expected_terms": ["AssetLease"],
+      "expected_term_groups": [
+        {
+          "any": ["LX.Res", "LXContext.Res"]
+        },
+        {
+          "any": ["LifetimeScope", "using", "调用方", "最窄生命周期"]
+        }
+      ],
+      "budgets": {
+        "tool_calls": 12,
+        "retries": 1,
+        "input_tokens": 250000,
+        "uncached_input_tokens": 55000,
+        "output_tokens": 3000
+      }
+    },
+    {
+      "id": "create-game",
+      "suite": "smoke",
+      "setup": "clean",
+      "prompt": "把这个干净的 LXFramework 基线变成一个名为 EvalGame 的新游戏。使用框架已有的结构创建入口，不要手改生成代码；完成必要修改并运行最终验证。仅在会改变结果的重要歧义存在时提问。",
+      "expected_write": true,
+      "expected_skills": ["lx-game"],
+      "forbidden_skills": ["lx-framework", "lx-migrate"],
+      "expected_files": [
+        "godot_project/script/EvalGame/AGENTS.md",
+        "godot_project/script/EvalGame/GameRoot.cs",
+        "godot_project/scene/world/main_world.tscn"
+      ],
+      "validate": true,
+      "budgets": {
+        "tool_calls": 10,
+        "retries": 1,
+        "input_tokens": 500000,
+        "uncached_input_tokens": 70000,
+        "output_tokens": 4000
+      }
+    },
+    {
+      "id": "important-ui-ambiguity",
+      "suite": "full",
+      "setup": "game",
+      "prompt": "我需要给当前游戏新增背包界面，但还没有决定它是全屏页面还是可叠加弹窗，也没有确定格子数据接口。请按框架工作流处理。",
+      "expected_write": false,
+      "expected_skills": ["lx-ui"],
+      "forbidden_skills": ["lx-game", "lx-data", "lx-framework"],
+      "question_count": {
+        "min": 1,
+        "max": 3
+      },
+      "budgets": {
+        "tool_calls": 6,
+        "retries": 1,
+        "input_tokens": 150000,
+        "uncached_input_tokens": 30000,
+        "output_tokens": 2000
+      }
+    },
+    {
+      "id": "native-node-context",
+      "suite": "full",
+      "setup": "game",
+      "prompt": "给当前游戏创建一个名为 DamageNumber 的 Godot Label 节点脚手架，ID 使用 damage_number。必须沿用 LX 上下文注入方式，不得建立全局上下文或第二套服务入口；完成后运行最终验证。",
+      "expected_write": true,
+      "expected_skills": ["lx-game"],
+      "forbidden_skills": ["lx-framework"],
+      "expected_files": [
+        "godot_project/script/EvalBase/Nodes/DamageNumber.cs",
+        "godot_project/scene/nodes/damage_number.tscn"
+      ],
+      "validate": true,
+      "budgets": {
+        "tool_calls": 12,
+        "retries": 1,
+        "input_tokens": 450000,
+        "uncached_input_tokens": 70000,
+        "output_tokens": 4000
+      }
+    },
+    {
+      "id": "vertical-slice",
+      "suite": "full",
+      "setup": "game",
+      "prompt": "为当前 EvalBase 游戏建立一个最小但完整的 Hangar 纵向切片：创建 Hangar 世界、HangarFeature 功能和 HangarScreen 页面，三者稳定 ID 都使用 hangar；创建 OpenHangar 输入动作，Godot action 使用 open_hangar，默认绑定 H。只使用已有 lx create 工作流和内容事实源，不手改生成文件；完成后运行最终验证。",
+      "expected_write": true,
+      "expected_skills": ["lx-game", "lx-ui", "lx-input"],
+      "forbidden_skills": ["lx-migrate"],
+      "expected_files": [
+        "godot_project/scene/world/hangar.tscn",
+        "godot_project/scene/features/hangar.tscn",
+        "godot_project/scene/ui/hangar.tscn"
+      ],
+      "validate": true,
+      "budgets": {
+        "tool_calls": 18,
+        "retries": 1,
+        "input_tokens": 650000,
+        "uncached_input_tokens": 100000,
+        "output_tokens": 5500
+      }
+    },
+    {
+      "id": "resource-registration",
+      "suite": "full",
+      "setup": "game",
+      "prompt": "把 res://scene/main.tscn 作为 PackedScene 资源注册为 framework_entry，并让产品代码通过生成的类型化引用获取它。禁止在游戏代码中使用 GD.Load 或 ResourceLoader.Load；完成后运行最终验证。",
+      "expected_write": true,
+      "expected_skills": ["lx-content"],
+      "forbidden_skills": ["lx-game", "lx-resources"],
+      "expected_files": [
+        "godot_project/content/res/res-manifest.json"
+      ],
+      "validate": true,
+      "budgets": {
+        "tool_calls": 14,
+        "retries": 1,
+        "input_tokens": 500000,
+        "uncached_input_tokens": 80000,
+        "output_tokens": 4500
+      }
+    },
+    {
+      "id": "generated-input-discipline",
+      "suite": "full",
+      "setup": "game",
+      "prompt": "给当前游戏增加 PauseGame 输入动作，默认绑定 Escape。必须修改上游清单并通过生成器得到绑定，禁止直接编辑 Generated 目录；完成后运行最终验证。",
+      "expected_write": true,
+      "expected_skills": ["lx-input"],
+      "forbidden_skills": ["lx-game", "lx-data"],
+      "expected_files": [
+        "godot_project/content/input/input-manifest.json"
+      ],
+      "validate": true,
+      "budgets": {
+        "tool_calls": 12,
+        "retries": 1,
+        "input_tokens": 450000,
+        "uncached_input_tokens": 70000,
+        "output_tokens": 4000
+      }
+    },
+    {
+      "id": "readonly-luban-route",
+      "suite": "full",
+      "setup": "clean",
+      "prompt": "只读说明 LXFramework 新增一张 Luban 表时应修改哪些上游目录、运行哪个命令、生成到哪些目录以及运行时数据格式。不得修改文件；只给仓库事实源和最短操作顺序。",
+      "expected_write": false,
+      "expected_skills": ["lx-data"],
+      "forbidden_skills": ["lx-game"],
+      "expected_terms": [
+        "game_design/schema",
+        "game_design/data",
+        ".bytes",
+        "lx.ps1 data"
+      ],
+      "budgets": {
+        "tool_calls": 10,
+        "retries": 1,
+        "input_tokens": 250000,
+        "uncached_input_tokens": 45000,
+        "output_tokens": 3500
+      }
+    },
+    {
+      "id": "readonly-runtime-diagnostics",
+      "suite": "full",
+      "setup": "clean",
+      "prompt": "只读说明 Codex 应用什么命令发现 LXFramework 的运行时诊断能力、查询当前 UI 快照，并指出框架用什么字段拒绝旧运行会话。只给命令与契约，不实际执行它们；不得修改任何文件，答案不超过 10 行。",
+      "expected_write": false,
+      "expected_skills": ["lx-runtime-observe"],
+      "forbidden_skills": ["lx-capabilities", "lx-framework", "lx-game"],
+      "expected_terms": [
+        "capabilities runtime",
+        "runtime snapshot ui",
+        "sessionId",
+        "generation"
+      ],
+      "budgets": {
+        "tool_calls": 10,
+        "retries": 1,
+        "input_tokens": 250000,
+        "uncached_input_tokens": 45000,
+        "output_tokens": 3000
+      }
+    },
+    {
+      "id": "readonly-capability-catalog",
+      "suite": "full",
+      "setup": "clean",
+      "prompt": "只读说明 LXFramework 新增一个根 CLI 命令时 Capability 目录必须同步哪些元数据、三种副作用分类如何区分，以及为什么能力查询不能扩大授权。不得修改文件，只给目录契约。",
+      "expected_write": false,
+      "expected_skills": ["lx-capabilities"],
+      "forbidden_skills": ["lx-runtime-observe", "lx-maintenance", "lx-codex-workflow"],
+      "expected_terms": [
+        "verifyRecipe",
+        "ReadOnly",
+        "LocalArtifact",
+        "ProjectMutation"
+      ],
+      "budgets": {
+        "tool_calls": 8,
+        "retries": 1,
+        "input_tokens": 250000,
+        "uncached_input_tokens": 45000,
+        "output_tokens": 3000
+      }
+    },
+    {
+      "id": "readonly-maintenance-transaction",
+      "suite": "full",
+      "setup": "clean",
+      "prompt": "只读说明 upgrade --apply 中断后如何恢复、人工改动造成哈希冲突时必须怎样处理，以及哪些事务状态才算成功终态。不得修改文件，不讨论旧游戏迁移。",
+      "expected_write": false,
+      "expected_skills": ["lx-maintenance"],
+      "forbidden_skills": ["lx-capabilities", "lx-migrate", "lx-codex-workflow"],
+      "expected_terms": [
+        "--recover",
+        "RecoveryRequired",
+        "Applied",
+        "RolledBack"
+      ],
+      "budgets": {
+        "tool_calls": 8,
+        "retries": 1,
+        "input_tokens": 250000,
+        "uncached_input_tokens": 45000,
+        "output_tokens": 3500
+      }
+    },
+    {
+      "id": "readonly-human-tooling",
+      "suite": "full",
+      "setup": "clean",
+      "prompt": "一个不使用 Codex 的开发者想创建页面、检查问题并比较 UI 视觉基准。只读给出 Godot 编辑器中的入口和等价命令，不得修改文件。",
+      "expected_write": false,
+      "expected_skills": ["lx-editor-tools"],
+      "forbidden_skills": ["lx-game", "lx-codex-workflow"],
+      "expected_terms": [
+        "visual compare",
+        "create screen"
+      ],
+      "expected_term_groups": [
+        {
+          "any": ["LX Tools", "LX 开发工具"]
+        }
+      ],
+      "budgets": {
+        "tool_calls": 10,
+        "retries": 1,
+        "input_tokens": 250000,
+        "uncached_input_tokens": 45000,
+        "output_tokens": 3000
+      }
+    },
+    {
+      "id": "save-migration-audit",
+      "suite": "full",
+      "setup": "clean",
+      "prompt": "只读审查存档的版本迁移、备份回退、槽位枚举和删除能力分别由哪些 API 提供。不得修改文件；给出最少路径证据，并指出迁移函数失败时的行为。",
+      "expected_write": false,
+      "expected_skills": ["lx-persistence"],
+      "forbidden_skills": ["lx-game", "lx-data"],
+      "expected_terms": [
+        "SaveStore",
+        "ListSlots",
+        "DeleteAsync"
+      ],
+      "expected_term_groups": [
+        {
+          "any": ["Backup", "备份", ".bak.json", "SaveLoadResult.Source"]
+        }
+      ],
+      "budgets": {
+        "tool_calls": 10,
+        "retries": 1,
+        "input_tokens": 250000,
+        "uncached_input_tokens": 45000,
+        "output_tokens": 3000
+      }
+    },
+    {
+      "id": "legacy-lx-upgrade-plan",
+      "suite": "full",
+      "setup": "migration-lx",
+      "prompt": "只读规划把 legacy_lx 中的旧 LX 游戏升级到当前干净主干。必须使用迁移 Capability/计划入口，区分产品内容、当前框架、生成物和构建产物；不得复制文件或修改项目。给出下一步纵向切片和验收证据。",
+      "expected_write": false,
+      "expected_skills": ["lx-migrate"],
+      "forbidden_skills": ["lx-game", "lx-ui", "lx-input", "lx-framework"],
+      "expected_terms": [
+        "upgrade",
+        "FrameworkOwned",
+        "BuildArtifact"
+      ],
+      "expected_command_terms": ["migrate plan"],
+      "expected_term_groups": [
+        {
+          "any": ["纵向切片", "vertical slice"]
+        },
+        {
+          "any": ["smoke product", "product smoke"]
+        }
+      ],
+      "budgets": {
+        "tool_calls": 12,
+        "retries": 1,
+        "input_tokens": 350000,
+        "uncached_input_tokens": 60000,
+        "output_tokens": 4000
+      }
+    },
+    {
+      "id": "cross-engine-remake-plan",
+      "suite": "full",
+      "setup": "migration-unity",
+      "prompt": "只读规划把 legacy_unity 中的 Unity 游戏复刻到当前 LXFramework。必须运行迁移计划并识别引擎；说明哪些内容可复用、哪些必须映射到 LX，不能机械翻译 GameManager 或复制 Library 构建物。不得修改项目。",
+      "expected_write": false,
+      "expected_skills": ["lx-migrate"],
+      "forbidden_skills": ["lx-game", "lx-ui", "lx-input", "lx-framework"],
+      "expected_terms": [
+        "remake",
+        "Unity",
+        "BuildArtifact"
+      ],
+      "expected_command_terms": ["migrate plan"],
+      "expected_term_groups": [
+        {
+          "any": ["授权", "许可", "license"]
+        },
+        {
+          "any": ["LX", "能力映射"]
+        }
+      ],
+      "budgets": {
+        "tool_calls": 12,
+        "retries": 1,
+        "input_tokens": 350000,
+        "uncached_input_tokens": 60000,
+        "output_tokens": 4000
+      }
+    },
+    {
+      "id": "readonly-framework-boundary",
+      "suite": "full",
+      "setup": "clean",
+      "prompt": "只读判断一个新的纯 C# 时间算法和一个依赖 Godot Node 的适配器分别应放入 LXFramework.Core 还是 LXFramework，并说明依赖方向。不得修改文件，只给最少仓库证据。",
+      "expected_write": false,
+      "expected_skills": ["lx-framework"],
+      "forbidden_skills": ["lx-game", "lx-capabilities", "lx-runtime-observe"],
+      "expected_terms": ["LXFramework.Core", "LXFramework"],
+      "budgets": {
+        "tool_calls": 8,
+        "retries": 1,
+        "input_tokens": 250000,
+        "uncached_input_tokens": 45000,
+        "output_tokens": 3000
+      }
+    },
+    {
+      "id": "readonly-skill-isolation",
+      "suite": "full",
+      "setup": "clean",
+      "prompt": "只读依据 lx-codex-workflow 已归纳的规则，说明 description、SKILL.md 正文和 reference 三阶段应如何控制语义激活与无关上下文。不要枚举或读取其他领域 Skill 正文，不讨论模型基线或 Project Knowledge，不得修改文件。",
+      "expected_write": false,
+      "expected_skills": ["lx-codex-workflow"],
+      "forbidden_skills": ["lx-model-eval", "lx-project-knowledge"],
+      "expected_terms": ["description", "SKILL.md", "reference", "最小充分"],
+      "budgets": {
+        "tool_calls": 8,
+        "retries": 1,
+        "input_tokens": 250000,
+        "uncached_input_tokens": 45000,
+        "output_tokens": 3000
+      }
+    },
+    {
+      "id": "readonly-model-eval-contract",
+      "suite": "full",
+      "setup": "clean",
+      "prompt": "只读说明 LXFramework 当前保证的 Codex 模型 profile、无额度预检命令和真实 outcome eval 的授权边界。不要审查 AGENTS 或 Skill 结构，不得修改文件。",
+      "expected_write": false,
+      "expected_skills": ["lx-model-eval"],
+      "forbidden_skills": ["lx-codex-workflow"],
+      "expected_terms": ["gpt-5.6-sol", "PreflightOnly"],
+      "budgets": {
+        "tool_calls": 8,
+        "retries": 1,
+        "input_tokens": 250000,
+        "uncached_input_tokens": 45000,
+        "output_tokens": 3000
+      }
+    },
+    {
+      "id": "readonly-project-knowledge-route",
+      "suite": "full",
+      "setup": "clean",
+      "prompt": "只读说明一条无法从源码重建、会影响未来决策的稳定用户反馈应如何写入 LXFramework Project Knowledge，包括分类、索引和被替代后的状态。不要修改文件。",
+      "expected_write": false,
+      "expected_skills": ["lx-project-knowledge"],
+      "forbidden_skills": ["lx-codex-workflow", "lx-model-eval"],
+      "expected_terms": [".codex/memory", "INDEX.md", "superseded"],
+      "budgets": {
+        "tool_calls": 8,
+        "retries": 1,
+        "input_tokens": 250000,
+        "uncached_input_tokens": 45000,
+        "output_tokens": 3000
+      }
+    }
+  ]
+}

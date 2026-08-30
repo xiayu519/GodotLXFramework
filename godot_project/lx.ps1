@@ -92,7 +92,11 @@ function Invoke-LxOperation {
             if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
             dotnet run --project $toolProject --no-build -- smoke
             if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
+            dotnet run --project $toolProject --no-build -- smoke product all
+            if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
             dotnet run --project $toolProject --no-build -- visual compare ui_components
+            if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
+            dotnet run --project $toolProject --no-build -- visual compare product
         }
         "check" {
             if ($CommandArguments.Count -eq 1 -and
@@ -213,7 +217,11 @@ function Invoke-LxOperation {
                 $smokeArguments = @("run", "--project", $toolProject, "--no-build", "--", "smoke")
                 dotnet @smokeArguments
                 if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
+                dotnet run --project $toolProject --no-build -- smoke product all
+                if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
                 dotnet run --project $toolProject --no-build -- visual compare ui_components
+                if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
+                dotnet run --project $toolProject --no-build -- visual compare product
             }
         }
         default {

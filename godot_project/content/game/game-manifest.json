@@ -12,7 +12,7 @@
       "scenePath": "res://scene/world/main_world.tscn"
     }
   ],
-  "exportSmokes": [
+  "productSmokes": [
     {
       "id": "level_one",
       "argument": "--plane-fight-smoke",
@@ -31,5 +31,6 @@
       "successMarker": "PLANE_FIGHT_API_SHOWCASE_PASS",
       "timeoutSeconds": 15
     }
-  ]
+  ],
+  "visualTargets": []
 }

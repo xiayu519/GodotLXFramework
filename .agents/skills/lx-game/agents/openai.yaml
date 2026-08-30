@@ -1,0 +1,6 @@
+interface:
+  display_name: "LX 游戏产品开发"
+  short_description: "开发玩法、世界、Feature、场景与产品结构"
+  default_prompt: "使用 $lx-game 完成这个 LXFramework 游戏产品任务。"
+policy:
+  allow_implicit_invocation: true

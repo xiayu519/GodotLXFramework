@@ -14,11 +14,12 @@ internal static class Program
             {
                 "doctor" => Doctor.Run(root, commandArgs),
                 "upgrade" => MaintenancePlanner.Run(root, "upgrade", commandArgs),
+                "migrate" => MigrationPlanner.Run(root, commandArgs),
                 "inspect" => ProjectInspector.Run(root, commandArgs),
                 "capabilities" => CapabilityCatalog.Run(root, commandArgs),
                 "generate" => ProjectGenerator.Run(root, commandArgs),
                 "validate" => Validator.Run(root),
-                "smoke" => await GodotSmoke.RunAsync(root),
+                "smoke" => await GodotSmoke.RunAsync(root, commandArgs),
                 "visual" => await VisualRunner.RunAsync(root, commandArgs),
                 "export" => await ExportRunner.RunAsync(root, commandArgs),
                 "benchmark" => BenchmarkRunner.Run(root),
@@ -46,14 +47,16 @@ internal static class Program
 
               doctor [--plan|--apply|--rollback|--recover] 检查环境并事务化修复当前派生状态。
               upgrade --plan|--apply|--rollback|--recover  将产品派生状态升级到当前 LX checkout。
-              inspect [--full]               写入紧凑项目索引；--full 才附完整文件表。
+              migrate plan --source <path|ref> 规划旧 LX、其他 Godot 或跨引擎游戏升级/移植/复刻。
+              inspect [--full] [--product-coverage] 写入项目索引，并可附产品 LX 服务静态使用图。
               capabilities [id]              写入机器可读能力、前置条件、副作用与验收配方。
               data                            用固定版本 Luban 生成强类型 C# 与 .bytes 二进制表。
               generate [--verbose]           生成目录与绑定；默认只报告汇总。
               check <changed-path> [...]      执行最小去重检查组合（仅 lx.ps1）。
               validate                       校验事实源、生成结果并完成最终门禁。
               smoke                          用 Godot 无窗口导入并启动框架。
-              visual capture|compare|approve 捕获、比较或显式批准 UI 视觉基准。
+              smoke product [id|all]         在 Debug/headless 工程中运行清单声明的产品烟测。
+              visual capture|compare|approve [target|product] 捕获、比较或显式批准框架/产品视觉基准。
               export <platform>               Release 导出到 build/<platform> 并运行框架与产品烟测；当前支持 windows。
               benchmark                       写入核心性能基线报告。
               api check|update                 检查或显式更新公开 API 兼容基线。

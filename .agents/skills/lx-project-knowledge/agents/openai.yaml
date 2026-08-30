@@ -1,0 +1,6 @@
+interface:
+  display_name: "LX Project Knowledge"
+  short_description: "维护版本化项目知识、失效状态和精简索引"
+  default_prompt: "使用 $lx-project-knowledge 审查这条 LXFramework 项目知识。"
+policy:
+  allow_implicit_invocation: true

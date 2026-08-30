@@ -31,6 +31,8 @@ internal static class ExportRunner
 
         var game = ToolFiles.ReadJson<GameManifest>(
             Path.Combine(root, "content", "game", "game-manifest.json"));
+        GameGenerator.Validate(root, game);
+        var productSmokes = game.GetProductSmokes();
         var productName = GetSafeProductName(game.Name);
         var version = FileVersionInfo.GetVersionInfo(executable).ProductVersion ?? "unknown";
         var templateVersion = GodotLocator.RequiredTemplateVersion;
@@ -136,7 +138,7 @@ internal static class ExportRunner
         smokes.Add(frameworkSmoke);
         if (frameworkSmoke.Success)
         {
-            foreach (var smoke in game.ExportSmokes)
+            foreach (var smoke in productSmokes)
             {
                 smokes.Add(await RunSmokeAsync(
                     root,
@@ -151,7 +153,7 @@ internal static class ExportRunner
         }
 
         var smokePassed = smokes.All(smoke => smoke.Success) &&
-                          smokes.Count == game.ExportSmokes.Count + 1;
+                          smokes.Count == productSmokes.Count + 1;
         var files = CollectFiles(workspaceRoot, outputDirectory);
         var report = new ExportReport(
             "lx.export-report",

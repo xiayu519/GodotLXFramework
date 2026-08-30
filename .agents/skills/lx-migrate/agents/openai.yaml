@@ -1,0 +1,6 @@
+interface:
+  display_name: "LX 游戏迁移"
+  short_description: "升级旧 LX、移植 Godot 或复刻其他引擎游戏"
+  default_prompt: "使用 $lx-migrate 规划这个游戏到当前 LXFramework 的迁移。"
+policy:
+  allow_implicit_invocation: true

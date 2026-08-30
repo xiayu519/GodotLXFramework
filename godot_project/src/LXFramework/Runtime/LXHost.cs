@@ -264,11 +264,20 @@ public partial class LXHost : Node
             if (visualMode is not null)
             {
                 var actualPath = RequireArgument(userArguments, "--lx-visual-actual=");
+                var visualTarget = RequireArgument(userArguments, "--lx-visual-target=");
+                var visualScene = RequireArgument(userArguments, "--lx-visual-scene=");
+                var visualWidth = int.Parse(RequireArgument(userArguments, "--lx-visual-width="),
+                    System.Globalization.CultureInfo.InvariantCulture);
+                var visualHeight = int.Parse(RequireArgument(userArguments, "--lx-visual-height="),
+                    System.Globalization.CultureInfo.InvariantCulture);
                 var baselinePath = GetArgument(userArguments, "--lx-visual-baseline=");
                 var diffPath = GetArgument(userArguments, "--lx-visual-diff=");
                 var reportPath = RequireArgument(userArguments, "--lx-visual-report=");
-                var report = await new VisualCaptureRunner(this, LX.Res).RunAsync(
+                var report = await new VisualCaptureRunner(this, LX).RunAsync(
                     visualMode,
+                    visualTarget,
+                    visualScene,
+                    new Vector2I(visualWidth, visualHeight),
                     actualPath,
                     baselinePath,
                     diffPath,

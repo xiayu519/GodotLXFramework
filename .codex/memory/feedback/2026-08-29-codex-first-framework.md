@@ -6,7 +6,8 @@ verified: 2026-08-29
 sources:
   - README.md
   - Books/AI-Development-Workflow.md
-  - .agents/skills/lx-codex-workflow/references/ai-control-plane.md
+  - .agents/skills/lx-capabilities/references/capability-catalog.md
+  - .agents/skills/lx-runtime-observe/references/runtime-observation.md
 ---
 
 LXFramework 的首要用户是 Codex，人工开发是兼容和接管入口。后续取舍优先减少模型决策分支、隐藏状态、重复事实源和无法机器验收的步骤；模块数量与人工可视化工具不能凌驾于机器发现、运行时可观测、确定性生成、生命周期闭环、结构化证据和安全恢复。
