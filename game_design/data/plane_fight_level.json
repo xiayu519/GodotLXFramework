@@ -1,0 +1,44 @@
+[
+  {
+    "id": "level_1",
+    "designWidth": 720,
+    "designHeight": 1280,
+    "enemySpawnInterval": 0.3,
+    "enemySpawnCount": 1,
+    "passScore": 125,
+    "bossWarningSeconds": 3.0,
+    "pickupSpawnInterval": 10.0,
+    "pickupSpawnCount": 1,
+    "player": {
+      "aircraftHp": 5,
+      "shieldBonusHp": 1,
+      "power": 1,
+      "moveSpeed": 520.0,
+      "fireInterval": 0.16,
+      "bulletDamage": 8.0,
+      "missileCount": 3,
+      "iceMissileCount": 4,
+      "nuclearBombCount": 3,
+      "shieldCount": 1,
+      "shieldDuration": 8.0,
+      "shieldCooldown": 20.0
+    },
+    "enemies": [
+      { "id": "enemy_2", "selectionThreshold": 10.0, "speed": 120.0, "score": 5, "hp": 37.0, "maxAlive": 1, "chasesPlayer": false, "fires": true, "fireInterval": 1.0, "contactDamage": 2.0 },
+      { "id": "enemy_5", "selectionThreshold": 22.0, "speed": 200.0, "score": 3, "hp": 5.0, "maxAlive": 2, "chasesPlayer": true, "fires": true, "fireInterval": 1.5, "contactDamage": 1.0 },
+      { "id": "enemy_1", "selectionThreshold": 100.0, "speed": 350.0, "score": 1, "hp": 4.0, "maxAlive": 10, "chasesPlayer": false, "fires": false, "fireInterval": 0.0, "contactDamage": 1.0 }
+    ],
+    "boss": { "id": "boss_2", "speed": 100.0, "score": 800, "hp": 800.0, "stopY": 300.0, "fireInterval": 0.55, "contactDamage": 3.0 },
+    "pickups": [
+      { "id": "nuke", "selectionThreshold": 2.0, "effect": "NUCLEAR_BOMB", "amount": 150.0, "duration": 0.0 },
+      { "id": "missile", "selectionThreshold": 2.7, "effect": "ADD_MISSILE", "amount": 1.0, "duration": 0.0 },
+      { "id": "ice_missile", "selectionThreshold": 3.4, "effect": "ADD_ICE_MISSILE", "amount": 1.0, "duration": 0.0 },
+      { "id": "weapon_spread", "selectionThreshold": 4.8, "effect": "SPREAD_WEAPON", "amount": 0.0, "duration": 4.0 },
+      { "id": "weapon_laser", "selectionThreshold": 6.5, "effect": "LASER_WEAPON", "amount": 0.0, "duration": 8.0 },
+      { "id": "weapon_twin", "selectionThreshold": 9.2, "effect": "TWIN_WEAPON", "amount": 0.0, "duration": 6.0 },
+      { "id": "heal", "selectionThreshold": 11.5, "effect": "HEAL", "amount": 0.35, "duration": 0.0 },
+      { "id": "medal", "selectionThreshold": 20.0, "effect": "ADD_MEDAL", "amount": 3.0, "duration": 0.0 },
+      { "id": "gold", "selectionThreshold": 50.0, "effect": "ADD_GOLD", "amount": 6.0, "duration": 0.0 }
+    ]
+  }
+]

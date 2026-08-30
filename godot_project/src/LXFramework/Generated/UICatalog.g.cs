@@ -7,6 +7,15 @@ namespace LX.Generated;
 
 public static class UICatalog
 {
+    public static readonly UIDescriptor BattleHud = new(
+        new UIId("battle_hud"),
+        "res://scene/ui/battle_hud.tscn",
+        UILayer.Screen,
+        UICachePolicy.CachedSingleton,
+        UICoverPolicy.KeepVisible,
+        UIInputPolicy.Normal,
+        UIFocusPolicy.Preserve);
+
     public static readonly UIDescriptor FrameworkStatus = new(
         new UIId("framework_status"),
         "res://scene/ui/framework_status.tscn",
@@ -15,6 +24,24 @@ public static class UICatalog
         UICoverPolicy.KeepVisible,
         UIInputPolicy.Normal,
         UIFocusPolicy.Preserve);
+
+    public static readonly UIDescriptor Result = new(
+        new UIId("result"),
+        "res://scene/ui/result.tscn",
+        UILayer.Popup,
+        UICachePolicy.CachedSingleton,
+        UICoverPolicy.KeepVisible,
+        UIInputPolicy.Modal,
+        UIFocusPolicy.GrabFirst);
+
+    public static readonly UIDescriptor Start = new(
+        new UIId("start"),
+        "res://scene/ui/start.tscn",
+        UILayer.Popup,
+        UICachePolicy.CachedSingleton,
+        UICoverPolicy.KeepVisible,
+        UIInputPolicy.Modal,
+        UIFocusPolicy.GrabFirst);
 
     public static readonly UIDescriptor UIComponentsShowcase = new(
         new UIId("ui_components_showcase"),
@@ -34,5 +61,5 @@ public static class UICatalog
         UIInputPolicy.Modal,
         UIFocusPolicy.Preserve);
 
-    public static IReadOnlyList<UIDescriptor> All { get; } = [FrameworkStatus, UIComponentsShowcase, UIFadeTransition];
+    public static IReadOnlyList<UIDescriptor> All { get; } = [BattleHud, FrameworkStatus, Result, Start, UIComponentsShowcase, UIFadeTransition];
 }

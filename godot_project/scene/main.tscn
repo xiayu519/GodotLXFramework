@@ -5,4 +5,4 @@
 [node name="LXHost" type="Node"]
 process_mode = 3
 script = ExtResource("1_host")
-ShowFrameworkStatus = true
+ShowFrameworkStatus = false

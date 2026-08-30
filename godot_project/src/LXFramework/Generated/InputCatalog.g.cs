@@ -10,19 +10,25 @@ public static class InputCatalog
 {
     public static readonly InputActionId Cancel = new("cancel");
     public static readonly InputActionId Confirm = new("confirm");
+    public static readonly InputActionId IceMissile = new("ice_missile");
     public static readonly InputActionId Menu = new("menu");
+    public static readonly InputActionId Missile = new("missile");
     public static readonly InputActionId MoveDown = new("move_down");
     public static readonly InputActionId MoveLeft = new("move_left");
     public static readonly InputActionId MoveRight = new("move_right");
     public static readonly InputActionId MoveUp = new("move_up");
+    public static readonly InputActionId NuclearBomb = new("nuclear_bomb");
     public static readonly InputActionId QuickLoad = new("quick_load");
     public static readonly InputActionId QuickSave = new("quick_save");
+    public static readonly InputActionId Shield = new("shield");
 
     public static IReadOnlyList<InputRouteDescriptor> All { get; } =
     [
         new(Cancel, "ui_cancel"),
         new(Confirm, "ui_accept"),
+        new(IceMissile, "plane_ice_missile", Key.E),
         new(Menu, "lx_menu", Key.Tab),
+        new(Missile, "plane_missile", Key.Q),
         new(MoveDown, "lx_move_down", Key.S),
         new(MoveDown, "ui_down"),
         new(MoveLeft, "lx_move_left", Key.A),
@@ -31,7 +37,9 @@ public static class InputCatalog
         new(MoveRight, "ui_right"),
         new(MoveUp, "lx_move_up", Key.W),
         new(MoveUp, "ui_up"),
+        new(NuclearBomb, "plane_nuclear_bomb", Key.Space),
         new(QuickLoad, "lx_quick_load", Key.F9),
         new(QuickSave, "lx_quick_save", Key.F5),
+        new(Shield, "plane_shield", Key.Shift),
     ];
 }

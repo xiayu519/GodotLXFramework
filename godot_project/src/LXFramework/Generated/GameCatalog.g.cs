@@ -5,9 +5,9 @@ namespace LX.Generated;
 
 public static class GameCatalog
 {
-    public const string Name = "";
-    public const string RootNamespace = "Game";
-    public const string SourceRoot = "";
-    public const string InitialWorldId = "";
-    public const bool HasProduct = false;
+    public const string Name = "PlaneFight";
+    public const string RootNamespace = "PlaneFight";
+    public const string SourceRoot = "script/PlaneFight";
+    public const string InitialWorldId = "main_world";
+    public const bool HasProduct = true;
 }

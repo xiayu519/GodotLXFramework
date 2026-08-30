@@ -6,8 +6,322 @@
       "id": "app_icon",
       "resourceType": "Texture2D",
       "path": "res://icon.svg",
-      "cachePolicy": "Cached",
-      "group": null
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_boss_2",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/boss_2.png",
+      "cachePolicy": "Resident"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_boss_fire",
+      "resourceType": "AudioStream",
+      "path": "res://content/plane_fight/audio/boss_fire.mp3",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_boss_warning",
+      "resourceType": "AudioStream",
+      "path": "res://content/plane_fight/audio/boss_warning.mp3",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_enemy_1",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/enemy_1.png",
+      "cachePolicy": "Resident"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_enemy_2",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/enemy_2.png",
+      "cachePolicy": "Resident"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_enemy_5",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/enemy_5.png",
+      "cachePolicy": "Resident"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_enemy_explosion",
+      "resourceType": "AudioStream",
+      "path": "res://content/plane_fight/audio/enemy_explosion.mp3",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_enemy_fire",
+      "resourceType": "AudioStream",
+      "path": "res://content/plane_fight/audio/enemy_fire.mp3",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_game_over",
+      "resourceType": "AudioStream",
+      "path": "res://content/plane_fight/audio/game_over.mp3",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_heal",
+      "resourceType": "AudioStream",
+      "path": "res://content/plane_fight/audio/heal.mp3",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_ice_impact_1",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/ice_impact_1.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_ice_impact_2",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/ice_impact_2.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_ice_impact_3",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/ice_impact_3.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_ice_impact_4",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/ice_impact_4.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_ice_missile",
+      "resourceType": "AudioStream",
+      "path": "res://content/plane_fight/audio/ice_missile.mp3",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_ice_missile_projectile",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/ice_missile_projectile.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_level_1_background",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/level_1_background.jpg",
+      "cachePolicy": "Resident"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_level_bgm",
+      "resourceType": "AudioStream",
+      "path": "res://content/plane_fight/audio/level_bgm.mp3",
+      "cachePolicy": "Resident"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_missile",
+      "resourceType": "AudioStream",
+      "path": "res://content/plane_fight/audio/missile.mp3",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_missile_projectile",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/missile_projectile.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_nuclear_bomb",
+      "resourceType": "AudioStream",
+      "path": "res://content/plane_fight/audio/nuclear_bomb.mp3",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_pickup_gold_1",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/pickup_gold_1.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_pickup_gold_2",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/pickup_gold_2.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_pickup_gold_3",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/pickup_gold_3.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_pickup_gold_4",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/pickup_gold_4.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_pickup_gold_5",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/pickup_gold_5.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_pickup_gold_6",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/pickup_gold_6.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_pickup_gold_7",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/pickup_gold_7.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_pickup_heal",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/pickup_heal.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_pickup_heal_plus",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/pickup_heal_plus.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_pickup_ice_missile",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/pickup_ice_missile.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_pickup_medal",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/pickup_medal.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_pickup_missile",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/pickup_missile.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_pickup_nuke",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/pickup_nuke.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_pickup_weapon_laser",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/pickup_weapon_laser.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_pickup_weapon_spread",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/pickup_weapon_spread.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_pickup_weapon_twin",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/pickup_weapon_twin.png",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_player",
+      "resourceType": "Texture2D",
+      "path": "res://content/plane_fight/art/player.png",
+      "cachePolicy": "Resident"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_player_fire",
+      "resourceType": "AudioStream",
+      "path": "res://content/plane_fight/audio/player_fire.mp3",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_shield",
+      "resourceType": "AudioStream",
+      "path": "res://content/plane_fight/audio/shield.mp3",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_showcase_pulse",
+      "resourceType": "PackedScene",
+      "path": "res://scene/nodes/showcase_pulse.tscn",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_ui_click",
+      "resourceType": "AudioStream",
+      "path": "res://content/plane_fight/audio/ui_click.mp3",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_victory",
+      "resourceType": "AudioStream",
+      "path": "res://content/plane_fight/audio/victory.mp3",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_weapon_fire_alt",
+      "resourceType": "AudioStream",
+      "path": "res://content/plane_fight/audio/weapon_fire_alt.mp3",
+      "cachePolicy": "Cached"
+    },
+    {
+      "scope": "Product",
+      "id": "pf_weapon_upgrade",
+      "resourceType": "AudioStream",
+      "path": "res://content/plane_fight/audio/weapon_upgrade.mp3",
+      "cachePolicy": "Cached"
     }
   ]
 }

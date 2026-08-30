@@ -1,0 +1,17 @@
+[
+  {
+    "id": "invalid_level",
+    "designWidth": 720,
+    "designHeight": 1280,
+    "enemySpawnInterval": -0.3,
+    "enemySpawnCount": "not_an_integer",
+    "passScore": 125,
+    "bossWarningSeconds": 3.0,
+    "pickupSpawnInterval": 10.0,
+    "pickupSpawnCount": 1,
+    "player": {},
+    "enemies": [],
+    "boss": {},
+    "pickups": []
+  }
+]

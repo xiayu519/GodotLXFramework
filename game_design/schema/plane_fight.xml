@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<module name="plane_fight">
+  <enum name="PickupEffect" comment="Gameplay effect granted by a level-one pickup">
+    <var name="NONE" value="0" comment="No gameplay effect" />
+    <var name="NUCLEAR_BOMB" value="1" comment="Detonate a screen-wide nuclear attack" />
+    <var name="ADD_MISSILE" value="2" comment="Add standard missile inventory" />
+    <var name="ADD_ICE_MISSILE" value="3" comment="Add freezing missile inventory" />
+    <var name="SPREAD_WEAPON" value="4" comment="Activate the spread weapon" />
+    <var name="LASER_WEAPON" value="5" comment="Activate the laser weapon" />
+    <var name="TWIN_WEAPON" value="6" comment="Activate the twin weapon" />
+    <var name="HEAL" value="7" comment="Restore player health" />
+    <var name="ADD_MEDAL" value="8" comment="Add medal currency" />
+    <var name="ADD_GOLD" value="9" comment="Add gold currency" />
+  </enum>
+  <bean name="PlayerConfig" comment="Player combat parameters for one level">
+    <var name="aircraftHp" type="int" comment="Base aircraft hit points" />
+    <var name="shieldBonusHp" type="int" comment="Additional hit points granted by the aircraft shield" />
+    <var name="power" type="int" comment="Weapon power level" />
+    <var name="moveSpeed" type="float" comment="Player movement speed in pixels per second" />
+    <var name="fireInterval" type="float" comment="Base automatic fire interval in seconds" />
+    <var name="bulletDamage" type="float" comment="Base projectile damage" />
+    <var name="missileCount" type="int" comment="Initial standard missile inventory" />
+    <var name="iceMissileCount" type="int" comment="Initial freezing missile inventory" />
+    <var name="nuclearBombCount" type="int" comment="Initial nuclear bomb inventory" />
+    <var name="shieldCount" type="int" comment="Initial shield inventory" />
+    <var name="shieldDuration" type="float" comment="Shield active duration in seconds" />
+    <var name="shieldCooldown" type="float" comment="Shield cooldown in seconds" />
+  </bean>
+  <bean name="EnemyConfig" comment="Weighted ordinary enemy parameters">
+    <var name="id" type="string" comment="Registered enemy presentation ID" />
+    <var name="selectionThreshold" type="float" comment="Cumulative random selection threshold" />
+    <var name="speed" type="float" comment="Base movement speed" />
+    <var name="score" type="int" comment="Score awarded on destruction" />
+    <var name="hp" type="float" comment="Enemy hit points" />
+    <var name="maxAlive" type="int" comment="Maximum simultaneous instances" />
+    <var name="chasesPlayer" type="bool" comment="Whether the enemy steers toward the player" />
+    <var name="fires" type="bool" comment="Whether the enemy fires projectiles" />
+    <var name="fireInterval" type="float" comment="Projectile fire interval in seconds" />
+    <var name="contactDamage" type="float" comment="Collision damage dealt to the player" />
+  </bean>
+  <bean name="BossConfig" comment="Level boss parameters">
+    <var name="id" type="string" comment="Registered boss presentation ID" />
+    <var name="speed" type="float" comment="Base movement speed" />
+    <var name="score" type="int" comment="Score awarded on destruction" />
+    <var name="hp" type="float" comment="Boss hit points" />
+    <var name="stopY" type="float" comment="Vertical combat position" />
+    <var name="fireInterval" type="float" comment="Projectile fire interval in seconds" />
+    <var name="contactDamage" type="float" comment="Collision damage dealt to the player" />
+  </bean>
+  <bean name="PickupConfig" comment="Weighted pickup parameters">
+    <var name="id" type="string" comment="Registered pickup presentation ID" />
+    <var name="selectionThreshold" type="float" comment="Cumulative random selection threshold" />
+    <var name="effect" type="PickupEffect" comment="Strongly typed gameplay effect" />
+    <var name="amount" type="float" comment="Effect amount" />
+    <var name="duration" type="float" comment="Effect duration in seconds" />
+  </bean>
+  <bean name="LevelConfig" comment="Complete first-level gameplay configuration">
+    <var name="id" type="string" comment="Stable level ID" />
+    <var name="designWidth" type="int" comment="Reference viewport width" />
+    <var name="designHeight" type="int" comment="Reference viewport height" />
+    <var name="enemySpawnInterval" type="float" comment="Ordinary enemy spawn interval in seconds" />
+    <var name="enemySpawnCount" type="int" comment="Ordinary enemies attempted per spawn interval" />
+    <var name="passScore" type="int" comment="Score required before the boss warning" />
+    <var name="bossWarningSeconds" type="float" comment="Boss warning duration in seconds" />
+    <var name="pickupSpawnInterval" type="float" comment="Fallback pickup spawn interval in seconds" />
+    <var name="pickupSpawnCount" type="int" comment="Fallback pickups attempted per interval" />
+    <var name="player" type="PlayerConfig" comment="Player parameters" />
+    <var name="enemies" type="list,EnemyConfig" comment="Weighted ordinary enemy definitions" />
+    <var name="boss" type="BossConfig" comment="Boss parameters" />
+    <var name="pickups" type="list,PickupConfig" comment="Weighted pickup definitions" />
+  </bean>
+  <table name="TbLevel" value="LevelConfig" input="*@plane_fight_level.json" index="id" group="client" />
+</module>

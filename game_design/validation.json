@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "productNegativeData": {
+    "fixture": "fixtures/invalid/plane_fight_level.json",
+    "target": "plane_fight_level.json",
+    "expectedTerms": [
+      "enemySpawnCount"
+    ]
+  }
+}

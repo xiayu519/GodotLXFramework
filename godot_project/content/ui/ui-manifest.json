@@ -2,6 +2,18 @@
   "version": 1,
   "screens": [
     {
+      "scope": "Product",
+      "id": "battle_hud",
+      "className": "BattleHudScreen",
+      "namespace": "PlaneFight.UI",
+      "scenePath": "res://scene/ui/battle_hud.tscn",
+      "layer": "Screen",
+      "cachePolicy": "CachedSingleton",
+      "coverPolicy": "KeepVisible",
+      "inputPolicy": "Normal",
+      "focusPolicy": "Preserve"
+    },
+    {
       "scope": "Framework",
       "id": "framework_status",
       "className": "FrameworkStatusScreen",
@@ -9,7 +21,33 @@
       "scenePath": "res://scene/ui/framework_status.tscn",
       "layer": "Screen",
       "cachePolicy": "CachedSingleton",
-      "coverPolicy": "KeepVisible"
+      "coverPolicy": "KeepVisible",
+      "inputPolicy": "Normal",
+      "focusPolicy": "Preserve"
+    },
+    {
+      "scope": "Product",
+      "id": "result",
+      "className": "ResultScreen",
+      "namespace": "PlaneFight.UI",
+      "scenePath": "res://scene/ui/result.tscn",
+      "layer": "Popup",
+      "cachePolicy": "CachedSingleton",
+      "coverPolicy": "KeepVisible",
+      "inputPolicy": "Modal",
+      "focusPolicy": "GrabFirst"
+    },
+    {
+      "scope": "Product",
+      "id": "start",
+      "className": "StartScreen",
+      "namespace": "PlaneFight.UI",
+      "scenePath": "res://scene/ui/start.tscn",
+      "layer": "Popup",
+      "cachePolicy": "CachedSingleton",
+      "coverPolicy": "KeepVisible",
+      "inputPolicy": "Modal",
+      "focusPolicy": "GrabFirst"
     },
     {
       "scope": "Framework",

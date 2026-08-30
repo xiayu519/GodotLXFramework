@@ -7,5 +7,9 @@ namespace LX.Generated;
 
 public static class FeatureCatalog
 {
-    public static IReadOnlyList<FeatureDescriptor> All { get; } = [];
+    public static readonly FeatureDescriptor LevelOneBattle = new(
+        new FeatureId("level_one_battle"),
+        "res://scene/features/level_one_battle.tscn");
+
+    public static IReadOnlyList<FeatureDescriptor> All { get; } = [LevelOneBattle];
 }

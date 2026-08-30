@@ -12,4 +12,184 @@ public static class ResCatalog
         "res://icon.svg",
         AssetCachePolicy.Cached);
 
+    public static readonly AssetRef<Texture2D> PfBoss2 = new(
+        "res://content/plane_fight/art/boss_2.png",
+        AssetCachePolicy.Resident);
+
+    public static readonly AssetRef<AudioStream> PfBossFire = new(
+        "res://content/plane_fight/audio/boss_fire.mp3",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<AudioStream> PfBossWarning = new(
+        "res://content/plane_fight/audio/boss_warning.mp3",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfEnemy1 = new(
+        "res://content/plane_fight/art/enemy_1.png",
+        AssetCachePolicy.Resident);
+
+    public static readonly AssetRef<Texture2D> PfEnemy2 = new(
+        "res://content/plane_fight/art/enemy_2.png",
+        AssetCachePolicy.Resident);
+
+    public static readonly AssetRef<Texture2D> PfEnemy5 = new(
+        "res://content/plane_fight/art/enemy_5.png",
+        AssetCachePolicy.Resident);
+
+    public static readonly AssetRef<AudioStream> PfEnemyExplosion = new(
+        "res://content/plane_fight/audio/enemy_explosion.mp3",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<AudioStream> PfEnemyFire = new(
+        "res://content/plane_fight/audio/enemy_fire.mp3",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<AudioStream> PfGameOver = new(
+        "res://content/plane_fight/audio/game_over.mp3",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<AudioStream> PfHeal = new(
+        "res://content/plane_fight/audio/heal.mp3",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfIceImpact1 = new(
+        "res://content/plane_fight/art/ice_impact_1.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfIceImpact2 = new(
+        "res://content/plane_fight/art/ice_impact_2.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfIceImpact3 = new(
+        "res://content/plane_fight/art/ice_impact_3.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfIceImpact4 = new(
+        "res://content/plane_fight/art/ice_impact_4.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<AudioStream> PfIceMissile = new(
+        "res://content/plane_fight/audio/ice_missile.mp3",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfIceMissileProjectile = new(
+        "res://content/plane_fight/art/ice_missile_projectile.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfLevel1Background = new(
+        "res://content/plane_fight/art/level_1_background.jpg",
+        AssetCachePolicy.Resident);
+
+    public static readonly AssetRef<AudioStream> PfLevelBgm = new(
+        "res://content/plane_fight/audio/level_bgm.mp3",
+        AssetCachePolicy.Resident);
+
+    public static readonly AssetRef<AudioStream> PfMissile = new(
+        "res://content/plane_fight/audio/missile.mp3",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfMissileProjectile = new(
+        "res://content/plane_fight/art/missile_projectile.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<AudioStream> PfNuclearBomb = new(
+        "res://content/plane_fight/audio/nuclear_bomb.mp3",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfPickupGold1 = new(
+        "res://content/plane_fight/art/pickup_gold_1.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfPickupGold2 = new(
+        "res://content/plane_fight/art/pickup_gold_2.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfPickupGold3 = new(
+        "res://content/plane_fight/art/pickup_gold_3.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfPickupGold4 = new(
+        "res://content/plane_fight/art/pickup_gold_4.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfPickupGold5 = new(
+        "res://content/plane_fight/art/pickup_gold_5.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfPickupGold6 = new(
+        "res://content/plane_fight/art/pickup_gold_6.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfPickupGold7 = new(
+        "res://content/plane_fight/art/pickup_gold_7.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfPickupHeal = new(
+        "res://content/plane_fight/art/pickup_heal.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfPickupHealPlus = new(
+        "res://content/plane_fight/art/pickup_heal_plus.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfPickupIceMissile = new(
+        "res://content/plane_fight/art/pickup_ice_missile.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfPickupMedal = new(
+        "res://content/plane_fight/art/pickup_medal.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfPickupMissile = new(
+        "res://content/plane_fight/art/pickup_missile.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfPickupNuke = new(
+        "res://content/plane_fight/art/pickup_nuke.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfPickupWeaponLaser = new(
+        "res://content/plane_fight/art/pickup_weapon_laser.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfPickupWeaponSpread = new(
+        "res://content/plane_fight/art/pickup_weapon_spread.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfPickupWeaponTwin = new(
+        "res://content/plane_fight/art/pickup_weapon_twin.png",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<Texture2D> PfPlayer = new(
+        "res://content/plane_fight/art/player.png",
+        AssetCachePolicy.Resident);
+
+    public static readonly AssetRef<AudioStream> PfPlayerFire = new(
+        "res://content/plane_fight/audio/player_fire.mp3",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<AudioStream> PfShield = new(
+        "res://content/plane_fight/audio/shield.mp3",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<PackedScene> PfShowcasePulse = new(
+        "res://scene/nodes/showcase_pulse.tscn",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<AudioStream> PfUiClick = new(
+        "res://content/plane_fight/audio/ui_click.mp3",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<AudioStream> PfVictory = new(
+        "res://content/plane_fight/audio/victory.mp3",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<AudioStream> PfWeaponFireAlt = new(
+        "res://content/plane_fight/audio/weapon_fire_alt.mp3",
+        AssetCachePolicy.Cached);
+
+    public static readonly AssetRef<AudioStream> PfWeaponUpgrade = new(
+        "res://content/plane_fight/audio/weapon_upgrade.mp3",
+        AssetCachePolicy.Cached);
+
 }

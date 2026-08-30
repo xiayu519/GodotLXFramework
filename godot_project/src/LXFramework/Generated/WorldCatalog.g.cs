@@ -7,5 +7,9 @@ namespace LX.Generated;
 
 public static class WorldCatalog
 {
-    public static IReadOnlyList<WorldDescriptor> All { get; } = [];
+    public static readonly WorldDescriptor MainWorld = new(
+        new WorldId("main_world"),
+        "res://scene/world/main_world.tscn");
+
+    public static IReadOnlyList<WorldDescriptor> All { get; } = [MainWorld];
 }

@@ -1,4 +1,12 @@
 {
   "version": 1,
-  "features": []
+  "features": [
+    {
+      "scope": "Product",
+      "id": "level_one_battle",
+      "className": "LevelOneBattleFeature",
+      "namespace": "PlaneFight.Features.LevelOneBattle",
+      "scenePath": "res://scene/features/level_one_battle.tscn"
+    }
+  ]
 }

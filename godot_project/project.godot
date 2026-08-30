@@ -10,17 +10,17 @@ config_version=5
 
 [application]
 
-config/name="LXFramework"
+config/name="PlaneFight"
 run/main_scene="uid://s543p8mkoql5"
 config/features=PackedStringArray("4.7", "C#", "GL Compatibility")
 config/icon="res://icon.svg"
 
 [display]
 
-window/size/viewport_width=800
-window/size/viewport_height=600
-window/size/window_width_override=800
-window/size/window_height_override=600
+window/size/viewport_width=720
+window/size/viewport_height=1280
+window/size/window_width_override=450
+window/size/window_height_override=800
 window/stretch/mode="canvas_items"
 
 [dotnet]

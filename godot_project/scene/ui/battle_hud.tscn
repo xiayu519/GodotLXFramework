@@ -1,0 +1,307 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://script/PlaneFight/UI/BattleHudScreen.cs" id="1_screen"]
+
+[sub_resource type="StyleBoxFlat" id="TopPanel"]
+bg_color = Color(0.96, 0.98, 1, 0.9)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.22, 0.45, 0.7, 0.75)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+content_margin_left = 20.0
+content_margin_top = 14.0
+content_margin_right = 20.0
+content_margin_bottom = 14.0
+
+[sub_resource type="StyleBoxFlat" id="BottomPanel"]
+bg_color = Color(0.035, 0.075, 0.14, 0.9)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.25, 0.55, 0.85, 0.8)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+content_margin_left = 14.0
+content_margin_top = 14.0
+content_margin_right = 14.0
+content_margin_bottom = 14.0
+
+[sub_resource type="StyleBoxFlat" id="SkillButton"]
+bg_color = Color(0.12, 0.34, 0.58, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="PlayerHpBackground"]
+bg_color = Color(0.22, 0.025, 0.035, 0.42)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.55, 0.08, 0.1, 0.7)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="PlayerHpFill"]
+bg_color = Color(0.96, 0.15, 0.18, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="BossHpBackground"]
+bg_color = Color(0.12, 0.008, 0.014, 0.72)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.82, 0.05, 0.08, 0.9)
+corner_radius_top_left = 7
+corner_radius_top_right = 7
+corner_radius_bottom_right = 7
+corner_radius_bottom_left = 7
+
+[sub_resource type="StyleBoxFlat" id="BossHpFill"]
+bg_color = Color(0.68, 0.015, 0.035, 1)
+border_width_top = 2
+border_width_bottom = 2
+border_color = Color(1, 0.18, 0.2, 0.9)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[node name="BattleHudScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_screen")
+
+[node name="TopPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 20.0
+offset_top = 18.0
+offset_right = -20.0
+offset_bottom = 170.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("TopPanel")
+
+[node name="Row" type="HBoxContainer" parent="TopPanel"]
+layout_mode = 2
+theme_override_constants/separation = 26
+
+[node name="PlayerInfo" type="VBoxContainer" parent="TopPanel/Row"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="TitleLabel" type="Label" parent="TopPanel/Row/PlayerInfo"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.05, 0.14, 0.24, 1)
+theme_override_font_sizes/font_size = 20
+text = "第一关 · 风暴航线"
+
+[node name="HpRow" type="HBoxContainer" parent="TopPanel/Row/PlayerInfo"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="HpCaption" type="Label" parent="TopPanel/Row/PlayerInfo/HpRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.1, 0.13, 1)
+theme_override_font_sizes/font_size = 18
+text = "生命"
+
+[node name="HpBar" type="ProgressBar" parent="TopPanel/Row/PlayerInfo/HpRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(235, 28)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 6.0
+value = 6.0
+show_percentage = false
+theme_override_styles/background = SubResource("PlayerHpBackground")
+theme_override_styles/fill = SubResource("PlayerHpFill")
+
+[node name="HpLabel" type="Label" parent="TopPanel/Row/PlayerInfo/HpRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.12, 0.2, 0.28, 1)
+theme_override_font_sizes/font_size = 18
+text = "6 / 6"
+
+[node name="WeaponLabel" type="Label" parent="TopPanel/Row/PlayerInfo"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.16, 0.36, 0.62, 1)
+theme_override_font_sizes/font_size = 17
+text = "武器：标准机炮"
+
+[node name="ScoreInfo" type="VBoxContainer" parent="TopPanel/Row"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ScoreLabel" type="Label" parent="TopPanel/Row/ScoreInfo"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.04, 0.14, 0.25, 1)
+theme_override_font_sizes/font_size = 22
+text = "得分 0"
+horizontal_alignment = 2
+
+[node name="ProgressLabel" type="Label" parent="TopPanel/Row/ScoreInfo"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.18, 0.35, 0.52, 1)
+theme_override_font_sizes/font_size = 17
+text = "Boss 进度 0 / 125"
+horizontal_alignment = 2
+
+[node name="CurrencyLabel" type="Label" parent="TopPanel/Row/ScoreInfo"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.34, 0.04, 1)
+theme_override_font_sizes/font_size = 17
+text = "金币 0 · 勋章 0"
+horizontal_alignment = 2
+
+[node name="BossPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 74.0
+offset_top = 192.0
+offset_right = -74.0
+offset_bottom = 260.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("TopPanel")
+
+[node name="BossRow" type="HBoxContainer" parent="BossPanel"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="BossCaption" type="Label" parent="BossPanel/BossRow"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.08, 0.1, 1)
+theme_override_font_sizes/font_size = 19
+text = "BOSS"
+
+[node name="BossHpBar" type="ProgressBar" parent="BossPanel/BossRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(450, 30)
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 800.0
+value = 800.0
+show_percentage = false
+theme_override_styles/background = SubResource("BossHpBackground")
+theme_override_styles/fill = SubResource("BossHpFill")
+
+[node name="WarningLabel" type="Label" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -280.0
+offset_top = -55.0
+offset_right = 280.0
+offset_bottom = 55.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.24, 0.16, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.85)
+theme_override_constants/shadow_offset_x = 4
+theme_override_constants/shadow_offset_y = 4
+theme_override_font_sizes/font_size = 44
+text = "警告 · BOSS 接近"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="BottomPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -172.0
+offset_right = -20.0
+offset_bottom = -18.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 1
+theme_override_styles/panel = SubResource("BottomPanel")
+
+[node name="Skills" type="HBoxContainer" parent="BottomPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="MissileButton" type="Button" parent="BottomPanel/Skills"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(153, 112)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 17
+theme_override_styles/normal = SubResource("SkillButton")
+theme_override_styles/hover = SubResource("SkillButton")
+text = "导弹 Q\n× 3"
+
+[node name="IceMissileButton" type="Button" parent="BottomPanel/Skills"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(153, 112)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 17
+theme_override_styles/normal = SubResource("SkillButton")
+theme_override_styles/hover = SubResource("SkillButton")
+text = "冰冻 E\n× 4"
+
+[node name="NukeButton" type="Button" parent="BottomPanel/Skills"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(153, 112)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 17
+theme_override_styles/normal = SubResource("SkillButton")
+theme_override_styles/hover = SubResource("SkillButton")
+text = "核弹 Space\n× 3"
+
+[node name="ShieldButton" type="Button" parent="BottomPanel/Skills"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(153, 112)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 17
+theme_override_styles/normal = SubResource("SkillButton")
+theme_override_styles/hover = SubResource("SkillButton")
+text = "护盾 Shift\n× 1"

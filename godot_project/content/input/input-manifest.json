@@ -5,67 +5,140 @@
       "scope": "Framework",
       "id": "cancel",
       "routes": [
-        { "godotAction": "ui_cancel" }
+        {
+          "godotAction": "ui_cancel"
+        }
       ]
     },
     {
       "scope": "Framework",
       "id": "confirm",
       "routes": [
-        { "godotAction": "ui_accept" }
+        {
+          "godotAction": "ui_accept"
+        }
+      ]
+    },
+    {
+      "scope": "Product",
+      "id": "ice_missile",
+      "routes": [
+        {
+          "godotAction": "plane_ice_missile",
+          "defaultPhysicalKey": "E"
+        }
       ]
     },
     {
       "scope": "Framework",
       "id": "menu",
       "routes": [
-        { "godotAction": "lx_menu", "defaultPhysicalKey": "Tab" }
+        {
+          "godotAction": "lx_menu",
+          "defaultPhysicalKey": "Tab"
+        }
+      ]
+    },
+    {
+      "scope": "Product",
+      "id": "missile",
+      "routes": [
+        {
+          "godotAction": "plane_missile",
+          "defaultPhysicalKey": "Q"
+        }
       ]
     },
     {
       "scope": "Framework",
       "id": "move_down",
       "routes": [
-        { "godotAction": "ui_down" },
-        { "godotAction": "lx_move_down", "defaultPhysicalKey": "S" }
+        {
+          "godotAction": "ui_down"
+        },
+        {
+          "godotAction": "lx_move_down",
+          "defaultPhysicalKey": "S"
+        }
       ]
     },
     {
       "scope": "Framework",
       "id": "move_left",
       "routes": [
-        { "godotAction": "ui_left" },
-        { "godotAction": "lx_move_left", "defaultPhysicalKey": "A" }
+        {
+          "godotAction": "ui_left"
+        },
+        {
+          "godotAction": "lx_move_left",
+          "defaultPhysicalKey": "A"
+        }
       ]
     },
     {
       "scope": "Framework",
       "id": "move_right",
       "routes": [
-        { "godotAction": "ui_right" },
-        { "godotAction": "lx_move_right", "defaultPhysicalKey": "D" }
+        {
+          "godotAction": "ui_right"
+        },
+        {
+          "godotAction": "lx_move_right",
+          "defaultPhysicalKey": "D"
+        }
       ]
     },
     {
       "scope": "Framework",
       "id": "move_up",
       "routes": [
-        { "godotAction": "ui_up" },
-        { "godotAction": "lx_move_up", "defaultPhysicalKey": "W" }
+        {
+          "godotAction": "ui_up"
+        },
+        {
+          "godotAction": "lx_move_up",
+          "defaultPhysicalKey": "W"
+        }
+      ]
+    },
+    {
+      "scope": "Product",
+      "id": "nuclear_bomb",
+      "routes": [
+        {
+          "godotAction": "plane_nuclear_bomb",
+          "defaultPhysicalKey": "Space"
+        }
       ]
     },
     {
       "scope": "Framework",
       "id": "quick_load",
       "routes": [
-        { "godotAction": "lx_quick_load", "defaultPhysicalKey": "F9" }
+        {
+          "godotAction": "lx_quick_load",
+          "defaultPhysicalKey": "F9"
+        }
       ]
     },
     {
       "scope": "Framework",
       "id": "quick_save",
       "routes": [
-        { "godotAction": "lx_quick_save", "defaultPhysicalKey": "F5" }
+        {
+          "godotAction": "lx_quick_save",
+          "defaultPhysicalKey": "F5"
+        }
+      ]
+    },
+    {
+      "scope": "Product",
+      "id": "shield",
+      "routes": [
+        {
+          "godotAction": "plane_shield",
+          "defaultPhysicalKey": "Shift"
+        }
       ]
     }
   ]

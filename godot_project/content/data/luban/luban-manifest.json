@@ -1,0 +1,16 @@
+{
+    "schemaVersion":  1,
+    "generator":  "Luban",
+    "toolVersion":  "v4.10.2",
+    "toolCommit":  "332018b42be100dfc3e2bc77b7647e79851bb861",
+    "dataFormat":  "bin",
+    "fileExtension":  ".bytes",
+    "inputHash":  "6dc4d3d43cf5b86df9f455e979c27b09ef55b3ab74bbfb71b2385c563a74d011",
+    "outputHash":  "97039f0d61b06cfaede61ad30b0d3992ff20920fd87741ac876cdc2f2af39401",
+    "files":  [
+                  "design_tbdesigncategory.bytes",
+                  "design_tbdesignitem.bytes",
+                  "design_tbdesignprobe.bytes",
+                  "plane_fight_tblevel.bytes"
+              ]
+}

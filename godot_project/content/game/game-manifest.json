@@ -1,8 +1,35 @@
 {
   "version": 1,
-  "name": "",
-  "rootNamespace": "Game",
-  "sourceRoot": "",
-  "initialWorldId": "",
-  "worlds": []
+  "name": "PlaneFight",
+  "rootNamespace": "PlaneFight",
+  "sourceRoot": "script/PlaneFight",
+  "initialWorldId": "main_world",
+  "worlds": [
+    {
+      "id": "main_world",
+      "className": "GameRoot",
+      "namespace": "PlaneFight",
+      "scenePath": "res://scene/world/main_world.tscn"
+    }
+  ],
+  "exportSmokes": [
+    {
+      "id": "level_one",
+      "argument": "--plane-fight-smoke",
+      "successMarker": "PLANE_FIGHT_LEVEL_ONE_RUNTIME_PASS",
+      "timeoutSeconds": 30
+    },
+    {
+      "id": "game_flow",
+      "argument": "--plane-fight-flow-smoke",
+      "successMarker": "PLANE_FIGHT_FLOW_SMOKE_PASS",
+      "timeoutSeconds": 15
+    },
+    {
+      "id": "api_showcase",
+      "argument": "--plane-fight-api-smoke",
+      "successMarker": "PLANE_FIGHT_API_SHOWCASE_PASS",
+      "timeoutSeconds": 15
+    }
+  ]
 }

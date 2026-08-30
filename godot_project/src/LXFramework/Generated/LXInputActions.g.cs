@@ -9,11 +9,15 @@ public static class LXInputActions
 {
     public static InputActionId Cancel => InputCatalog.Cancel;
     public static InputActionId Confirm => InputCatalog.Confirm;
+    public static InputActionId IceMissile => InputCatalog.IceMissile;
     public static InputActionId Menu => InputCatalog.Menu;
+    public static InputActionId Missile => InputCatalog.Missile;
     public static InputActionId MoveDown => InputCatalog.MoveDown;
     public static InputActionId MoveLeft => InputCatalog.MoveLeft;
     public static InputActionId MoveRight => InputCatalog.MoveRight;
     public static InputActionId MoveUp => InputCatalog.MoveUp;
+    public static InputActionId NuclearBomb => InputCatalog.NuclearBomb;
     public static InputActionId QuickLoad => InputCatalog.QuickLoad;
     public static InputActionId QuickSave => InputCatalog.QuickSave;
+    public static InputActionId Shield => InputCatalog.Shield;
 }
