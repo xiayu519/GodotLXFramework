@@ -139,7 +139,7 @@ internal sealed class RuntimeBridgeService : IDisposable
         RuntimeBridgeResponse response;
         try
         {
-            var payload = _diagnostics.SnapshotSection(request.Section);
+            var payload = _diagnostics.SnapshotSection(request.Section, request.WindowSeconds);
             response = new RuntimeBridgeResponse(
                 ResponseSchema,
                 ProtocolVersion,
@@ -198,7 +198,8 @@ internal sealed class RuntimeBridgeService : IDisposable
                 requestId,
                 _sessionId,
                 _generation,
-                "runtime"));
+                "performance",
+                1.0));
         for (var attempt = 0; attempt < 8; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -222,6 +223,10 @@ internal sealed class RuntimeBridgeService : IDisposable
                 responseSession == _sessionId &&
                 responseGeneration == _generation)
             {
+                if (response.Payload is null)
+                {
+                    throw new InvalidOperationException("Runtime performance smoke response had no payload.");
+                }
                 return;
             }
         }
@@ -370,7 +375,8 @@ internal sealed record RuntimeBridgeRequest(
     string RequestId,
     string SessionId,
     long Generation,
-    string Section);
+    string Section,
+    double? WindowSeconds = null);
 
 internal sealed record RuntimeBridgeResponse(
     string Schema,

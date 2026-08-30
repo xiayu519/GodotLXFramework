@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using LX.Res;
 using LX.Audio;
 using LX.Content;
@@ -136,11 +137,15 @@ public partial class LXHost : Node
             return;
         }
 
+        var startedAt = Stopwatch.GetTimestamp();
         var frame = LX.Clock.Advance(delta);
         LX.Scheduler.Tick();
         LX.Metrics.SetGauge("runtime.frame", frame.FrameIndex);
         LX.Metrics.SetGauge("runtime.delta_ms", frame.DeltaSeconds * 1000.0);
         LX.Metrics.SetGauge("lifetime.root_owned", LX.Lifetime.OwnedCount);
+        LX.Diagnostics.RecordFrame(
+            frame.DeltaSeconds * 1000.0,
+            Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
         _runtimeBridge?.Pump();
     }
 
@@ -151,10 +156,14 @@ public partial class LXHost : Node
             return;
         }
 
+        var startedAt = Stopwatch.GetTimestamp();
         var frame = LX.PhysicsClock.Advance(delta);
         LX.PhysicsScheduler.Tick();
         LX.Metrics.SetGauge("runtime.physics_frame", frame.FrameIndex);
         LX.Metrics.SetGauge("runtime.physics_delta_ms", frame.DeltaSeconds * 1000.0);
+        LX.Diagnostics.RecordPhysicsFrame(
+            frame.DeltaSeconds * 1000.0,
+            Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
     }
 
     public override void _UnhandledInput(InputEvent inputEvent)

@@ -575,6 +575,7 @@ Godot Editor/Debug 正在运行时，Codex 可以读取当前会话而不修改�
 .\lx.ps1 runtime snapshot ui --json
 .\lx.ps1 runtime snapshot resources --json
 .\lx.ps1 runtime snapshot actions --json
+.\lx.ps1 runtime sample performance --duration 15 --interval 500 --json
 ```
 
 查询会验证进程、心跳、`sessionId` 和 `generation`，不会把上次运行残留的文件当成当前证据。可查询领域和命令副作用通过按需能力目录发现：
@@ -582,6 +583,17 @@ Godot Editor/Debug 正在运行时，Codex 可以读取当前会话而不修改�
 ```powershell
 .\lx.ps1 capabilities runtime --json
 ```
+
+性能采样使用固定容量环形缓冲记录帧/物理帧 delta 与 LXHost 工作耗时，并在本地聚合 `p50/p95/p99/max`、GC/堆/工作集和关键所有权指标。详细采样报告只写入 `.lx/runtime/performance/`；命令默认只输出一行摘要，因此 CI 不消耗模型 Token，Codex 也无需读取原始时间序列。只有性能、热点或发布任务才运行该命令；普通功能任务不会自动采样。
+
+需要把一次运行变成可失败的门禁时，可以声明预算：
+
+```powershell
+.\lx.ps1 runtime sample performance --duration 30 --max-p95-ms 18 --max-p99-ms 25 --max-frame-ms 40 --max-heap-growth-mb 8 --json
+.\lx.ps1 benchmark --json
+```
+
+`benchmark` 对每个核心用例预热后采集 5 轮并取中位数，同时检查吞吐回归和每操作分配；版本化阈值位于 `godot_project/tests/Performance/benchmark-gates.json`，门禁失败返回非零退出码。
 
 ## 推荐的开发流程
 

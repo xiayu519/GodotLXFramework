@@ -1,0 +1,32 @@
+{
+  "schema": "lx.benchmark-gates",
+  "schemaVersion": 1,
+  "iterations": 100000,
+  "samples": 5,
+  "cases": [
+    {
+      "name": "diagnostic_log.write",
+      "referenceOperationsPerSecond": 10000000,
+      "maxRegressionPercent": 80,
+      "maxAllocatedBytesPerOperation": 192
+    },
+    {
+      "name": "event_hub.publish",
+      "referenceOperationsPerSecond": 24000000,
+      "maxRegressionPercent": 80,
+      "maxAllocatedBytesPerOperation": 0
+    },
+    {
+      "name": "object_pool.rent_return",
+      "referenceOperationsPerSecond": 10000000,
+      "maxRegressionPercent": 80,
+      "maxAllocatedBytesPerOperation": 1
+    },
+    {
+      "name": "object_pool.rent_lease",
+      "referenceOperationsPerSecond": 10000000,
+      "maxRegressionPercent": 80,
+      "maxAllocatedBytesPerOperation": 40
+    }
+  ]
+}

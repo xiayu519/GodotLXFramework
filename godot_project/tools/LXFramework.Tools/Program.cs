@@ -58,11 +58,12 @@ internal static class Program
               smoke product [id|all]         在 Debug/headless 工程中运行清单声明的产品烟测。
               visual capture|compare|approve [target|product] 捕获、比较或显式批准框架/产品视觉基准。
               export <platform>               Release 导出到 build/<platform> 并运行框架与产品烟测；当前支持 windows。
-              benchmark                       写入核心性能基线报告。
+              benchmark                       执行多轮核心性能回归与分配门禁。
               api check|update                 检查或显式更新公开 API 兼容基线。
               soak [cycles]                    重复运行隔离 Godot smoke 并写入稳定性报告。
               runtime status                  查询当前 Editor/Debug 运行会话。
               runtime snapshot [section]      读取当前运行实例的有界结构化快照。
+              runtime sample performance [...] 持续采样帧时间、内存与所有权指标，可附性能预算。
               create game <Name>             创建产品层与初始世界。
               create world <Name> [id]       创建并注册世界。
               create input <Name> <action>   创建并生成输入动作。

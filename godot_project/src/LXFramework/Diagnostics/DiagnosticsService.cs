@@ -29,7 +29,7 @@ public sealed class DiagnosticsService
     internal static IReadOnlyList<string> AvailableSections { get; } =
     [
         "all", "runtime", "events", "scheduler", "actions", "metrics", "resources",
-        "ui", "features", "audio", "input", "localization", "settings", "logs",
+        "ui", "features", "audio", "input", "localization", "settings", "logs", "performance",
     ];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -55,6 +55,7 @@ public sealed class DiagnosticsService
     private readonly LocalizationService _localization;
     private readonly SettingsService _settings;
     private readonly DiagnosticLog _log;
+    private readonly RuntimePerformanceTracker _performance = new();
     private readonly DateTimeOffset _startedAtUtc = DateTimeOffset.UtcNow;
 
     public DiagnosticsService(
@@ -142,7 +143,13 @@ public sealed class DiagnosticsService
     /// <summary>把当前快照序列化为稳定、可供工具读取的 JSON。</summary>
     public string ToJson() => JsonSerializer.Serialize(Snapshot(), JsonOptions);
 
-    internal object SnapshotSection(string section)
+    internal void RecordFrame(double deltaMilliseconds, double hostWorkMilliseconds) =>
+        _performance.RecordFrame(deltaMilliseconds, hostWorkMilliseconds);
+
+    internal void RecordPhysicsFrame(double deltaMilliseconds, double hostWorkMilliseconds) =>
+        _performance.RecordPhysicsFrame(deltaMilliseconds, hostWorkMilliseconds);
+
+    internal object SnapshotSection(string section, double? windowSeconds = null)
     {
         if (string.IsNullOrWhiteSpace(section))
         {
@@ -171,6 +178,7 @@ public sealed class DiagnosticsService
             "localization" => _localization.Snapshot(),
             "settings" => _settings.Current,
             "logs" => _log.Snapshot(),
+            "performance" => _performance.Snapshot(windowSeconds, _metrics.Snapshot()),
             _ => throw new ArgumentException(
                 $"Unknown runtime snapshot section '{section}'. Available: " +
                 string.Join(", ", AvailableSections),
