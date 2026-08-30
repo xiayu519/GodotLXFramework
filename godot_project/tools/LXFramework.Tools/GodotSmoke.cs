@@ -5,8 +5,18 @@ namespace LXFramework.Tools;
 
 internal static partial class GodotSmoke
 {
-    public static async Task<int> RunAsync(string root)
+    public static async Task<int> RunAsync(string root, IReadOnlyList<string>? arguments = null)
     {
+        arguments ??= [];
+        if (arguments.Count > 0)
+        {
+            if (string.Equals(arguments[0], "product", StringComparison.OrdinalIgnoreCase))
+            {
+                return await ProductSmokeRunner.RunAsync(root, arguments.Skip(1).ToArray());
+            }
+            Console.Error.WriteLine("smoke usage: lx smoke | lx smoke product [id|all]");
+            return 2;
+        }
         var executable = GodotLocator.Find(root, preferConsole: true);
         if (executable is null)
         {
@@ -97,7 +107,7 @@ internal static partial class GodotSmoke
                        StringComparison.Ordinal));
     }
 
-    private static async Task<SmokeCheck> RunCheckAsync(
+    internal static async Task<SmokeCheck> RunCheckAsync(
         string executable,
         string root,
         string name,

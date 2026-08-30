@@ -1,6 +1,6 @@
 ---
 name: lx-dev
-description: 开发、审查、诊断或扩展 LXFramework Godot 4.7.2 C# 框架及其 Game 产品层。用于 LX/LX.Core API、场景、UI、资源、输入、内容、Feature、世界、游戏运行时与生命周期、生成清单和脚手架。Codex 工作流、Capability、runtime CLI/.lx 诊断桥、AGENTS、Skill、模型配置、Project Knowledge 或 eval 改用 lx-codex-workflow；泛泛 C# 或非本仓库 Godot 问题不触发。
+description: 开发、审查、诊断、创建、升级、移植或复刻 LXFramework Godot 4.7.2 C# 框架及其 Game 产品层。用于 LX/LX.Core API、场景、UI、资源、输入、内容、Feature、世界、游戏运行时与生命周期、生成清单和脚手架。Codex 工作流、Capability/runtime CLI 本身、AGENTS、Skill、模型配置、Project Knowledge 或 eval 改用 lx-codex-workflow；泛泛 C# 或非本仓库 Godot 问题不触发。
 ---
 
 # LXFramework 开发
@@ -28,6 +28,7 @@ description: 开发、审查、诊断或扩展 LXFramework Godot 4.7.2 C# 框架
 | 新抽象、通信或资源所有权取舍 | `references/design-decisions.md` | 对应实现源码 |
 | 自定义资源所有权、Prefab/图集绑定或释放闭环设计 | `references/resource-lifecycle.md` | `references/runtime-contracts.md` |
 | 创建游戏、世界、Feature、UI、普通内容、输入或资源；注册资源并在产品代码使用 | `references/product-workflow.md` | 对应产品源码；只有契约不足才读生命周期 reference |
+| 旧 LX 游戏升级、其他项目移植或跨引擎/行为复刻 | `references/migration-workflow.md` | `references/product-workflow.md`；涉及存档时再读 persistence |
 | Luban schema、数据、生成或运行时读取 | `references/data-workflow.md` | 无 |
 | Godot 编辑器人工入口与等价 CLI | `references/tooling-workflow.md` | 无 |
 | 存档、迁移、备份、槽位或删除 | `references/persistence-workflow.md` | 无 |

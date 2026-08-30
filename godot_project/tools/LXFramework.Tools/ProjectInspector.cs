@@ -13,9 +13,12 @@ internal static partial class ProjectInspector
     public static int Run(string root, IReadOnlyList<string>? arguments = null)
     {
         var includeFiles = arguments?.Contains("--full", StringComparer.OrdinalIgnoreCase) == true;
-        if (arguments?.Any(argument => !string.Equals(argument, "--full", StringComparison.OrdinalIgnoreCase)) == true)
+        var includeCoverage = arguments?.Contains("--product-coverage", StringComparer.OrdinalIgnoreCase) == true;
+        if (arguments?.Any(argument =>
+                !string.Equals(argument, "--full", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(argument, "--product-coverage", StringComparison.OrdinalIgnoreCase)) == true)
         {
-            throw new ArgumentException("inspect accepts only --full.");
+            throw new ArgumentException("inspect accepts only --full and --product-coverage.");
         }
 
         var files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
@@ -42,7 +45,7 @@ internal static partial class ProjectInspector
             Path.Combine(root, "content", "features", "feature-manifest.json"));
 
         var index = new ProjectIndex(
-            4,
+            5,
             "LXFramework",
             new ProductIndexEntry(
                 game.Name,
@@ -67,6 +70,7 @@ internal static partial class ProjectInspector
                     new RegisteredEntry(feature.Id, feature.ScenePath, feature.Scope)).ToArray()),
             ReadLuban(root),
             ReadExtensionTypes(root, files, game),
+            includeCoverage ? ReadProductCoverage(root, files, game, ReadContextServices(root)) : null,
             includeFiles ? files : null,
             scenes,
             files.Count(path => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)),
@@ -88,6 +92,12 @@ internal static partial class ProjectInspector
             $"catalog counts       worlds={index.Product.Worlds.Count}, ui={index.Catalogs.Ui.Count}, " +
             $"resources={index.Catalogs.Resources.Count}, input={index.Catalogs.Input.Count}, " +
             $"content={index.Catalogs.Content.Count}, features={index.Catalogs.Features.Count}");
+        if (index.ProductCoverage is not null)
+        {
+            Console.WriteLine(
+                $"product LX usage     used={index.ProductCoverage.Count(entry => entry.Occurrences > 0)}, " +
+                $"available={index.ProductCoverage.Count}");
+        }
         Console.WriteLine($"index                {Path.GetFullPath(output)}");
         return 0;
     }
@@ -158,6 +168,52 @@ internal static partial class ProjectInspector
         return results.OrderBy(result => result.ClassName, StringComparer.Ordinal).ToArray();
     }
 
+    private static IReadOnlyList<ProductCapabilityUsageEntry> ReadProductCoverage(
+        string root,
+        IEnumerable<string> files,
+        GameManifest game,
+        IReadOnlyList<ContextServiceIndexEntry> services)
+    {
+        var sourceRoot = ProductLayout.GetSourceRoot(game);
+        if (sourceRoot.Length == 0)
+        {
+            return services.Select(service => new ProductCapabilityUsageEntry(
+                service.Name,
+                service.Type,
+                0,
+                [])).ToArray();
+        }
+
+        var sourcePrefix = sourceRoot + "/";
+        var sourceFiles = files.Where(path =>
+                path.StartsWith(sourcePrefix, StringComparison.Ordinal) &&
+                path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) &&
+                !path.Contains("/Generated/", StringComparison.Ordinal))
+            .ToArray();
+        return services.Select(service =>
+        {
+            var token = "LX." + service.Name;
+            var paths = new List<string>();
+            var occurrences = 0;
+            foreach (var relative in sourceFiles)
+            {
+                var content = File.ReadAllText(Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar)));
+                var count = content.Split(token, StringSplitOptions.None).Length - 1;
+                if (count == 0)
+                {
+                    continue;
+                }
+                occurrences += count;
+                paths.Add(relative);
+            }
+            return new ProductCapabilityUsageEntry(
+                service.Name,
+                service.Type,
+                occurrences,
+                paths);
+        }).ToArray();
+    }
+
     private static LubanIndexEntry ReadLuban(string root)
     {
         var workspaceRoot = Directory.GetParent(root)?.FullName ?? root;
@@ -212,6 +268,7 @@ internal sealed record ProjectIndex(
     CatalogIndex Catalogs,
     LubanIndexEntry Luban,
     IReadOnlyList<ExtensionTypeIndexEntry> ExtensionTypes,
+    IReadOnlyList<ProductCapabilityUsageEntry>? ProductCoverage,
     IReadOnlyList<string>? Files,
     IReadOnlyList<SceneIndexEntry> Scenes,
     int CSharpFileCount,
@@ -243,6 +300,12 @@ internal sealed record LubanIndexEntry(
 internal sealed record ContextServiceIndexEntry(string Name, string Type);
 
 internal sealed record ExtensionTypeIndexEntry(string ClassName, string BaseType, string Path);
+
+internal sealed record ProductCapabilityUsageEntry(
+    string Service,
+    string Type,
+    int Occurrences,
+    IReadOnlyList<string> Paths);
 
 internal sealed record SceneIndexEntry(
     string Path,

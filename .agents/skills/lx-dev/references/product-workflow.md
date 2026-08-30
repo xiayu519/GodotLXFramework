@@ -95,4 +95,36 @@ await material.SetAsync(ResCatalog.PlayerMaterial, Lifetime.Token);
 .\lx.ps1 validate
 ```
 
+产品可在 `content/game/game-manifest.json` 的 `productSmokes` 声明快速、确定、会自行退出的业务 smoke；Debug 与导出共用 ID、参数、marker 和 timeout。旧字段 `exportSmokes` 只用于兼容，不能与 `productSmokes` 同时声明：
+
+```json
+{
+  "productSmokes": [
+    {
+      "id": "restart_cycle",
+      "argument": "--game-smoke-restart",
+      "successMarker": "GAME_RESTART_SMOKE_PASS",
+      "timeoutSeconds": 30
+    }
+  ],
+  "visualTargets": [
+    {
+      "id": "battle_hud",
+      "scenePath": "res://scene/validation/battle_hud_fixture.tscn",
+      "baselinePath": "tests/Visual/Baselines/battle_hud.png",
+      "width": 1280,
+      "height": 720
+    }
+  ]
+}
+```
+
+```powershell
+.\lx.ps1 smoke product all
+```
+
+有状态的玩法、UI 导航或重开任务在可持续运行的 Editor/Debug 会话中，再按需读取 `runtime snapshot ui|features|resources|input|metrics`；业务关键状态用现有 Metrics/结构化日志暴露。产品视觉夹具通过 `visualTargets` 注册并用 `visual compare product` 比较，只有人工确认设计变化后才能 approve。`validate` 会运行已声明的产品 smoke 和视觉目标；未声明时明确跳过。
+
+以“全面展示/炫技/验证框架 API”为目标时，先以 `api/LXFramework.PublicApi.txt` 作为公开面清单，用 `inspect --product-coverage` 查看服务级静态映射，再把能力分成主玩法自然使用、Framework Lab 独立展示、product smoke 自动验证和不适用四类。不要为追求表面 100% 覆盖把互斥策略、危险维护入口或与玩法无关的低层 API 硬塞进主流程；对声称已覆盖的能力必须给出可运行场景、断言或快照证据。
+
 `check` 会在事实源需要时先运行 Luban 或现有生成器，再执行最小去重检查组合；冷启动工作区缺少忽略的 `.lx/luban/report.json` 时也会自动补建，不需要手工 `data` 后重试。`validate` 是最终门禁，覆盖固定版本 Luban 转表、架构与 API 注释边界、清单、生成漂移、编译、纯核心测试、Godot 无窗口场景矩阵和 UI 视觉基准。

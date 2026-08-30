@@ -231,6 +231,62 @@
         "uncached_input_tokens": 45000,
         "output_tokens": 3000
       }
+    },
+    {
+      "id": "legacy-lx-upgrade-plan",
+      "suite": "full",
+      "setup": "migration-lx",
+      "prompt": "只读规划把 legacy_lx 中的旧 LX 游戏升级到当前干净主干。必须使用迁移 Capability/计划入口，区分产品内容、当前框架、生成物和构建产物；不得复制文件或修改项目。给出下一步纵向切片和验收证据。",
+      "expected_write": false,
+      "expected_terms": [
+        "migrate plan",
+        "upgrade",
+        "FrameworkOwned",
+        "BuildArtifact"
+      ],
+      "expected_term_groups": [
+        {
+          "any": ["纵向切片", "vertical slice"]
+        },
+        {
+          "any": ["smoke product", "product smoke"]
+        }
+      ],
+      "budgets": {
+        "tool_calls": 12,
+        "retries": 1,
+        "input_tokens": 350000,
+        "uncached_input_tokens": 60000,
+        "output_tokens": 4000
+      }
+    },
+    {
+      "id": "cross-engine-remake-plan",
+      "suite": "full",
+      "setup": "migration-unity",
+      "prompt": "只读规划把 legacy_unity 中的 Unity 游戏复刻到当前 LXFramework。必须运行迁移计划并识别引擎；说明哪些内容可复用、哪些必须映射到 LX，不能机械翻译 GameManager 或复制 Library 构建物。不得修改项目。",
+      "expected_write": false,
+      "expected_terms": [
+        "migrate plan",
+        "remake",
+        "Unity",
+        "BuildArtifact"
+      ],
+      "expected_term_groups": [
+        {
+          "any": ["授权", "许可", "license"]
+        },
+        {
+          "any": ["LX", "能力映射"]
+        }
+      ],
+      "budgets": {
+        "tool_calls": 12,
+        "retries": 1,
+        "input_tokens": 350000,
+        "uncached_input_tokens": 60000,
+        "output_tokens": 4000
+      }
     }
   ]
 }

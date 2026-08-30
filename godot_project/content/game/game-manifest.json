@@ -4,5 +4,7 @@
   "rootNamespace": "Game",
   "sourceRoot": "",
   "initialWorldId": "",
-  "worlds": []
+  "worlds": [],
+  "productSmokes": [],
+  "visualTargets": []
 }

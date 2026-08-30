@@ -25,7 +25,7 @@ internal static partial class GameGenerator
         };
     }
 
-    private static void Validate(string root, GameManifest manifest)
+    internal static void Validate(string root, GameManifest manifest)
     {
         if (manifest.Version != 1)
         {
@@ -40,38 +40,80 @@ internal static partial class GameGenerator
             _ = ProductLayout.GetSourceRoot(manifest);
         }
 
-        var duplicateSmoke = manifest.ExportSmokes
+        var productSmokes = manifest.GetProductSmokes();
+        var duplicateSmoke = productSmokes
             .GroupBy(smoke => smoke.Id, StringComparer.Ordinal)
             .FirstOrDefault(group => group.Count() > 1);
         if (duplicateSmoke is not null)
         {
-            throw new InvalidDataException($"Export smoke ID '{duplicateSmoke.Key}' is duplicated.");
+            throw new InvalidDataException($"Product smoke ID '{duplicateSmoke.Key}' is duplicated.");
         }
-        foreach (var smoke in manifest.ExportSmokes)
+        foreach (var smoke in productSmokes)
         {
             CodeNames.RequireSnakeCase(smoke.Id, nameof(smoke.Id));
             if (string.Equals(smoke.Id, "framework", StringComparison.Ordinal))
             {
                 throw new InvalidDataException(
-                    "Export smoke ID 'framework' is reserved for the built-in framework smoke.");
+                    "Product smoke ID 'framework' is reserved for the built-in framework smoke.");
             }
             if (!smoke.Argument.StartsWith("--", StringComparison.Ordinal) ||
                 smoke.Argument.Any(char.IsWhiteSpace))
             {
                 throw new InvalidDataException(
-                    $"Export smoke '{smoke.Id}' must declare one '--' prefixed user argument.");
+                    $"Product smoke '{smoke.Id}' must declare one '--' prefixed user argument.");
             }
             if (string.IsNullOrWhiteSpace(smoke.SuccessMarker) ||
                 smoke.SuccessMarker.Contains('\r', StringComparison.Ordinal) ||
                 smoke.SuccessMarker.Contains('\n', StringComparison.Ordinal))
             {
                 throw new InvalidDataException(
-                    $"Export smoke '{smoke.Id}' must declare a single-line success marker.");
+                    $"Product smoke '{smoke.Id}' must declare a single-line success marker.");
             }
             if (smoke.TimeoutSeconds is < 1 or > 300)
             {
                 throw new InvalidDataException(
-                    $"Export smoke '{smoke.Id}' timeoutSeconds must be between 1 and 300.");
+                    $"Product smoke '{smoke.Id}' timeoutSeconds must be between 1 and 300.");
+            }
+        }
+
+        var duplicateVisual = manifest.VisualTargets
+            .GroupBy(target => target.Id, StringComparer.Ordinal)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicateVisual is not null)
+        {
+            throw new InvalidDataException($"Visual target ID '{duplicateVisual.Key}' is duplicated.");
+        }
+        foreach (var target in manifest.VisualTargets)
+        {
+            CodeNames.RequireSnakeCase(target.Id, nameof(target.Id));
+            if (string.Equals(target.Id, "ui_components", StringComparison.Ordinal) ||
+                string.Equals(target.Id, "product", StringComparison.Ordinal))
+            {
+                throw new InvalidDataException($"Visual target ID '{target.Id}' is reserved.");
+            }
+            if (!target.ScenePath.StartsWith("res://", StringComparison.Ordinal) ||
+                !target.ScenePath.EndsWith(".tscn", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException($"Visual target '{target.Id}' has invalid scene path.");
+            }
+            if (!File.Exists(ToolFiles.ToAbsolutePath(root, target.ScenePath)))
+            {
+                throw new FileNotFoundException(
+                    $"Visual target '{target.Id}' scene is missing.",
+                    ToolFiles.ToAbsolutePath(root, target.ScenePath));
+            }
+            if (Path.IsPathRooted(target.BaselinePath) ||
+                target.BaselinePath.Contains("..", StringComparison.Ordinal) ||
+                !target.BaselinePath.Replace('\\', '/').StartsWith("tests/Visual/Baselines/", StringComparison.Ordinal) ||
+                !target.BaselinePath.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException(
+                    $"Visual target '{target.Id}' baselinePath must be a PNG under tests/Visual/Baselines/.");
+            }
+            if (target.Width is < 64 or > 4096 || target.Height is < 64 or > 4096)
+            {
+                throw new InvalidDataException(
+                    $"Visual target '{target.Id}' dimensions must be between 64 and 4096 pixels.");
             }
         }
 

@@ -1,7 +1,7 @@
 ---
 title: Sol/high 唯一工作流基线
 kind: reference
-status: active
+status: superseded
 verified: 2026-08-30
 sources:
   - .codex/config.toml
@@ -14,3 +14,5 @@ LXFramework 只保证 `gpt-5.6-sol/high`，普通任务与 Plan mode 使用同�
 Codex CLI `0.151.0-alpha.7.1` 下，2026-08-30 完整 11 项 outcome eval 通过 11/11：输入 1,021,028 tokens（缓存 759,808、未缓存 261,220），输出 20,440，工具调用 64，重试 0，总时长 1,048.81 秒。
 
 根 `AGENTS.md` 只保留 LX 仓库结构、不变量、命令和验证门禁；Skill 完全依赖 description 语义发现。修改根/嵌套 AGENTS、Skill description/路由/reference、模型配置、eval schema/runner，或升级 Codex CLI 的行为版本后，先跑静态/preflight，再重新建立完整 11/11 基线。
+
+该 11 项基线已被 13 项产品生命周期 schema 替代，仅保留为历史证据；不能外推为新 schema 通过。

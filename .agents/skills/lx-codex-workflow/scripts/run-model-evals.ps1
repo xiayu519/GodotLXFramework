@@ -106,6 +106,22 @@ function Invoke-ChildPowerShell([string[]]$arguments, [string]$logPath) {
     return $exitCode
 }
 
+function Invoke-EvalBuild([string]$fixture, [string]$logPath) {
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    Push-Location (Join-Path $fixture "godot_project")
+    try {
+        $lines = @(& dotnet build "LXFramework.sln" --nologo --verbosity quiet 2>&1)
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        Pop-Location
+        $ErrorActionPreference = $previousErrorAction
+    }
+    Write-Utf8 $logPath (($lines | ForEach-Object { $_.ToString() }) -join "`n")
+    return $exitCode
+}
+
 function Remove-EvalFixture([string]$fixture) {
     $resolvedFixture = [System.IO.Path]::GetFullPath($fixture)
     $allowedPrefix = [System.IO.Path]::GetFullPath($fixtureRoot).TrimEnd('\', '/') + [System.IO.Path]::DirectorySeparatorChar
@@ -261,6 +277,78 @@ function Prepare-CleanFixture([string]$fixture, [string]$logPath) {
     }
 }
 
+function Prepare-MigrationFixture([string]$fixture, [string]$kind) {
+    if ($kind -eq "migration-lx") {
+        $source = Join-Path $fixture "legacy_lx"
+        Write-Utf8 (Join-Path $source "godot_project\project.godot") ('[application]' + "`n" + 'config/name="LegacyGame"' + "`n")
+        Write-Utf8 (Join-Path $source "godot_project\content\game\game-manifest.json") ('{"version":1,"name":"LegacyGame","rootNamespace":"LegacyGame","sourceRoot":"script/LegacyGame","initialWorldId":"main_world","worlds":[]}' + "`n")
+        Write-Utf8 (Join-Path $source "godot_project\script\LegacyGame\GameRoot.cs") ('namespace LegacyGame; internal sealed class GameRoot { }' + "`n")
+        Write-Utf8 (Join-Path $source "godot_project\script\LegacyGame\Generated\Old.g.cs") ('// generated' + "`n")
+        Write-Utf8 (Join-Path $source "godot_project\src\LXFramework\OldRuntime.cs") ('namespace LX.Runtime; internal sealed class OldRuntime { }' + "`n")
+        Write-Utf8 (Join-Path $source "godot_project\build\windows\LegacyGame.exe") ('derived' + "`n")
+        Write-Utf8 (Join-Path $source "game_design\data\levels.json") ('{"levels":[]}' + "`n")
+        return
+    }
+    if ($kind -eq "migration-unity") {
+        $source = Join-Path $fixture "legacy_unity"
+        Write-Utf8 (Join-Path $source "ProjectSettings\ProjectVersion.txt") ('m_EditorVersion: 2022.3.0f1' + "`n")
+        Write-Utf8 (Join-Path $source "Assets\Scripts\GameManager.cs") ('using UnityEngine; internal sealed class GameManager : MonoBehaviour { }' + "`n")
+        Write-Utf8 (Join-Path $source "Assets\Scenes\Main.unity") ('%YAML 1.1' + "`n")
+        Write-Utf8 (Join-Path $source "Assets\Data\levels.json") ('{"levels":[]}' + "`n")
+        Write-Utf8 (Join-Path $source "Library\ScriptAssemblies\Game.dll") ('derived' + "`n")
+        Write-Utf8 (Join-Path $source "LICENSE.txt") ('Evaluation fixture only.' + "`n")
+        return
+    }
+    throw "Unknown migration fixture kind '$kind'."
+}
+
+function Prepare-ProductLifecycleFixture([string]$fixture) {
+    $gameRoot = Join-Path $fixture "godot_project\script\EvalPreflight\GameRoot.cs"
+    Write-Utf8 $gameRoot @"
+using Godot;
+using LX.Runtime;
+
+namespace EvalPreflight;
+
+public partial class GameRoot : LXNode
+{
+    protected override void OnLXInitialized()
+    {
+        if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--lx-eval-product-smoke") >= 0)
+        {
+            CallDeferred(nameof(CompleteSmoke));
+        }
+    }
+
+    private void CompleteSmoke()
+    {
+        GD.Print("LX_EVAL_PRODUCT_SMOKE_PASS");
+        GetTree().Quit();
+    }
+}
+"@
+    $manifestPath = Join-Path $fixture "godot_project\content\game\game-manifest.json"
+    $manifest = $utf8.GetString([System.IO.File]::ReadAllBytes($manifestPath)) | ConvertFrom-Json
+    $manifest.productSmokes = @(
+        [pscustomobject]@{
+            id = "eval_boot"
+            argument = "--lx-eval-product-smoke"
+            successMarker = "LX_EVAL_PRODUCT_SMOKE_PASS"
+            timeoutSeconds = 30
+        }
+    )
+    $manifest.visualTargets = @(
+        [pscustomobject]@{
+            id = "eval_product"
+            scenePath = "res://scene/world/main_world.tscn"
+            baselinePath = "tests/Visual/Baselines/eval_product.png"
+            width = 640
+            height = 360
+        }
+    )
+    Write-Utf8 $manifestPath (($manifest | ConvertTo-Json -Depth 10) + "`n")
+}
+
 function Read-JsonEvents([string]$path) {
     $events = @()
     if (-not (Test-Path -LiteralPath $path)) {
@@ -312,9 +400,11 @@ if ([string]::IsNullOrWhiteSpace($lubanPath) -or -not (Test-Path -LiteralPath $l
 $env:LX_LUBAN_DLL = $lubanPath
 
 $preflightFixture = Join-Path $fixtureRoot "_preflight"
+$preflightMigrationFixture = Join-Path $fixtureRoot "_preflight_source"
 try {
     Copy-EvalRepository $preflightFixture
     Prepare-CleanFixture $preflightFixture (Join-Path $runRoot "preflight-clean.log")
+    Prepare-MigrationFixture $preflightMigrationFixture "migration-lx"
     $jsonContractLog = Join-Path $runRoot "preflight-command-json.log"
     $jsonContractExit = Invoke-ChildPowerShell @(
         "-File", (Join-Path $preflightFixture "lx.ps1"), "help", "--json"
@@ -340,6 +430,26 @@ try {
     ) (Join-Path $runRoot "preflight-create.log")
     if ($preflightCreateExit -ne 0) {
         throw "Evaluation preflight could not create a game (exit $preflightCreateExit)."
+    }
+    Prepare-ProductLifecycleFixture $preflightFixture
+    $preflightBuildExit = Invoke-EvalBuild $preflightFixture (Join-Path $runRoot "preflight-product-build.log")
+    if ($preflightBuildExit -ne 0) {
+        throw "Evaluation preflight could not build the product lifecycle fixture (exit $preflightBuildExit)."
+    }
+    $preflightLifecycleCommands = @(
+        [pscustomobject]@{ Name = "coverage"; Arguments = @("inspect", "--product-coverage") },
+        [pscustomobject]@{ Name = "migration"; Arguments = @("migrate", "plan", "--source", (Join-Path $preflightMigrationFixture "legacy_lx"), "--mode", "upgrade") },
+        [pscustomobject]@{ Name = "product-smoke"; Arguments = @("smoke", "product", "all") },
+        [pscustomobject]@{ Name = "product-visual-approve"; Arguments = @("visual", "approve", "eval_product") },
+        [pscustomobject]@{ Name = "product-visual"; Arguments = @("visual", "compare", "product") }
+    )
+    foreach ($command in $preflightLifecycleCommands) {
+        $commandExit = Invoke-ChildPowerShell `
+            (@("-File", (Join-Path $preflightFixture "lx.ps1")) + @($command.Arguments)) `
+            (Join-Path $runRoot "preflight-$($command.Name).log")
+        if ($commandExit -ne 0) {
+            throw "Evaluation preflight '$($command.Name)' failed (exit $commandExit)."
+        }
     }
     $architectureProbe = Join-Path $preflightFixture "godot_project\script\EvalPreflight\ArchitectureViolationProbe.cs"
     Write-Utf8 $architectureProbe @"
@@ -404,9 +514,10 @@ public enum DocumentationViolationProbe
 }
 finally {
     Remove-EvalFixture $preflightFixture
+    Remove-EvalFixture $preflightMigrationFixture
 }
 if ($PreflightOnly) {
-    Write-Host "Evaluation preflight passed: JSON contract, syntax-tree boundary, game, world, feature, native node, screen, content, input, res, and validate."
+    Write-Host "Evaluation preflight passed: JSON contract, syntax-tree boundary, game, migration plan, product coverage/smoke/visual, scaffolds, and validate."
     exit 0
 }
 
@@ -431,7 +542,7 @@ foreach ($case in $cases) {
         try {
             Copy-EvalRepository $fixture
 
-            if ($case.setup -in @("clean", "game")) {
+            if ($case.setup -in @("clean", "game", "migration-lx", "migration-unity")) {
                 Prepare-CleanFixture $fixture (Join-Path $artifacts "clean-setup.log")
             }
 
@@ -443,6 +554,9 @@ foreach ($case in $cases) {
                 if ($setupExit -ne 0) {
                     throw "Fixture game setup failed with exit code $setupExit."
                 }
+            }
+            if ($case.setup -in @("migration-lx", "migration-unity")) {
+                Prepare-MigrationFixture $fixture ([string]$case.setup)
             }
 
             & git -C $fixture init --quiet

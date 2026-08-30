@@ -43,6 +43,7 @@ $requiredFiles = @(
     ".agents/skills/lx-dev/SKILL.md",
     ".agents/skills/lx-dev/agents/openai.yaml",
     ".agents/skills/lx-dev/references/data-workflow.md",
+    ".agents/skills/lx-dev/references/migration-workflow.md",
     ".agents/skills/lx-dev/references/persistence-workflow.md",
     ".agents/skills/lx-dev/references/tooling-workflow.md",
     ".agents/skills/lx-codex-workflow/SKILL.md",

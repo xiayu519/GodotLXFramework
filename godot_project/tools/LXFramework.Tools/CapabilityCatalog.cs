@@ -56,6 +56,8 @@ internal static class CapabilityCatalog
                 [
                     Command("inspect", "lx inspect [--full]", CapabilityCommandKind.LocalArtifact,
                         ["writes-.lx-project-index"], ["project-root-valid"], "project-index-written"),
+                    Command("inspect", "lx inspect --product-coverage", CapabilityCommandKind.LocalArtifact,
+                        ["writes-.lx-project-index"], ["project-root-valid"], "product-coverage-written"),
                     Command("capabilities", "lx capabilities [capability-id]", CapabilityCommandKind.LocalArtifact,
                         ["writes-.lx-capability-catalog"], ["project-root-valid"], "capability-catalog-written"),
                     Command("generate", "lx generate", CapabilityCommandKind.ProjectMutation,
@@ -92,6 +94,9 @@ internal static class CapabilityCatalog
                     Command("smoke", "lx smoke", CapabilityCommandKind.ProjectMutation,
                         ["may-import-godot-uids", "writes-.lx-smoke-report"],
                         ["godot-4.7.2-dotnet"], "runtime-smoke-pass"),
+                    Command("smoke", "lx smoke product [id|all]", CapabilityCommandKind.ProjectMutation,
+                        ["may-import-godot-uids", "writes-.lx-product-smoke-report"],
+                        ["godot-4.7.2-dotnet", "product-smokes-declared"], "product-smoke-pass"),
                     Command("runtime", "lx runtime status", CapabilityCommandKind.LocalArtifact,
                         ["writes-.lx-runtime-status"], ["debug-runtime-live"], "runtime-session-current"),
                     Command("runtime", "lx runtime snapshot [section]", CapabilityCommandKind.LocalArtifact,
@@ -124,14 +129,23 @@ internal static class CapabilityCatalog
                         ["transaction-present"], "upgrade-verified-or-rolled-back"),
                 ]),
             new CapabilityDescriptor(
+                "migration",
+                CapabilityState.Available,
+                "只读盘点旧 LX、Godot 或其他引擎游戏，并规划升级、移植或语义复刻。",
+                [
+                    Command("migrate", "lx migrate plan --source <directory|git-ref> --mode upgrade|port|remake",
+                        CapabilityCommandKind.LocalArtifact,
+                        ["writes-.lx-migration-plan"], ["source-readable"], "migration-plan-valid"),
+                ]),
+            new CapabilityDescriptor(
                 "quality",
                 CapabilityState.Available,
                 "视觉、性能与发行门禁。",
                 [
-                    Command("visual", "lx visual capture|compare", CapabilityCommandKind.LocalArtifact,
+                    Command("visual", "lx visual capture|compare [target|product]", CapabilityCommandKind.LocalArtifact,
                         ["writes-.lx-visual-artifacts"],
                         ["godot-4.7.2-dotnet"], "visual-result-explicit"),
-                    Command("visual", "lx visual approve", CapabilityCommandKind.ProjectMutation,
+                    Command("visual", "lx visual approve [target|product]", CapabilityCommandKind.ProjectMutation,
                         ["updates-visual-baseline", "writes-.lx-visual-artifacts"],
                         ["godot-4.7.2-dotnet"], "visual-result-explicit"),
                     Command("benchmark", "lx benchmark", CapabilityCommandKind.LocalArtifact,
@@ -152,6 +166,7 @@ internal static class CapabilityCatalog
         var recipes = new[]
         {
             Recipe("project-index-written", ["command-success", "artifact-schema-valid"]),
+            Recipe("product-coverage-written", ["command-success", "context-services-mapped", "product-usage-bounded"]),
             Recipe("capability-catalog-written", ["command-success", "catalog-schema-valid"]),
             Recipe("generated-output-current", ["command-success", "validate-generated-pass"]),
             Recipe("changed-paths-pass", ["command-success", "selected-gates-pass"]),
@@ -161,6 +176,7 @@ internal static class CapabilityCatalog
             Recipe("luban-deterministic", ["command-success", "input-hash-current", "negative-fixtures-rejected"]),
             Recipe("godot-process-result", ["process-exit-observed"]),
             Recipe("runtime-smoke-pass", ["command-success", "all-scenarios-pass"]),
+            Recipe("product-smoke-pass", ["declared-scenarios-complete", "markers-observed", "engine-errors-absent"]),
             Recipe("runtime-session-current", ["process-live", "heartbeat-current", "session-generation-current"]),
             Recipe("runtime-snapshot-current", ["response-success", "session-generation-current", "payload-complete"]),
             Recipe("doctor-report-complete", ["checks-observed", "missing-list-complete"]),
@@ -168,6 +184,7 @@ internal static class CapabilityCatalog
             Recipe("upgrade-plan-valid", ["actions-bounded", "side-effects-declared", "hashes-recorded"]),
             Recipe("repair-verified-or-rolled-back", ["plan-current", "validator-pass", "transaction-terminal"]),
             Recipe("upgrade-verified-or-rolled-back", ["plan-current", "validator-pass", "transaction-terminal"]),
+            Recipe("migration-plan-valid", ["source-inventory-bounded", "ownership-classified", "required-gates-declared"]),
             Recipe("visual-result-explicit", ["capture-produced", "comparison-result-observed"]),
             Recipe("benchmark-gates-pass", ["command-success", "allocation-gates-pass"]),
             Recipe("soak-pass", ["requested-cycles-complete", "all-smoke-cycles-pass"]),

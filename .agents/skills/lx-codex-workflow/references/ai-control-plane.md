@@ -8,6 +8,8 @@
 
 每条命令声明调用形式、种类、副作用、前置条件和 `verifyRecipe`。新增、删除或改变根命令时同步元数据，并让静态验证确认 C# 或 PowerShell 路由真实存在。能力查询本身不能扩大用户授权。
 
+旧游戏升级、其他项目移植或跨引擎复刻先查询 `migration` capability，再用 `migrate plan` 生成只读来源盘点。计划只能写 `.lx/migration/`，不得切分支、复制来源或自动翻译手写代码；确定性当前 checkout 派生状态仍由 `upgrade --plan` 负责。
+
 副作用分类按“命令可能造成的最大变化”声明：完全不写入才是 `ReadOnly`；只写忽略目录 `.lx/` 是 `LocalArtifact`；可能更新生成输出、UID、视觉基准、API 基线或导出产物是 `ProjectMutation`。同一根命令的 plan/apply/rollback 等形态必须拆成独立条目，静态验证会拒绝 `ReadOnly` 携带副作用、`LocalArtifact` 写项目文件或 `ProjectMutation` 只写 `.lx/` 的错误分类。
 
 ## 运行时桥
