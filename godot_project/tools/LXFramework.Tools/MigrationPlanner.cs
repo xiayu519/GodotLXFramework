@@ -322,20 +322,24 @@ internal static class MigrationPlanner
         MigrationMode.Upgrade =>
         [
             "Keep the target checkout's framework, tools, Codex workflow, and root documentation.",
-            "Migrate product facts, product source, scenes, and authorized assets; regenerate derived outputs.",
+            "Recover the source game's driving architecture before bulk migration; preserve sound product runtimes and module contracts semantically.",
+            "Migrate product facts, product source, scenes, scripts/data, and authorized assets through that architecture; regenerate derived outputs.",
             "Compile against the target Godot/LX API and treat handwritten API drift as manual work.",
         ],
         MigrationMode.Port =>
         [
             $"Preserve source semantics from {engine}; do not copy its service locator, event bus, lifecycle, resource, scene, or UI managers into LXFramework.",
-            "Map gameplay, input, UI, data, save, audio, scene, and asset ownership to typed LX capabilities.",
-            "Create one playable vertical slice before migrating the remaining content.",
+            "Inspect boot composition, module boundaries, script interpreters/compilers, content schemas, state, and save semantics before product implementation.",
+            "Map the sound source architecture and gameplay, input, UI, data, save, audio, scene, and asset ownership to typed LX capabilities.",
+            "Build the target runtime skeleton and module contracts, prove them with one representative scenario, then convert and validate scripts/data in batch.",
         ],
         _ =>
         [
             $"Treat the {engine} source as behavioral reference; do not mechanically translate engine-specific code.",
             "Reuse only code and assets whose authorization and license are known.",
-            "Specify parity scenarios for state transitions, controls, timing, UI, data, save behavior, and restart closure before implementation.",
+            "If source code is readable, recover its driving architecture before implementation; otherwise design a target runtime skeleton before content-specific code.",
+            "Use one normalized event representation for repeated scripted flows and deterministic modules for high-frequency gameplay; do not hardcode content steps.",
+            "After the architecture contract passes, batch-validate state transitions, controls, timing, UI, scripts/data, save behavior, and restart closure.",
         ],
     };
 
@@ -347,7 +351,11 @@ internal static class MigrationPlanner
             "framework-owned-files-unchanged",
             "generated-and-build-artifacts-not-copied",
             "lx-capability-map-complete",
-            "vertical-slice-check-pass",
+            "driving-architecture-decision-recorded",
+            "target-runtime-skeleton-ready",
+            "architecture-contract-scenario-pass",
+            "script-and-data-reference-validation-pass",
+            "batch-content-behavior-validation-pass",
             "product-smoke-pass",
             "runtime-state-observed",
             "full-validation-pass",

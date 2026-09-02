@@ -57,6 +57,70 @@
       }
     },
     {
+      "id": "new-rpg-driving-architecture",
+      "suite": "full",
+      "setup": "game",
+      "prompt": "只读规划一个从零开发的老式 RPG 第一阶段：预计有数百段剧情、地图事件、人物移动、对话、音乐和战斗入口，来源内容以后可能是 bin、json 或 txt。不要修改文件。先给结论，再说明写第一段剧情前的驱动架构、事件脚本与高频模块边界、一次批量接入和验证；明确场景加载必须完成后继续而音乐可启动后继续，怎样表达 Await、Start、Join/Stop、取消和生命周期所有权；明确同类第二份内容是否修改执行运行时。证据充分后停止，最终答案不超过 18 行。",
+      "expected_write": false,
+      "expected_skills": ["lx-game"],
+      "forbidden_skills": ["lx-migrate", "lx-framework"],
+      "expected_terms": ["事件脚本", "批量"],
+      "expected_term_groups": [
+        {
+          "any": ["中间表示", "Event IR", "事件 IR", "字节码"]
+        },
+        {
+          "any": ["高频", "逐帧", "确定性模块"]
+        },
+        {
+          "any": ["架构契约", "契约切片", "代表场景"]
+        },
+        {
+          "any": ["只增加脚本", "仅靠脚本", "不修改执行运行时", "不修改运行时代码"]
+        },
+        {
+          "any": ["Await", "等待完成"]
+        },
+        {
+          "any": ["Start", "并发启动"]
+        },
+        {
+          "any": ["Join", "Stop", "生命周期"]
+        }
+      ],
+      "budgets": {
+        "tool_calls": 8,
+        "retries": 1,
+        "input_tokens": 220000,
+        "uncached_input_tokens": 45000,
+        "output_tokens": 3500
+      }
+    },
+    {
+      "id": "small-game-no-script-overdesign",
+      "suite": "full",
+      "setup": "game",
+      "prompt": "只读规划一个单屏双人 Pong：只有球拍移动、球反弹、计分和重新开局，没有剧情、任务、批量关卡或外部内容。不要修改文件。首句明确写出是否需要事件脚本，再给出少量类型化模块或确定性状态方案；只读 lx-game 及其产品架构 reference，证据充分后停止，不检查 UI、输入、场景或 Public API，最终答案不超过 8 行。",
+      "expected_write": false,
+      "expected_skills": ["lx-game"],
+      "forbidden_skills": ["lx-migrate", "lx-framework", "lx-data"],
+      "expected_term_groups": [
+        {
+          "any": ["不需要事件脚本", "无需事件脚本", "不必引入事件脚本", "无需引入事件脚本"]
+        },
+        {
+          "any": ["类型化模块", "状态机", "确定性"]
+        }
+      ],
+      "budgets": {
+        "tool_calls": 8,
+        "retries": 1,
+        "input_tokens": 180000,
+        "uncached_input_tokens": 40000,
+        "output_tokens": 2500
+      }
+    },
+    {
       "id": "important-ui-ambiguity",
       "suite": "full",
       "setup": "game",
@@ -302,7 +366,7 @@
       "id": "legacy-lx-upgrade-plan",
       "suite": "full",
       "setup": "migration-lx",
-      "prompt": "只读规划把 legacy_lx 中的旧 LX 游戏升级到当前干净主干。必须使用迁移 Capability/计划入口，区分产品内容、当前框架、生成物和构建产物；不得复制文件或修改项目。给出下一步纵向切片和验收证据。",
+      "prompt": "只读规划把 legacy_lx 中的旧 LX 游戏升级到当前干净主干。必须使用迁移 Capability/计划入口，区分产品内容、当前框架、生成物和构建产物；不得复制文件或修改项目。源码可读时先判断来源由什么架构驱动，再给出架子、模块、脚本/数据批量迁移顺序和验收证据。",
       "expected_write": false,
       "expected_skills": ["lx-migrate"],
       "forbidden_skills": ["lx-game", "lx-ui", "lx-input", "lx-framework"],
@@ -314,10 +378,13 @@
       "expected_command_terms": ["migrate plan"],
       "expected_term_groups": [
         {
-          "any": ["纵向切片", "vertical slice"]
+          "any": ["驱动架构", "架构承载", "目标骨架"]
         },
         {
           "any": ["smoke product", "product smoke"]
+        },
+        {
+          "any": ["批量", "batch"]
         }
       ],
       "budgets": {
@@ -332,7 +399,7 @@
       "id": "cross-engine-remake-plan",
       "suite": "full",
       "setup": "migration-unity",
-      "prompt": "只读规划把 legacy_unity 中的 Unity 游戏复刻到当前 LXFramework。必须运行迁移计划并识别引擎；说明哪些内容可复用、哪些必须映射到 LX，不能机械翻译 GameManager 或复制 Library 构建物。不得修改项目。",
+      "prompt": "只读规划把 legacy_unity 中的 Unity 游戏复刻到当前 LXFramework。必须运行迁移计划并识别引擎；先检查源码的启动组合、模块与脚本/数据驱动方式，再判断哪些架构语义可保留、适配或必须替换。不能机械翻译 GameManager、逐内容硬编码或复制 Library 构建物；不得修改项目。按只读计划停止条件精简汇报，最终答案不超过 16 行。",
       "expected_write": false,
       "expected_skills": ["lx-migrate"],
       "forbidden_skills": ["lx-game", "lx-ui", "lx-input", "lx-framework"],
@@ -348,6 +415,12 @@
         },
         {
           "any": ["LX", "能力映射"]
+        },
+        {
+          "any": ["Preserve", "AdaptToLX", "Replace"]
+        },
+        {
+          "any": ["驱动架构", "启动", "模块"]
         }
       ],
       "budgets": {
