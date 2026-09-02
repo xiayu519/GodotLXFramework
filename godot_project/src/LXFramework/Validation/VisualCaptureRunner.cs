@@ -103,6 +103,12 @@ internal sealed class VisualCaptureRunner
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 await _host.ToSignal(_host.GetTree(), SceneTree.SignalName.ProcessFrame);
+                if (captureMode == "RenderedViewport" && !RenderingServer.RenderLoopEnabled)
+                {
+                    // Hidden validation renders only the explicitly requested frames.
+                    // swapBuffers=false keeps the GPU result off the desktop compositor.
+                    RenderingServer.ForceDraw(false, 1.0 / 60.0);
+                }
             }
 
             using var actual = captureMode == "RenderedViewport"
@@ -249,7 +255,15 @@ internal sealed class VisualCaptureRunner
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        await _host.ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+        if (RenderingServer.RenderLoopEnabled)
+        {
+            await _host.ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+        }
+        else
+        {
+            RenderingServer.ForceDraw(false, 1.0 / 60.0);
+        }
+        RenderingServer.ForceSync();
         cancellationToken.ThrowIfCancellationRequested();
         return viewport.GetTexture().GetImage();
     }

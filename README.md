@@ -643,7 +643,7 @@ Godot Editor/Debug 正在运行时，Codex 可以读取当前会话而不修改�
 .\lx.ps1 visual compare ui_components
 ```
 
-产品目标需在 `game-manifest.json` 明确选择模式：`SemanticControl` 提供快速、确定性的 Control 语义图；`RenderedViewport` 启动真实渲染器并捕获 Godot Viewport，可覆盖 `Sprite2D`、shader、真实字体、hover 和 `VideoStream`。后者可用 `IVisualCaptureReady` 固定异步状态，并声明 pointer、像素容差和最大变化比例；两种证据不会互相冒充。
+产品目标需在 `game-manifest.json` 明确选择模式：`SemanticControl` 以 headless 提供快速、确定性的 Control 语义图；`RenderedViewport` 保留真实渲染器但隐藏且禁止聚焦根窗口，只绘制声明所需的帧并捕获 Godot Viewport，可覆盖 `Sprite2D`、shader、真实字体、hover 和 `VideoStream`。后者可用 `IVisualCaptureReady` 固定异步状态，并声明 pointer、像素容差和最大变化比例；两种证据不会互相冒充。自动验收不会显示 GUI，只有显式 `run` 的人工试玩才显示游戏窗口。
 
 只有人工确认差异符合设计时才更新基准：
 

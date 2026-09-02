@@ -19,7 +19,7 @@ LXFramework 是 Codex 优先的 Godot 4.7.2 C# 框架。
 - 可重开流程连续覆盖死亡、胜利和重开；每轮验证 UI、Feature、音频、资源租约及池借出闭合，预热后节点、资源和产品资产不持续增长。
 - `godot_project/content/` 清单是运行时内容事实源；Luban 表以 `game_design/schema` 与 `game_design/data` 为上游事实源，并通过 `./lx.ps1 data` 生成到 `content/data/luban` 和产品 `Generated/Luban`。禁止手改任何生成输出。
 - 产品节点通过注入上下文调用 `LX.UI.*`、`LX.Res.*` 等服务；禁止全局上下文和游戏代码中的动态 `GD.Load`/`ResourceLoader.Load*`。
-- `godot_project/scene/main.tscn` 及其 UID 是固定入口；自动化 Godot 使用 `--headless --audio-driver Dummy`。
+- 固定入口 `scene/main.tscn` 及 UID；自动验收无 GUI：逻辑用 `--headless`，视觉用隐藏渲染。
 - 框架公开枚举、枚举成员和公开常量必须说明语义；UI 视觉变化先 `visual compare`，只有人工确认设计变化后才可 `visual approve`。
 
 ## 最短执行与完成

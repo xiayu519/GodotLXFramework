@@ -46,6 +46,10 @@ internal static class Validator
         {
             errors.Add(exportProtocolError);
         }
+        if (VisualRunner.ValidateProtocol() is { } visualProtocolError)
+        {
+            errors.Add(visualProtocolError);
+        }
         if (AssetBudgetValidator.ValidateProtocol(root) is { } assetBudgetProtocolError)
         {
             errors.Add(assetBudgetProtocolError);

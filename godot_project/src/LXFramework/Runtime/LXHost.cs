@@ -51,6 +51,7 @@ public partial class LXHost : Node
 
     public override void _Ready()
     {
+        PrepareAutomatedVisualWindow(OS.GetCmdlineUserArgs());
         _lifetime = new LifetimeScope("LXFramework");
         var metrics = new MetricRegistry();
         var events = _lifetime.Own(new EventHub(
@@ -416,6 +417,27 @@ public partial class LXHost : Node
                 "LXFramework UI back navigation failed.",
                 exception);
         }
+    }
+
+    private void PrepareAutomatedVisualWindow(IReadOnlyList<string> userArguments)
+    {
+        if (!userArguments.Contains("--lx-visual-hidden-window", StringComparer.Ordinal))
+        {
+            return;
+        }
+
+        // Real viewport capture needs a rendering driver, but automated evidence
+        // must never steal focus or expose a native game window to the user.
+        var window = GetWindow();
+        window.Unfocusable = true;
+        window.Mode = Window.ModeEnum.Minimized;
+        RenderingServer.RenderLoopEnabled = false;
+        if (window.Mode != Window.ModeEnum.Minimized || window.HasFocus())
+        {
+            throw new InvalidOperationException(
+                "Automated visual validation could not minimize and unfocus the native Godot window.");
+        }
+        GD.Print("LX_VISUAL_HIDDEN_WINDOW_PASS");
     }
 
     private static string? GetArgument(IReadOnlyList<string> arguments, string prefix) =>
