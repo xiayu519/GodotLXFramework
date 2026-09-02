@@ -9,33 +9,64 @@ internal static partial class ProductSmokeRunner
         string root,
         IReadOnlyList<string> arguments)
     {
-        if (arguments.Count > 1)
+        var selection = arguments.Count == 0 ? "all" : arguments[0];
+        var affected = string.Equals(selection, "affected", StringComparison.OrdinalIgnoreCase);
+        if ((!affected && arguments.Count > 1) || (affected && arguments.Count < 2))
         {
-            Console.Error.WriteLine("smoke product usage: lx smoke product [id|all]");
+            Console.Error.WriteLine(
+                "smoke product usage: lx smoke product [id|all|affected <changed-path> ...]");
             return 2;
         }
-
-        var executable = GodotLocator.Find(root, preferConsole: true);
-        if (executable is null)
+        if (affected && arguments.Skip(1).Any(path => !ProductSmokeImpact.IsValidChangedPath(path)))
         {
-            Console.Error.WriteLine("smoke product: Godot .NET was not found. Run 'lx doctor'.");
+            Console.Error.WriteLine(
+                "smoke product affected paths must stay inside the workspace and cannot contain '.' or '..' segments.");
             return 2;
         }
         var game = ToolFiles.ReadJson<GameManifest>(
             Path.Combine(root, "content", "game", "game-manifest.json"));
         GameGenerator.Validate(root, game);
         var productSmokes = game.GetProductSmokes();
-        var selectedId = arguments.Count == 0 ? "all" : arguments[0];
-        var selected = string.Equals(selectedId, "all", StringComparison.OrdinalIgnoreCase)
+        var selected = affected
+            ? ProductSmokeImpact.SelectAffected(productSmokes, arguments.Skip(1)).ToArray()
+            : string.Equals(selection, "all", StringComparison.OrdinalIgnoreCase)
             ? productSmokes.ToArray()
             : productSmokes
-                .Where(smoke => string.Equals(smoke.Id, selectedId, StringComparison.Ordinal))
+                .Where(smoke => string.Equals(smoke.Id, selection, StringComparison.Ordinal))
                 .ToArray();
-        if (selected.Length == 0 && !string.Equals(selectedId, "all", StringComparison.OrdinalIgnoreCase))
+        if (selected.Length == 0 &&
+            !affected &&
+            !string.Equals(selection, "all", StringComparison.OrdinalIgnoreCase))
         {
             Console.Error.WriteLine(
-                $"smoke product: unknown id '{selectedId}'. Available: " +
+                $"smoke product: unknown id '{selection}'. Available: " +
                 string.Join(", ", productSmokes.Select(smoke => smoke.Id)));
+            return 2;
+        }
+
+        if (selected.Length == 0)
+        {
+            var emptyReport = new ProductSmokeReport(
+                "lx.product-smoke-report",
+                2,
+                DateTimeOffset.UtcNow,
+                game.Name,
+                true,
+                null,
+                []);
+            var emptyOutput = Path.Combine(root, ".lx", "product-smoke.json");
+            ToolFiles.WriteJson(emptyOutput, emptyReport);
+            Console.WriteLine(affected
+                ? "product-smoke        skipped (no affected scenarios)"
+                : "product-smoke        skipped (no product smoke scenarios)");
+            Console.WriteLine($"report               {ToolFiles.Relative(root, emptyOutput)}");
+            return 0;
+        }
+
+        var executable = GodotLocator.Find(root, preferConsole: true);
+        if (executable is null)
+        {
+            Console.Error.WriteLine("smoke product: Godot .NET was not found. Run 'lx doctor'.");
             return 2;
         }
 
@@ -78,10 +109,6 @@ internal static partial class ProductSmokeRunner
             {
                 Console.Error.WriteLine($"smoke product: editor-import: {error}");
             }
-        }
-        if (selected.Length == 0 && preparation?.Success != false)
-        {
-            Console.WriteLine("product-smoke        skipped (no product smoke scenarios)");
         }
         foreach (var result in results)
         {

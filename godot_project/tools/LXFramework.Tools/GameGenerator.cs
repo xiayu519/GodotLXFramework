@@ -51,10 +51,10 @@ internal static partial class GameGenerator
         foreach (var smoke in productSmokes)
         {
             CodeNames.RequireSnakeCase(smoke.Id, nameof(smoke.Id));
-            if (string.Equals(smoke.Id, "framework", StringComparison.Ordinal))
+            if (smoke.Id is "framework" or "all" or "affected")
             {
                 throw new InvalidDataException(
-                    "Product smoke ID 'framework' is reserved for the built-in framework smoke.");
+                    $"Product smoke ID '{smoke.Id}' is reserved by the smoke command.");
             }
             if (!smoke.Argument.StartsWith("--", StringComparison.Ordinal) ||
                 smoke.Argument.Any(char.IsWhiteSpace))
@@ -73,6 +73,20 @@ internal static partial class GameGenerator
             {
                 throw new InvalidDataException(
                     $"Product smoke '{smoke.Id}' timeoutSeconds must be between 1 and 300.");
+            }
+            if (smoke.CheckPaths is null)
+            {
+                throw new InvalidDataException(
+                    $"Product smoke '{smoke.Id}' checkPaths must be an array when declared.");
+            }
+            foreach (var pattern in smoke.CheckPaths)
+            {
+                if (!ProductSmokeImpact.IsValidPattern(pattern))
+                {
+                    throw new InvalidDataException(
+                        $"Product smoke '{smoke.Id}' checkPaths entry '{pattern}' must be a normalized " +
+                        "Godot-root/workspace-relative glob without '.', '..', backslashes, or drive prefixes.");
+                }
             }
         }
 

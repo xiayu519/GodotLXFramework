@@ -7,4 +7,4 @@ description: 维护 Godot 编辑器 LX Tools 面板及 CLI 等价入口；不处
 
 完整读取 `references/tooling-workflow.md`。编辑器只呈现人工开发者需要的入口，复用现有清单和 CLI，不建立第二套生成或验证逻辑。
 
-修改插件后验证后台进程、程序集重载后的结果恢复和中文诊断；运行明确路径的 `check` 与最终 `validate`。
+修改插件后验证后台进程、程序集重载后的结果恢复和中文诊断，并运行明确路径的 `check`；达到根 `AGENTS.md` 的仓库级门禁时才运行 `validate`。

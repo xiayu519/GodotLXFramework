@@ -60,7 +60,7 @@
       "id": "new-rpg-driving-architecture",
       "suite": "full",
       "setup": "game",
-      "prompt": "只读规划一个从零开发的老式 RPG 第一阶段：预计有数百段剧情、地图事件、人物移动、对话、音乐和战斗入口，来源内容以后可能是 bin、json 或 txt。不要修改文件。先给结论，再说明写第一段剧情前的驱动架构、事件脚本与高频模块边界、一次批量接入和验证；明确场景加载必须完成后继续而音乐可启动后继续，怎样表达 Await、Start、Join/Stop、取消和生命周期所有权；明确同类第二份内容是否修改执行运行时。证据充分后停止，最终答案不超过 18 行。",
+      "prompt": "只读规划一个从零开发的老式 RPG 第一阶段：预计有数百段剧情、地图事件、人物移动、对话、音乐和战斗入口，来源内容以后可能是 bin、json 或 txt。不要修改文件。先给结论，再说明写第一段剧情前的驱动架构、事件脚本与高频模块边界、一次批量接入和验证；明确场景加载必须完成后继续而音乐可启动后继续，怎样表达 Await、Start、Join/Stop、取消和生命周期所有权；明确同类第二份内容是否修改执行运行时。还要说明内容批量填充未冻结时、单个 bug 修复后各验证什么范围，何时才运行全量 validate。证据充分后停止，最终答案不超过 18 行。",
       "expected_write": false,
       "expected_skills": ["lx-game"],
       "forbidden_skills": ["lx-migrate", "lx-framework"],
@@ -86,6 +86,12 @@
         },
         {
           "any": ["Join", "Stop", "生命周期"]
+        },
+        {
+          "any": ["受影响", "局部", "失败场景", "相关场景"]
+        },
+        {
+          "any": ["内容冻结", "仓库级门禁", "提交", "推送"]
         }
       ],
       "budgets": {
@@ -469,11 +475,19 @@
       "id": "readonly-model-eval-contract",
       "suite": "full",
       "setup": "clean",
-      "prompt": "只读说明 LXFramework 当前保证的 Codex 模型 profile、无额度预检命令和真实 outcome eval 的授权边界。不要审查 AGENTS 或 Skill 结构，不得修改文件。",
+      "prompt": "只读说明 LXFramework 当前保证的 Codex 模型 profile、无额度预检命令和真实 outcome eval 的授权边界；再说明局部用例或完成语义变更后真实评测默认运行什么范围，何时才运行完整套件。不要审查 AGENTS 或 Skill 结构，不得修改文件。",
       "expected_write": false,
       "expected_skills": ["lx-model-eval"],
       "forbidden_skills": ["lx-codex-workflow"],
-      "expected_terms": ["gpt-5.6-sol", "PreflightOnly"],
+      "expected_terms": ["gpt-5.6-sol", "PreflightOnly", "CaseId"],
+      "expected_term_groups": [
+        {
+          "any": ["受影响", "直接相关", "对应用例"]
+        },
+        {
+          "any": ["工作流发布", "基线重建", "明确要求"]
+        }
+      ],
       "budgets": {
         "tool_calls": 8,
         "retries": 1,

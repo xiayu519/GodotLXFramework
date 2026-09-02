@@ -13,4 +13,4 @@ description: 处理 LX.Res 租约、动态绑定、PackedScene/节点池与释�
 
 修改框架资源 API 时同时使用 `$lx-framework`；修改玩法或 UI 消费代码时只追加对应的 `$lx-game` 或 `$lx-ui`。禁止建立第二套资源注册表或动态 `GD.Load`/`ResourceLoader.Load*`。
 
-修改后运行相关 `check` 和最终 `validate`，需要重开闭环时检查资源与节点指标。
+修改后运行相关 `check`，需要重开闭环时检查资源与节点指标；达到根 `AGENTS.md` 的仓库级门禁时才运行 `validate`。

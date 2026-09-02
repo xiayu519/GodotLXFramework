@@ -9,4 +9,4 @@ description: 创建或修改 Game 产品普通 JSON 内容表与静态资源登�
 
 仅在已知产品文件加入生成 Catalog 的固定获取代码仍属于本 Skill，不追加玩法 Skill。只有继续改变玩法或 UI 行为时才追加对应 `$lx-game` 或 `$lx-ui`。Luban 使用 `$lx-data`；动态绑定、PackedScene 实例、租约诊断与释放闭环使用 `$lx-resources`。
 
-修改后把命令回显路径一次交给 `check`，交付前运行 `validate`。
+修改后把命令回显路径一次交给 `check`；达到根 `AGENTS.md` 的仓库级门禁时才运行 `validate`。

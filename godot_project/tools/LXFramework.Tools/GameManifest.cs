@@ -56,6 +56,8 @@ internal sealed class ProductSmokeManifestEntry
     public string SuccessMarker { get; set; } = string.Empty;
 
     public int TimeoutSeconds { get; set; } = 30;
+
+    public List<string> CheckPaths { get; set; } = [];
 }
 
 internal sealed class VisualTargetManifestEntry

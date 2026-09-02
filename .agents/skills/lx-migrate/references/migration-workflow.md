@@ -40,17 +40,17 @@
 
 ## 验收闭环
 
-迁移先完成驱动骨架和一个代表架构契约，再批量转换全部脚本/数据并统一验证：
+迁移先完成驱动骨架和一个代表架构契约，再批量转换全部脚本/数据。填充期间只运行变更路径映射的静态门禁、产品 smoke 与单个视觉目标；内容冻结或根 `AGENTS.md` 定义的仓库级门禁才运行全部产品场景：
 
 ```powershell
 .\lx.ps1 check <changed-path> [...]
-.\lx.ps1 smoke product all
-.\lx.ps1 visual compare product
-.\lx.ps1 validate
+.\lx.ps1 smoke product <affected-id>  # 仅在需要显式复现时补跑
+.\lx.ps1 visual compare <target-id>   # 仅涉及该视觉目标时运行
+.\lx.ps1 validate                     # 内容冻结或仓库级门禁
 ```
 
 状态型产品应通过现有 `LX.Metrics`/结构化日志暴露少量业务事实，例如游戏状态、生命、分数、关键库存/冷却、活动实体和池借出数；不新建诊断服务。用户或开发会话已经启动可持续运行的 Editor/Debug 实例时，AI 应主动运行 `runtime status --json`，再按任务读取 `runtime snapshot ui|features|resources|input|metrics --json`，而不是只凭截图或日志推测；运行时桥只读并要求当前 `sessionId/generation`。没有活动会话时明确说明未取得实时快照，并以可退出的 product smoke 验证确定场景，不能声称已经观察运行状态。
 
-产品 smoke 由 `game-manifest.json` 的 `productSmokes` 声明，Debug 与 export 共用同一 marker/timeout 契约；旧清单的 `exportSmokes` 仍兼容，但不能与新字段同时声明。产品视觉由 `visualTargets` 声明，基准只有人工确认后才能 approve。
+产品 smoke 由 `game-manifest.json` 的 `productSmokes` 声明，Debug 与 export 共用同一 marker/timeout 契约；每项通过 `checkPaths` 把产品或公共机制路径映射到受影响场景，`check` 只运行命中项。旧清单的 `exportSmokes` 仍兼容，但不能与新字段同时声明。产品视觉由 `visualTargets` 声明，迭代比较明确的 target ID，基准只有人工确认后才能 approve。
 
-交付证据至少包括：框架所有文件未被来源覆盖、生成/构建产物未迁移、来源与目标驱动架构有据可查、架构契约行为通过、同类第二份内容可仅靠脚本/数据接入、全部脚本可解析且引用闭合、批量行为验证、产品 smoke、需要的实时快照、产品视觉结果、重开资源闭合和最终 `validate`。无法合法读取来源、关键行为无判定标准或资产授权不明时停止并请求方向。
+内容冻结后的交付证据至少包括：框架所有文件未被来源覆盖、生成/构建产物未迁移、来源与目标驱动架构有据可查、架构契约行为通过、同类第二份内容可仅靠脚本/数据接入、全部脚本可解析且引用闭合、批量行为验证、全部产品 smoke、需要的实时快照、产品视觉结果、重开资源闭合和最终 `validate`。无法合法读取来源、关键行为无判定标准或资产授权不明时停止并请求方向。

@@ -75,7 +75,7 @@ internal static class GameScaffolder
             - 通过注入的 `LX` 上下文调用 `LX.UI`、`LX.Res` 等模块；禁止全局上下文、服务定位器和直接动态 `GD.Load`/`ResourceLoader.Load*`。
             - 编写具体内容前先确定驱动架构；重复剧情、任务、场景、对话和战斗入口由统一事件脚本/数据驱动通用模块，禁止逐内容硬编码。架构契约通过后批量验证全部内容。
             - 新结构使用 `./lx.ps1 create world|feature|screen|content|input|res`；`Generated/` 禁止手改。
-            - 产品行为变更后运行相关 `./lx.ps1 check <changed-path> [...]`，交付前运行 `./lx.ps1 validate`。
+            - 迭代只运行相关 `./lx.ps1 check <changed-path> [...]` 与受影响场景；达到根 `AGENTS.md` 的仓库级门禁时才运行 `./lx.ps1 validate`。
             """ + "\n");
         var resourceScriptPath = ProductLayout.GetResourcePath(manifest, "GameRoot.cs");
         ToolFiles.WriteText(scenePath,

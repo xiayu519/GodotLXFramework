@@ -55,7 +55,7 @@ internal static class Program
               check <changed-path> [...]      执行最小去重检查组合（仅 lx.ps1）。
               validate                       校验事实源、生成结果并完成最终门禁。
               smoke                          用 Godot 无窗口导入并启动框架。
-              smoke product [id|all]         在 Debug/headless 工程中运行清单声明的产品烟测。
+              smoke product [id|all|affected <path> ...] 运行指定、全部或受变更路径影响的产品烟测。
               visual capture|compare|approve [target|product] 捕获、比较或显式批准框架/产品视觉基准。
               export <platform>               Release 导出到 build/<platform> 并运行框架与产品烟测；当前支持 windows。
               benchmark                       执行多轮核心性能回归与分配门禁。

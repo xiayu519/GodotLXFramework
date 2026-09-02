@@ -22,7 +22,7 @@ LXFramework 是一个 **Codex 优先、面向全 AI 游戏开发** 的 Godot 4.7
 .\lx.ps1 migrate plan --source <directory|git-ref> --mode upgrade|port|remake
 ```
 
-规划会区分产品内容、框架文件、生成物和构建产物；不会自动覆盖当前框架或机械翻译跨引擎代码。产品实现可通过 `smoke product all`、运行时 snapshot 和 `visual compare product` 建立行为与视觉证据。
+规划会区分产品内容、框架文件、生成物和构建产物；不会自动覆盖当前框架或机械翻译跨引擎代码。产品迭代由 `productSmokes[].checkPaths` 选择受影响场景，并按 target 比较视觉；内容冻结时再通过全部 product smoke、运行时 snapshot 和产品视觉建立完整证据。
 
 ## 示例项目
 

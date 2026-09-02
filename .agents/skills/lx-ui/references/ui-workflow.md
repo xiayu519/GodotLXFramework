@@ -16,8 +16,8 @@ UI 优先接收只读 payload/view data，不直接绑定尚未确定的领域�
 
 ```powershell
 .\lx.ps1 check <changed-path> [...]
-.\lx.ps1 visual compare product
-.\lx.ps1 validate
+.\lx.ps1 visual compare <target-id>
+.\lx.ps1 validate # 仅在根 AGENTS.md 定义的仓库级门禁运行
 ```
 
-视觉基准只有人工确认设计变化后才可 `visual approve`。
+普通 UI 迭代不运行 `visual compare product`；它只用于内容冻结或仓库级门禁。视觉基准只有人工确认设计变化后才可 `visual approve`。

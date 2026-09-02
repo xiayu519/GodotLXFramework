@@ -335,6 +335,14 @@ public partial class GameRoot : LXNode
             argument = "--lx-eval-product-smoke"
             successMarker = "LX_EVAL_PRODUCT_SMOKE_PASS"
             timeoutSeconds = 30
+            checkPaths = @("script/EvalPreflight/GameRoot.cs")
+        },
+        [pscustomobject]@{
+            id = "eval_unrelated"
+            argument = "--lx-eval-product-smoke"
+            successMarker = "LX_EVAL_PRODUCT_SMOKE_PASS"
+            timeoutSeconds = 30
+            checkPaths = @("content/story/**")
         }
     )
     $manifest.visualTargets = @(
@@ -492,6 +500,54 @@ try {
     $preflightBuildExit = Invoke-EvalBuild $preflightFixture (Join-Path $runRoot "preflight-product-build.log")
     if ($preflightBuildExit -ne 0) {
         throw "Evaluation preflight could not build the product lifecycle fixture (exit $preflightBuildExit)."
+    }
+    # Probe exact, glob, and no-match routing without widening to every product smoke.
+    $preflightAffectedLog = Join-Path $runRoot "preflight-product-smoke-affected-exact.log"
+    $preflightAffectedExit = Invoke-ChildPowerShell @(
+        "-File", (Join-Path $preflightFixture "lx.ps1"),
+        "check", "script/EvalPreflight/GameRoot.cs"
+    ) $preflightAffectedLog
+    if ($preflightAffectedExit -ne 0) {
+        throw "Evaluation preflight affected product smoke failed (exit $preflightAffectedExit)."
+    }
+    $preflightAffectedOutput = $utf8.GetString(
+        [System.IO.File]::ReadAllBytes($preflightAffectedLog))
+    if ($preflightAffectedOutput.IndexOf(
+            "product:eval_boot", [System.StringComparison]::Ordinal) -lt 0 -or
+        $preflightAffectedOutput.IndexOf(
+            "product:eval_unrelated", [System.StringComparison]::Ordinal) -ge 0) {
+        throw "Evaluation preflight did not restrict product smoke to the changed-path mapping."
+    }
+    $preflightGlobLog = Join-Path $runRoot "preflight-product-smoke-affected-glob.log"
+    $preflightGlobExit = Invoke-ChildPowerShell @(
+        "-File", (Join-Path $preflightFixture "lx.ps1"),
+        "check", "content/story/chapter_01/event.json"
+    ) $preflightGlobLog
+    if ($preflightGlobExit -ne 0) {
+        throw "Evaluation preflight glob-mapped product smoke failed (exit $preflightGlobExit)."
+    }
+    $preflightGlobOutput = $utf8.GetString([System.IO.File]::ReadAllBytes($preflightGlobLog))
+    if ($preflightGlobOutput.IndexOf(
+            "product:eval_unrelated", [System.StringComparison]::Ordinal) -lt 0 -or
+        $preflightGlobOutput.IndexOf(
+            "product:eval_boot", [System.StringComparison]::Ordinal) -ge 0) {
+        throw "Evaluation preflight did not select only the glob-mapped product smoke."
+    }
+    $preflightNoMatchLog = Join-Path $runRoot "preflight-product-smoke-affected-none.log"
+    $preflightNoMatchExit = Invoke-ChildPowerShell @(
+        "-File", (Join-Path $preflightFixture "lx.ps1"),
+        "check", "content/unmapped/value.json"
+    ) $preflightNoMatchLog
+    if ($preflightNoMatchExit -ne 0) {
+        throw "Evaluation preflight no-match product smoke failed (exit $preflightNoMatchExit)."
+    }
+    $preflightNoMatchOutput = $utf8.GetString(
+        [System.IO.File]::ReadAllBytes($preflightNoMatchLog))
+    if ($preflightNoMatchOutput.IndexOf(
+            "skipped (no affected scenarios)", [System.StringComparison]::Ordinal) -lt 0 -or
+        $preflightNoMatchOutput.IndexOf(
+            "product:eval_", [System.StringComparison]::Ordinal) -ge 0) {
+        throw "Evaluation preflight launched a product smoke without an affected mapping."
     }
     $preflightLifecycleCommands = @(
         [pscustomobject]@{ Name = "coverage"; Arguments = @("inspect", "--product-coverage") },

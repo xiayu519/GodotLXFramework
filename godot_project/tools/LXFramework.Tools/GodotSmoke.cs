@@ -14,7 +14,8 @@ internal static partial class GodotSmoke
             {
                 return await ProductSmokeRunner.RunAsync(root, arguments.Skip(1).ToArray());
             }
-            Console.Error.WriteLine("smoke usage: lx smoke | lx smoke product [id|all]");
+            Console.Error.WriteLine(
+                "smoke usage: lx smoke | lx smoke product [id|all|affected <changed-path> ...]");
             return 2;
         }
         var executable = GodotLocator.Find(root, preferConsole: true);

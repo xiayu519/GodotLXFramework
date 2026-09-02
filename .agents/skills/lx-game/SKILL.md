@@ -13,4 +13,4 @@ description: 开发 Game 产品的驱动架构、玩法、世界、Feature、场
 
 产品代码只依赖 LXFramework，通过注入的 `LX` 调用服务；不建立产品管理器转发框架 API，不使用全局上下文或动态 `GD.Load`。新结构使用 `./lx.ps1 create ...`，事实源和非生成代码由人工维护，生成输出交给工具。
 
-迭代时一次运行 `./lx.ps1 check <changed-path> [...]`，交付前运行 `./lx.ps1 validate`。
+迭代时一次运行 `./lx.ps1 check <changed-path> [...]`，并只补充受影响的产品场景；达到根 `AGENTS.md` 的仓库级门禁时才运行 `./lx.ps1 validate`。

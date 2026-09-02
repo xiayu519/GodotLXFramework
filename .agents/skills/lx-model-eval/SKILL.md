@@ -9,4 +9,4 @@ description: 维护 Codex 模型配置、reasoning、路由/outcome eval 与基�
 
 只读询问保证 profile、preflight 命令或额度授权边界时，依据 reference 和必要的 `.codex/config.toml` 直接回答后停止；不读取 runner、eval schema、历史基线或 Project Knowledge。
 
-修改 eval schema 或 runner 后先运行 `scripts/run-model-evals.ps1 -Suite full -PreflightOnly`。真实 Sol/high 用例会消耗外部额度，只有获得明确授权才运行；结果按用例保存 token、工具、重试、延迟和失败原因。
+修改 eval schema 或 runner 后先运行 `scripts/run-model-evals.ps1 -Suite full -PreflightOnly`。真实 Sol/high 用例会消耗外部额度，只有获得明确授权才运行；默认用 `-CaseId` 只跑受影响用例，完整套件仅用于工作流发布、基线重建或开发者明确要求。结果按用例保存 token、工具、重试、延迟和失败原因。

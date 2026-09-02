@@ -102,7 +102,7 @@ function Invoke-LxOperation {
             if ($CommandArguments.Count -eq 1 -and
                 $CommandArguments[0] -in @("--help", "-h", "help")) {
                 Write-Host "Usage: lx check <changed-path> [changed-path ...]"
-                Write-Host "Runs one deduplicated validation profile selected from the changed paths."
+                Write-Host "Runs one deduplicated validation profile, including only product smokes mapped to the changed paths."
                 $lxExitCode = 0
                 break
             }
@@ -130,14 +130,33 @@ function Invoke-LxOperation {
                         throw "check path '$candidate' is outside the LXFramework workspace."
                     }
                 }
-                $normalized = $candidate.Replace("\", "/").TrimStart([char[]]@('.', '/'))
+                $normalized = $candidate.Replace("\", "/")
+                while ($normalized.StartsWith("./", [System.StringComparison]::Ordinal)) {
+                    $normalized = $normalized.Substring(2)
+                }
                 if ($normalized.StartsWith("godot_project/", [System.StringComparison]::OrdinalIgnoreCase)) {
                     $normalized = $normalized.Substring("godot_project/".Length)
+                }
+                if ([string]::IsNullOrWhiteSpace($normalized) -or
+                    $normalized.StartsWith("/", [System.StringComparison]::Ordinal) -or
+                    $normalized.IndexOf(":", [System.StringComparison]::Ordinal) -ge 0 -or
+                    @($normalized.Split("/") | Where-Object { $_ -in @("", ".", "..") }).Count -ne 0) {
+                    throw "check path '$candidate' must be a normalized path inside the LXFramework workspace."
                 }
                 $normalized
             }
             $needsData = [bool]($changedPaths | Where-Object {
-                $_ -like "game_design/*" -or
+                $_ -like "game_design/schema/*" -or
+                $_ -like "game_design/data/*" -or
+                $_ -like "game_design/fixtures/*" -or
+                $_ -in @(
+                    "game_design/build.bat",
+                    "game_design/build.ps1",
+                    "game_design/install-luban.ps1",
+                    "game_design/luban.conf",
+                    "game_design/toolchain.json",
+                    "game_design/validation.json"
+                ) -or
                 $_ -like "content/data/luban/*" -or
                 $_ -like "script/*/Generated/Luban/*" -or
                 $_ -like "src/LXFramework.Core/Data/Luban*" -or
@@ -150,39 +169,53 @@ function Invoke-LxOperation {
             $needsData = $needsData -or -not (Test-Path -LiteralPath ".lx\luban\report.json" -PathType Leaf)
             $needsGenerate = [bool]($changedPaths | Where-Object {
                 $_ -like "content/*/*-manifest.json" -or
-                $_ -like "scene/ui/*" -or
+                ($_ -like "scene/ui/*" -and $_ -notlike "*.md") -or
                 $_ -like "tools/LXFramework.Tools/*Generator.cs" -or
                 $_ -like "tools/LXFramework.Tools/*Manifest.cs"
             })
             $needsTests = [bool]($changedPaths | Where-Object {
-                $_ -like "src/LXFramework.Core/*" -or
-                $_ -like "tests/LXFramework.Core.Tests/*" -or
-                $_ -like "script/*/Tools/*" -or
-                $_ -like "script/*/Tests/*" -or
-                $_ -like "script/*/Domain/*" -or
-                $_ -like "script/*/Content/*"
+                ($_ -like "src/LXFramework.Core/*" -and $_ -notlike "*.md") -or
+                ($_ -like "tests/LXFramework.Core.Tests/*" -and $_ -notlike "*.md")
             })
-            $needsBuild = [bool]($changedPaths | Where-Object {
-                $_ -like "src/*" -or $_ -like "tools/*" -or $_ -like "tests/*" -or
+            $needsFrameworkSmoke = [bool]($changedPaths | Where-Object {
+                ($_ -like "src/LXFramework/*" -and $_ -notlike "*.md") -or
+                $_ -eq "scene/main.tscn" -or
+                $_ -eq "project.godot"
+            })
+            $needsProductSmoke = [bool]($changedPaths | Where-Object {
+                ($_ -like "scene/*" -and $_ -notlike "*.md") -or
                 $_ -like "script/*.cs" -or
-                $_ -like "*.csproj" -or $_ -like "*.sln" -or
+                $_ -like "script/*.tscn" -or
+                ($_ -like "content/*" -and $_ -notlike "*.md")
+            })
+            $needsProductSmoke = $needsProductSmoke -or $needsData
+            $needsFrameworkVisual = [bool]($changedPaths | Where-Object {
+                ($_ -like "src/LXFramework/UI/*" -and $_ -notlike "*.md") -or
+                ($_ -like "scene/ui/examples/*" -and $_ -notlike "*.md")
+            })
+            $needsSolutionBuild = [bool]($changedPaths | Where-Object {
+                ($_ -like "src/LXFramework.Core/*" -and $_ -notlike "*.md") -or
+                $_ -eq "src/LXFramework.Core/LXFramework.Core.csproj" -or
+                $_ -like "*.sln" -or
                 $_ -eq "Directory.Build.props"
             })
-            $needsBuild = $needsBuild -or $needsGenerate -or $needsData
-            $needsSmoke = [bool]($changedPaths | Where-Object {
-                $_ -like "src/LXFramework/*" -or $_ -like "scene/*" -or
-                $_ -like "script/*.cs" -or $_ -like "script/*.tscn" -or
-                $_ -like "content/*" -or $_ -eq "project.godot"
+            $needsProductBuild = [bool]($changedPaths | Where-Object {
+                ($_ -like "src/LXFramework/*" -and $_ -notlike "*.md") -or
+                $_ -like "script/*.cs" -or
+                $_ -eq "LXFramework.csproj"
             })
-            $needsSmoke = $needsSmoke -or $needsData
+            $needsProductBuild = $needsProductBuild -or $needsGenerate -or $needsData
             $profile = @()
             $profile += "workflow"
             if ($needsData) { $profile += "data" }
             if ($needsGenerate) { $profile += "generate" }
             $profile += "static"
-            if ($needsBuild) { $profile += "build" }
+            if ($needsSolutionBuild) { $profile += "solution-build" }
+            elseif ($needsProductBuild) { $profile += "product-build" }
             if ($needsTests) { $profile += "test" }
-            if ($needsSmoke) { $profile += "smoke" }
+            if ($needsFrameworkSmoke) { $profile += "framework-smoke" }
+            if ($needsProductSmoke) { $profile += "product-smoke-affected" }
+            if ($needsFrameworkVisual) { $profile += "framework-visual" }
             Write-Host "check profile: $($profile -join '+')"
 
             & $workflowCheck
@@ -197,31 +230,41 @@ function Invoke-LxOperation {
             }
             dotnet run --project $toolProject -- validate
             if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
-            if ($needsBuild) {
+            if ($needsSolutionBuild) {
                 dotnet build "LXFramework.sln" --nologo --verbosity quiet
+                if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
+            }
+            elseif ($needsProductBuild) {
+                dotnet build "LXFramework.csproj" --nologo --verbosity quiet
                 if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
             }
             if ($needsTests) {
                 $testArguments = @(
                     "test",
-                    "LXFramework.sln",
+                    "tests/LXFramework.Core.Tests/LXFramework.Core.Tests.csproj",
                     "--nologo",
                     "--verbosity",
                     "quiet"
                 )
-                if ($needsBuild) { $testArguments += "--no-build" }
+                if ($needsSolutionBuild) { $testArguments += "--no-build" }
                 dotnet @testArguments
                 if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
             }
-            if ($needsSmoke) {
+            if ($needsFrameworkSmoke) {
                 $smokeArguments = @("run", "--project", $toolProject, "--no-build", "--", "smoke")
                 dotnet @smokeArguments
                 if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
-                dotnet run --project $toolProject --no-build -- smoke product all
+            }
+            if ($needsProductSmoke) {
+                $productSmokeArguments = @(
+                    "run", "--project", $toolProject, "--no-build", "--",
+                    "smoke", "product", "affected"
+                ) + @($changedPaths)
+                dotnet @productSmokeArguments
                 if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
+            }
+            if ($needsFrameworkVisual) {
                 dotnet run --project $toolProject --no-build -- visual compare ui_components
-                if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
-                dotnet run --project $toolProject --no-build -- visual compare product
             }
         }
         default {

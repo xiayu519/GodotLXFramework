@@ -27,7 +27,10 @@ if ($Command.Equals("check", [System.StringComparison]::OrdinalIgnoreCase)) {
             $candidate = $absolute.Substring($workspacePrefix.Length)
         }
 
-        $normalized = $candidate.Replace("\", "/").TrimStart([char[]]@('.', '/'))
+        $normalized = $candidate.Replace("\", "/")
+        while ($normalized.StartsWith("./", [System.StringComparison]::Ordinal)) {
+            $normalized = $normalized.Substring(2)
+        }
         if ($normalized.StartsWith("godot_project/", [System.StringComparison]::OrdinalIgnoreCase)) {
             $forwardArguments[$index] = $normalized.Substring("godot_project/".Length)
         }
