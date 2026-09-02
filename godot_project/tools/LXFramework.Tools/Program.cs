@@ -18,7 +18,7 @@ internal static class Program
                 "inspect" => ProjectInspector.Run(root, commandArgs),
                 "capabilities" => CapabilityCatalog.Run(root, commandArgs),
                 "generate" => ProjectGenerator.Run(root, commandArgs),
-                "validate" => Validator.Run(root),
+                "validate" => Validator.Run(root, commandArgs),
                 "smoke" => await GodotSmoke.RunAsync(root, commandArgs),
                 "visual" => await VisualRunner.RunAsync(root, commandArgs),
                 "export" => await ExportRunner.RunAsync(root, commandArgs),

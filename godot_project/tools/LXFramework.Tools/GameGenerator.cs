@@ -143,6 +143,85 @@ internal static partial class GameGenerator
                         $"Product smoke '{smoke.Id}' statePolicy.metricGauges must contain unique non-empty names.");
                 }
             }
+
+            if (smoke.PerformanceChecks is null)
+            {
+                throw new InvalidDataException(
+                    $"Product smoke '{smoke.Id}' performanceChecks must be an array when declared.");
+            }
+            var duplicatePerformanceCheck = smoke.PerformanceChecks
+                .GroupBy(check => check.Id, StringComparer.Ordinal)
+                .FirstOrDefault(group => group.Count() > 1);
+            if (duplicatePerformanceCheck is not null)
+            {
+                throw new InvalidDataException(
+                    $"Product smoke '{smoke.Id}' performance check ID " +
+                    $"'{duplicatePerformanceCheck.Key}' is duplicated.");
+            }
+            foreach (var performance in smoke.PerformanceChecks)
+            {
+                CodeNames.RequireSnakeCase(performance.Id, nameof(performance.Id));
+                if (performance.SampleSource is not ("Frames" or "PhysicsFrames"))
+                {
+                    throw new InvalidDataException(
+                        $"Product smoke '{smoke.Id}' performance check '{performance.Id}' " +
+                        "sampleSource must be Frames or PhysicsFrames.");
+                }
+                if (!double.IsFinite(performance.WindowSeconds) ||
+                    performance.WindowSeconds is < 1 or > 60)
+                {
+                    throw new InvalidDataException(
+                        $"Product smoke '{smoke.Id}' performance check '{performance.Id}' " +
+                        "windowSeconds must be between 1 and 60.");
+                }
+                if (performance.MinSamples is < 1 or > 16_384)
+                {
+                    throw new InvalidDataException(
+                        $"Product smoke '{smoke.Id}' performance check '{performance.Id}' " +
+                        "minSamples must be between 1 and 16384.");
+                }
+                var durationBudgets = new[]
+                {
+                    performance.MaxP95HostWorkMilliseconds,
+                    performance.MaxP99HostWorkMilliseconds,
+                    performance.MaxHostWorkMilliseconds,
+                };
+                if (durationBudgets.Any(value => value is { } number && (!double.IsFinite(number) || number <= 0)))
+                {
+                    throw new InvalidDataException(
+                        $"Product smoke '{smoke.Id}' performance check '{performance.Id}' " +
+                        "host-work budgets must be finite and greater than zero.");
+                }
+                if (performance.MaxManagedHeapGrowthBytes is < 0 || performance.MaxAllocatedBytes is < 0)
+                {
+                    throw new InvalidDataException(
+                        $"Product smoke '{smoke.Id}' performance check '{performance.Id}' " +
+                        "memory budgets cannot be negative.");
+                }
+                if (durationBudgets.All(value => value is null) &&
+                    performance.MaxManagedHeapGrowthBytes is null &&
+                    performance.MaxAllocatedBytes is null)
+                {
+                    throw new InvalidDataException(
+                        $"Product smoke '{smoke.Id}' performance check '{performance.Id}' " +
+                        "must declare at least one host-work or memory budget.");
+                }
+            }
+        }
+
+        if (manifest.WindowsRelease is null)
+        {
+            throw new InvalidDataException("Game manifest windowsRelease must be an object when declared.");
+        }
+        if (manifest.WindowsRelease.MaxPackageBytes is <= 0)
+        {
+            throw new InvalidDataException(
+                "Game manifest windowsRelease.maxPackageBytes must be greater than zero when declared.");
+        }
+        if (manifest.WindowsRelease.MaxFileCount is <= 0)
+        {
+            throw new InvalidDataException(
+                "Game manifest windowsRelease.maxFileCount must be greater than zero when declared.");
         }
 
         if (manifest.StaticCheckPaths is null)

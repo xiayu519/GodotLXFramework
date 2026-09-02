@@ -179,9 +179,27 @@ function Invoke-LxOperation {
             })
             $needsFrameworkSmoke = [bool]($changedPaths | Where-Object {
                 ($_ -like "src/LXFramework/*" -and $_ -notlike "*.md") -or
+                ($_ -like "content/res/*" -and $_ -notlike "*.md") -or
                 $_ -eq "scene/main.tscn" -or
                 $_ -eq "project.godot"
             })
+            $resourceManifestPath = Join-Path $repoRoot "content\res\res-manifest.json"
+            if (-not $needsFrameworkSmoke -and
+                (Test-Path -LiteralPath $resourceManifestPath -PathType Leaf)) {
+                $resourceManifest = Get-Content -LiteralPath $resourceManifestPath -Raw -Encoding UTF8 |
+                    ConvertFrom-Json
+                $registeredResourcePaths = @($resourceManifest.assets | ForEach-Object {
+                    ([string]$_.path).Replace("res://", "")
+                })
+                $needsFrameworkSmoke = [bool]($changedPaths | Where-Object {
+                    $changedResourcePath = $_
+                    $registeredResourcePaths | Where-Object {
+                        $_ -eq $changedResourcePath -or
+                        $_.StartsWith($changedResourcePath.TrimEnd("/") + "/", [System.StringComparison]::OrdinalIgnoreCase) -or
+                        $changedResourcePath.StartsWith($_.TrimEnd("/") + "/", [System.StringComparison]::OrdinalIgnoreCase)
+                    }
+                })
+            }
             $needsProductSmoke = [bool]($changedPaths | Where-Object {
                 ($_ -like "scene/*" -and $_ -notlike "*.md") -or
                 $_ -like "script/*.cs" -or
@@ -239,7 +257,9 @@ function Invoke-LxOperation {
                 dotnet run --project $toolProject -- generate
                 if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
             }
-            dotnet run --project $toolProject -- validate
+            $staticArguments = @("run", "--project", $toolProject, "--", "validate", "--changed") +
+                @($changedPaths)
+            dotnet @staticArguments
             if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
             if ($needsSolutionBuild) {
                 dotnet build "LXFramework.sln" --nologo --verbosity quiet

@@ -55,6 +55,7 @@ internal static partial class GodotSmoke
             "LX_ACTIONS_LIFETIME_PASS",
             "LX_VIDEO_SEQUENCE_CONTRACT_PASS",
             "LX_RUNTIME_DIAGNOSTICS_PASS",
+            "LX_PRODUCT_SMOKE_PERFORMANCE_PROBE_PASS",
             "LX_RUNTIME_BRIDGE_PASS",
             "LX_FRAMEWORK_SMOKE_PASS",
             "LX_ASYNC_SHUTDOWN_PASS",
@@ -66,9 +67,24 @@ internal static partial class GodotSmoke
             expectedFrameworkMarkers.Add("LX_LUBAN_BINARY_TABLE_PASS");
         }
 
+        var importCheck = await RunCheckAsync(
+            executable,
+            root,
+            "editor-import",
+            ["--headless", "--editor", "--quit"]);
+        var assetBudget = AssetBudgetValidator.Evaluate(root, includeImported: true);
+        ToolFiles.WriteJson(Path.Combine(root, ".lx", "asset-budget.json"), assetBudget);
+        if (!assetBudget.Success)
+        {
+            importCheck = importCheck with
+            {
+                Success = false,
+                Errors = importCheck.Errors.Concat(assetBudget.Errors).ToArray(),
+            };
+        }
         var checks = new[]
         {
-            await RunCheckAsync(executable, root, "editor-import", ["--headless", "--editor", "--quit"]),
+            importCheck,
             await RunCheckAsync(
                 executable,
                 root,
@@ -92,6 +108,11 @@ internal static partial class GodotSmoke
                 Console.Error.WriteLine($"smoke: {check.Name}: {error}");
             }
         }
+
+        Console.WriteLine(
+            $"asset-budget         {(assetBudget.Success ? "passed" : "failed")} " +
+            $"({assetBudget.SourceBytes} source bytes, {assetBudget.ImportArtifactBytes ?? 0} import bytes)");
+        Console.WriteLine("asset report          .lx/asset-budget.json");
 
         Console.WriteLine($"report               {ToolFiles.Relative(root, output)}");
         return report.Success ? 0 : 1;

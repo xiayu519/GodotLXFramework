@@ -7,5 +7,6 @@
   "worlds": [],
   "productSmokes": [],
   "visualTargets": [],
-  "staticCheckPaths": []
+  "staticCheckPaths": [],
+  "windowsRelease": {}
 }

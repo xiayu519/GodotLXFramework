@@ -26,6 +26,8 @@ internal sealed class GameManifest
 
     public List<StaticCheckPathManifestEntry> StaticCheckPaths { get; set; } = [];
 
+    public WindowsReleasePolicyManifestEntry WindowsRelease { get; set; } = new();
+
     public IReadOnlyList<ProductSmokeManifestEntry> GetProductSmokes()
     {
         if (ProductSmokes.Count != 0 && ExportSmokes is { Count: > 0 })
@@ -66,6 +68,8 @@ internal sealed class ProductSmokeManifestEntry
     public List<ProductSmokeCheckpointManifestEntry> Checkpoints { get; set; } = [];
 
     public ProductSmokeStatePolicyManifestEntry? StatePolicy { get; set; }
+
+    public List<ProductSmokePerformanceCheckManifestEntry> PerformanceChecks { get; set; } = [];
 }
 
 internal sealed class ProductSmokeCheckpointManifestEntry
@@ -82,6 +86,34 @@ internal sealed class ProductSmokeStatePolicyManifestEntry
     public List<string> Compare { get; set; } = [];
 
     public List<string> MetricGauges { get; set; } = [];
+}
+
+internal sealed class ProductSmokePerformanceCheckManifestEntry
+{
+    public string Id { get; set; } = string.Empty;
+
+    public string SampleSource { get; set; } = "Frames";
+
+    public double WindowSeconds { get; set; } = 15;
+
+    public int MinSamples { get; set; } = 1;
+
+    public double? MaxP95HostWorkMilliseconds { get; set; }
+
+    public double? MaxP99HostWorkMilliseconds { get; set; }
+
+    public double? MaxHostWorkMilliseconds { get; set; }
+
+    public long? MaxManagedHeapGrowthBytes { get; set; }
+
+    public long? MaxAllocatedBytes { get; set; }
+}
+
+internal sealed class WindowsReleasePolicyManifestEntry
+{
+    public long? MaxPackageBytes { get; set; }
+
+    public int? MaxFileCount { get; set; }
 }
 
 internal sealed class VisualTargetManifestEntry

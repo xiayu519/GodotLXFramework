@@ -6,7 +6,17 @@
 
 具有重复流程或批量内容时，先按 `product-architecture.md` 搭好驱动骨架，再交付覆盖启动、核心操作、状态变化、死亡或胜利、重开的架构契约切片；禁止把切片扩展成逐剧情、逐地图或逐任务的手写实现。连续重开覆盖 UI、Feature、音频、事件运行时、资源租约和池借出闭合，预热后产品节点、资源和资产不持续增长。用现有 `LX.Metrics` 或结构化日志暴露少量业务事实，不新建诊断服务。
 
-`content/game/game-manifest.json` 可声明会自行退出的 `productSmokes`。每项使用 `checkPaths` 登记会影响该场景的 Godot 根相对 glob，例如公共事件运行时可登记 `script/MyGame/EventRuntime/**`，某条剧情可登记 `content/story/chapter_01/**`；同一公共路径可以映射多个 smoke。独立测试入口用 `scenePath` 与正式 `GameRoot` 分离；一条累计路线用 `checkpoints` 在一个进程报告多个稳定阶段，避免反复执行相同前缀。需要闭合所有权时通过 `ProductSmokeProbe.Snapshot` 发出前后快照，并在 `statePolicy` 选择 `resources/ui/features/audio/input/actions` 及产品池的 `LX.Metrics` gauge。运行器流式扫描日志，只在报告保留有界 tail、耗时、日志大小和失败阶段。
+`content/game/game-manifest.json` 可声明会自行退出的 `productSmokes`。每项使用 `checkPaths` 登记会影响该场景的 Godot 根相对 glob，例如公共事件运行时可登记 `script/MyGame/EventRuntime/**`，某条剧情可登记 `content/story/chapter_01/**`；同一公共路径可以映射多个 smoke。独立测试入口用 `scenePath` 与正式 `GameRoot` 分离；一条累计路线用 `checkpoints` 在一个进程报告多个稳定阶段，避免反复执行相同前缀。需要闭合所有权时通过 `ProductSmokeProbe.Snapshot` 发出前后快照，并在 `statePolicy` 选择 `resources/ui/features/audio/input/actions` 及产品池的 `LX.Metrics` gauge。代表场景的 `performanceChecks` 仍复用同一进程与路径映射，通过 `ProductSmokeProbe.Performance` 比较 host work、样本和内存预算，不额外重跑共同前缀。运行器流式扫描日志，只在报告保留有界 tail、耗时、日志大小和失败阶段。
+
+性能项使用稳定 snake_case ID，`sampleSource` 选择 `Frames` 或 `PhysicsFrames`，`windowSeconds` 为 1-60，`minSamples` 与至少一项 `maxP95HostWorkMilliseconds`、`maxP99HostWorkMilliseconds`、`maxHostWorkMilliseconds`、`maxManagedHeapGrowthBytes`、`maxAllocatedBytes` 共同定义目标。场景在被测区间前后以相同 ID/window 调用：
+
+```csharp
+ProductSmokeProbe.Performance(LX, "steady_state", "before", 15);
+// Execute the representative gameplay interval.
+ProductSmokeProbe.Performance(LX, "steady_state", "after", 15);
+```
+
+资源清单的 `budgets` 支持 `maxAssetCount`、`maxSourceBytes`、`maxSingleSourceBytes`、`maxImportArtifactBytes`，单项资源可声明 `maxSourceBytes`；Windows Release 的 `windowsRelease` 支持 `maxPackageBytes` 和 `maxFileCount`。没有产品目标或可信基线时不猜预算值；先取得开发者决定。
 
 `visualTargets[].checkPaths` 以同样方式映射受影响视觉目标。`check` 会输出每个产品运行时路径对应的 smoke/visual 门禁；确实只有生成或静态闭合要求的路径才可登记到有边界的 `staticCheckPaths`，每项必须给出窄 glob 和可审查的 `reason`。产品存在时，运行时路径若三者均未命中会失败，不允许以“没有受影响场景”为由成功跳过。`all` 只用于内容冻结和仓库级门禁。
 
@@ -18,4 +28,4 @@
 .\lx.ps1 validate                    # 仅在根 AGENTS.md 定义的仓库级门禁运行
 ```
 
-涉及页面布局与视觉基准使用 `$lx-ui`，涉及输入动作使用 `$lx-input`。`validate` 会运行全部产品 smoke 与视觉目标；Windows export 仅在已安装精确模板且任务要求交付包时运行。
+涉及页面布局与视觉基准使用 `$lx-ui`，涉及输入动作使用 `$lx-input`。`validate` 会运行全部产品 smoke 与视觉目标；Windows export 仅在已安装精确模板且任务要求交付包时运行，并验证声明的 `windowsRelease` 包体预算及每个实际启动场景的诊断证据。当前产品工作流只覆盖 PC，不推导其他平台、网络或服务器门禁。

@@ -5,6 +5,8 @@ internal sealed class AssetManifest
     public int Version { get; set; } = 1;
 
     public List<AssetManifestEntry> Assets { get; set; } = [];
+
+    public AssetBudgetManifest Budgets { get; set; } = new();
 }
 
 internal sealed class AssetManifestEntry
@@ -22,4 +24,17 @@ internal sealed class AssetManifestEntry
     public string? Group { get; set; }
 
     public string? CatalogPartition { get; set; }
+
+    public long? MaxSourceBytes { get; set; }
+}
+
+internal sealed class AssetBudgetManifest
+{
+    public int? MaxAssetCount { get; set; }
+
+    public long? MaxSourceBytes { get; set; }
+
+    public long? MaxSingleSourceBytes { get; set; }
+
+    public long? MaxImportArtifactBytes { get; set; }
 }

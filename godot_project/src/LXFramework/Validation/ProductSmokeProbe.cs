@@ -86,6 +86,23 @@ public static class ProductSmokeProbe
         Emit(new { kind = "snapshot", stage, state });
     }
 
+    /// <summary>Captures a bounded runtime performance sample for a declared product smoke budget.</summary>
+    public static void Performance(
+        LXContext context,
+        string id,
+        string stage,
+        double windowSeconds = 15)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        if (stage is not ("before" or "after"))
+        {
+            throw new ArgumentException("Performance stage must be 'before' or 'after'.", nameof(stage));
+        }
+
+        var sample = context.Diagnostics.SnapshotSection("performance", windowSeconds);
+        Emit(new { kind = "performance", id = RequireId(id), stage, sample });
+    }
+
     private static object BuildAudioState(LXContext context)
     {
         var audio = context.Audio.Snapshot();

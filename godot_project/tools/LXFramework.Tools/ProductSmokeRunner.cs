@@ -104,7 +104,7 @@ internal static partial class ProductSmokeRunner
         }
         var report = new ProductSmokeReport(
             "lx.product-smoke-report",
-            3,
+            4,
             DateTimeOffset.UtcNow,
             game.Name,
             preparation?.Success != false &&
@@ -159,7 +159,7 @@ internal static partial class ProductSmokeRunner
     {
         var report = new ProductSmokeReport(
             "lx.product-smoke-report",
-            3,
+            4,
             DateTimeOffset.UtcNow,
             product,
             success,
@@ -267,6 +267,7 @@ internal static partial class ProductSmokeRunner
             ToolFiles.Relative(root, logPath),
             failureStage,
             evaluation.Checkpoints,
+            evaluation.Performance,
             scanner.Tail,
             errors.Count == 0 ? null : string.Join(" ", errors));
     }
@@ -296,6 +297,17 @@ internal static partial class ProductSmokeRunner
                     SuccessMarker = "FIXTURE_LOADED",
                 },
             ],
+            PerformanceChecks =
+            [
+                new ProductSmokePerformanceCheckManifestEntry
+                {
+                    Id = "steady_state",
+                    MinSamples = 60,
+                    MaxP95HostWorkMilliseconds = 2,
+                    MaxManagedHeapGrowthBytes = 1_024,
+                    MaxAllocatedBytes = 2_048,
+                },
+            ],
         };
         var scanner = new SmokeEvidenceScanner(smoke);
         scanner.Scan("fixture", "LX_SMOKE_EVENT {\"kind\":\"started\",\"id\":\"loaded\"}");
@@ -304,6 +316,12 @@ internal static partial class ProductSmokeRunner
         const string state = "{\"resources\":[],\"metrics\":{\"gauges\":{\"product.pool.borrowed\":0}}}";
         scanner.Scan("fixture", $"LX_SMOKE_EVENT {{\"kind\":\"snapshot\",\"stage\":\"before\",\"state\":{state}}}");
         scanner.Scan("fixture", $"LX_SMOKE_EVENT {{\"kind\":\"snapshot\",\"stage\":\"after\",\"state\":{state}}}");
+        const string performanceBefore = "{\"windowSeconds\":15,\"frames\":{\"sampleCount\":60,\"hostWorkMilliseconds\":{\"p95\":1,\"p99\":1.2,\"maximum\":1.4}},\"physicsFrames\":{\"sampleCount\":60,\"hostWorkMilliseconds\":{\"p95\":0.5,\"p99\":0.7,\"maximum\":0.8}},\"memory\":{\"totalAllocatedBytes\":1000,\"managedHeapBytes\":2000}}";
+        const string performanceAfter = "{\"windowSeconds\":15,\"frames\":{\"sampleCount\":120,\"hostWorkMilliseconds\":{\"p95\":1.5,\"p99\":1.7,\"maximum\":1.9}},\"physicsFrames\":{\"sampleCount\":120,\"hostWorkMilliseconds\":{\"p95\":0.6,\"p99\":0.8,\"maximum\":0.9}},\"memory\":{\"totalAllocatedBytes\":2500,\"managedHeapBytes\":2500}}";
+        scanner.Scan("fixture", $"LX_SMOKE_EVENT {{\"kind\":\"performance\",\"id\":\"steady_state\",\"stage\":\"before\",\"sample\":{performanceBefore}}}");
+        scanner.Scan("fixture", $"LX_SMOKE_EVENT {{\"kind\":\"performance\",\"id\":\"steady_state\",\"stage\":\"after\",\"sample\":{performanceAfter}}}");
+        scanner.Scan("duplicate-log", $"LX_SMOKE_EVENT {{\"kind\":\"performance\",\"id\":\"steady_state\",\"stage\":\"before\",\"sample\":{performanceBefore}}}");
+        scanner.Scan("duplicate-log", $"LX_SMOKE_EVENT {{\"kind\":\"performance\",\"id\":\"steady_state\",\"stage\":\"after\",\"sample\":{performanceAfter}}}");
         var evaluation = scanner.Evaluate(new ProductSmokeStatePolicyManifestEntry
         {
             Required = true,
@@ -312,7 +330,9 @@ internal static partial class ProductSmokeRunner
         });
         if (evaluation.Errors.Count != 0 ||
             evaluation.Checkpoints.Count != 2 ||
-            evaluation.Checkpoints.Any(checkpoint => !checkpoint.Success))
+            evaluation.Checkpoints.Any(checkpoint => !checkpoint.Success) ||
+            evaluation.Performance.Count != 1 ||
+            evaluation.Performance.Any(performance => !performance.Success))
         {
             return "Structured product smoke protocol did not accept valid checkpoints and balanced snapshots.";
         }
@@ -324,6 +344,20 @@ internal static partial class ProductSmokeRunner
             incompleteEvaluation.FailureStage != "checkpoint:loaded")
         {
             return "Structured product smoke protocol accepted a missing checkpoint.";
+        }
+
+        var overBudget = new SmokeEvidenceScanner(smoke);
+        overBudget.Scan("fixture", "LX_SMOKE_EVENT {\"kind\":\"checkpoint\",\"id\":\"loaded\",\"success\":true}");
+        overBudget.Scan("fixture", "FIXTURE_PASS");
+        overBudget.Scan("fixture", $"LX_SMOKE_EVENT {{\"kind\":\"performance\",\"id\":\"steady_state\",\"stage\":\"before\",\"sample\":{performanceBefore}}}");
+        var slowPerformance = performanceAfter.Replace("\"p95\":1.5", "\"p95\":3", StringComparison.Ordinal);
+        overBudget.Scan("fixture", $"LX_SMOKE_EVENT {{\"kind\":\"performance\",\"id\":\"steady_state\",\"stage\":\"after\",\"sample\":{slowPerformance}}}");
+        var overBudgetEvaluation = overBudget.Evaluate(null);
+        if (overBudgetEvaluation.Errors.Count == 0 ||
+            overBudgetEvaluation.FailureStage != "performance:steady_state" ||
+            overBudgetEvaluation.Performance.Single().Success)
+        {
+            return "Structured product smoke protocol accepted an over-budget performance sample.";
         }
         return null;
     }
@@ -337,6 +371,7 @@ internal static partial class ProductSmokeRunner
         private const int TailCapacity = 200;
         private readonly object _gate = new();
         private readonly Dictionary<string, ExpectedCheckpoint> _checkpoints;
+        private readonly Dictionary<string, ExpectedPerformance> _performance;
         private readonly HashSet<string> _engineErrors = new(StringComparer.Ordinal);
         private readonly HashSet<string> _protocolErrors = new(StringComparer.Ordinal);
         private readonly Queue<string> _tail = new();
@@ -354,6 +389,10 @@ internal static partial class ProductSmokeRunner
             {
                 _checkpoints.Add(smoke.Id, new ExpectedCheckpoint(smoke.Id, smoke.SuccessMarker));
             }
+            _performance = smoke.PerformanceChecks.ToDictionary(
+                check => check.Id,
+                check => new ExpectedPerformance(check),
+                StringComparer.Ordinal);
         }
 
         public string? ActiveStage
@@ -436,6 +475,8 @@ internal static partial class ProductSmokeRunner
                 errors.AddRange(_engineErrors);
                 errors.AddRange(_protocolErrors);
                 errors.AddRange(CompareState(policy));
+                var performanceResults = EvaluatePerformance();
+                errors.AddRange(performanceResults.SelectMany(result => result.Errors));
                 var firstMissing = checkpointResults.FirstOrDefault(checkpoint => !checkpoint.Success)?.Id;
                 var failureStage = firstMissing is not null
                     ? $"checkpoint:{firstMissing}"
@@ -443,8 +484,14 @@ internal static partial class ProductSmokeRunner
                         ? $"engine:{_activeStage ?? "process"}"
                         : _protocolErrors.Count != 0
                             ? $"protocol:{_activeStage ?? "process"}"
-                            : errors.Count != 0 ? "state" : null;
-                return new SmokeEvidenceEvaluation(checkpointResults, errors, failureStage);
+                            : performanceResults.FirstOrDefault(result => !result.Success) is { } failedPerformance
+                                ? $"performance:{failedPerformance.Id}"
+                                : errors.Count != 0 ? "state" : null;
+                return new SmokeEvidenceEvaluation(
+                    checkpointResults,
+                    performanceResults,
+                    errors,
+                    failureStage);
             }
         }
 
@@ -512,6 +559,47 @@ internal static partial class ProductSmokeRunner
                         }
                         break;
                     }
+                    case "performance":
+                    {
+                        var id = root.GetProperty("id").GetString() ?? string.Empty;
+                        if (!_performance.TryGetValue(id, out var performance))
+                        {
+                            _protocolErrors.Add($"Unknown performance check '{id}'.");
+                            break;
+                        }
+                        var stage = root.GetProperty("stage").GetString();
+                        var sample = root.GetProperty("sample").Clone();
+                        if (stage == "before")
+                        {
+                            if (performance.Before is { } existingBefore &&
+                                !string.Equals(
+                                    Canonicalize(existingBefore),
+                                    Canonicalize(sample),
+                                    StringComparison.Ordinal))
+                            {
+                                _protocolErrors.Add($"Performance check '{id}' emitted conflicting before samples.");
+                            }
+                            performance.Before = sample;
+                        }
+                        else if (stage == "after")
+                        {
+                            if (performance.After is { } existingAfter &&
+                                !string.Equals(
+                                    Canonicalize(existingAfter),
+                                    Canonicalize(sample),
+                                    StringComparison.Ordinal))
+                            {
+                                _protocolErrors.Add($"Performance check '{id}' emitted conflicting after samples.");
+                            }
+                            performance.After = sample;
+                        }
+                        else
+                        {
+                            _protocolErrors.Add($"Unknown performance stage '{stage}' for '{id}'.");
+                        }
+                        _activeStage = id;
+                        break;
+                    }
                     default:
                         _protocolErrors.Add($"Unknown smoke event kind '{kind}'.");
                         break;
@@ -566,6 +654,146 @@ internal static partial class ProductSmokeRunner
             return errors;
         }
 
+        private IReadOnlyList<ProductSmokePerformanceResult> EvaluatePerformance() =>
+            _performance.Values.Select(EvaluatePerformance).ToArray();
+
+        private static ProductSmokePerformanceResult EvaluatePerformance(ExpectedPerformance expected)
+        {
+            var errors = new List<string>();
+            if (expected.Before is null || expected.After is null)
+            {
+                errors.Add(
+                    $"Performance check '{expected.Manifest.Id}' requires both before and after samples.");
+                return new ProductSmokePerformanceResult(
+                    expected.Manifest.Id,
+                    false,
+                    expected.Manifest.SampleSource,
+                    0,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    errors);
+            }
+
+            var before = expected.Before.Value;
+            var after = expected.After.Value;
+            if (!TryGetDouble(before, "windowSeconds", out var beforeWindowSeconds) ||
+                !TryGetDouble(after, "windowSeconds", out var afterWindowSeconds) ||
+                Math.Abs(beforeWindowSeconds - expected.Manifest.WindowSeconds) > 0.001 ||
+                Math.Abs(afterWindowSeconds - expected.Manifest.WindowSeconds) > 0.001)
+            {
+                errors.Add(
+                    $"Performance check '{expected.Manifest.Id}' expected a " +
+                    $"{expected.Manifest.WindowSeconds:0.###} second sample window.");
+            }
+
+            var sourceName = expected.Manifest.SampleSource == "Frames" ? "frames" : "physicsFrames";
+            var sampleCount = 0;
+            var p95 = 0.0;
+            var p99 = 0.0;
+            var maximum = 0.0;
+            var hasFrameData = TryGetProperty(after, sourceName, out var frames) &&
+                               TryGetInt32(frames, "sampleCount", out sampleCount) &&
+                               TryGetProperty(frames, "hostWorkMilliseconds", out var hostWork) &&
+                               TryGetDouble(hostWork, "p95", out p95) &&
+                               TryGetDouble(hostWork, "p99", out p99) &&
+                               TryGetDouble(hostWork, "maximum", out maximum);
+            if (!hasFrameData)
+            {
+                errors.Add($"Performance check '{expected.Manifest.Id}' sample is missing frame statistics.");
+            }
+            else
+            {
+                if (sampleCount < expected.Manifest.MinSamples)
+                {
+                    errors.Add(
+                        $"Performance check '{expected.Manifest.Id}' captured {sampleCount} samples; " +
+                        $"at least {expected.Manifest.MinSamples} are required.");
+                }
+                AddMaximumError(
+                    expected.Manifest.Id,
+                    "p95 host work",
+                    p95,
+                    expected.Manifest.MaxP95HostWorkMilliseconds,
+                    errors);
+                AddMaximumError(
+                    expected.Manifest.Id,
+                    "p99 host work",
+                    p99,
+                    expected.Manifest.MaxP99HostWorkMilliseconds,
+                    errors);
+                AddMaximumError(
+                    expected.Manifest.Id,
+                    "maximum host work",
+                    maximum,
+                    expected.Manifest.MaxHostWorkMilliseconds,
+                    errors);
+            }
+
+            long? heapGrowth = null;
+            long? allocatedBytes = null;
+            if (TryGetProperty(before, "memory", out var beforeMemory) &&
+                TryGetProperty(after, "memory", out var afterMemory) &&
+                TryGetInt64(beforeMemory, "managedHeapBytes", out var beforeHeap) &&
+                TryGetInt64(afterMemory, "managedHeapBytes", out var afterHeap) &&
+                TryGetInt64(beforeMemory, "totalAllocatedBytes", out var beforeAllocated) &&
+                TryGetInt64(afterMemory, "totalAllocatedBytes", out var afterAllocated))
+            {
+                heapGrowth = afterHeap - beforeHeap;
+                allocatedBytes = afterAllocated - beforeAllocated;
+                if (allocatedBytes < 0)
+                {
+                    errors.Add(
+                        $"Performance check '{expected.Manifest.Id}' total allocation counter moved backwards.");
+                }
+                if (expected.Manifest.MaxManagedHeapGrowthBytes is { } heapLimit && heapGrowth > heapLimit)
+                {
+                    errors.Add(
+                        $"Performance check '{expected.Manifest.Id}' managed heap grew by {heapGrowth} bytes; " +
+                        $"the budget is {heapLimit} bytes.");
+                }
+                if (expected.Manifest.MaxAllocatedBytes is { } allocationLimit && allocatedBytes > allocationLimit)
+                {
+                    errors.Add(
+                        $"Performance check '{expected.Manifest.Id}' allocated {allocatedBytes} bytes; " +
+                        $"the budget is {allocationLimit} bytes.");
+                }
+            }
+            else
+            {
+                errors.Add($"Performance check '{expected.Manifest.Id}' sample is missing memory counters.");
+            }
+
+            return new ProductSmokePerformanceResult(
+                expected.Manifest.Id,
+                errors.Count == 0,
+                expected.Manifest.SampleSource,
+                sampleCount,
+                hasFrameData ? p95 : null,
+                hasFrameData ? p99 : null,
+                hasFrameData ? maximum : null,
+                heapGrowth,
+                allocatedBytes,
+                errors);
+        }
+
+        private static void AddMaximumError(
+            string id,
+            string metric,
+            double value,
+            double? limit,
+            ICollection<string> errors)
+        {
+            if (limit is { } maximum && value > maximum)
+            {
+                errors.Add(
+                    $"Performance check '{id}' {metric} was {value:0.###} ms; " +
+                    $"the budget is {maximum:0.###} ms.");
+            }
+        }
+
         private static bool TryGetGauge(JsonElement state, string name, out JsonElement gauge)
         {
             gauge = default;
@@ -578,6 +806,24 @@ internal static partial class ProductSmokeRunner
         {
             value = default;
             return element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out value);
+        }
+
+        private static bool TryGetDouble(JsonElement element, string name, out double value)
+        {
+            value = default;
+            return TryGetProperty(element, name, out var property) && property.TryGetDouble(out value);
+        }
+
+        private static bool TryGetInt32(JsonElement element, string name, out int value)
+        {
+            value = default;
+            return TryGetProperty(element, name, out var property) && property.TryGetInt32(out value);
+        }
+
+        private static bool TryGetInt64(JsonElement element, string name, out long value)
+        {
+            value = default;
+            return TryGetProperty(element, name, out var property) && property.TryGetInt64(out value);
         }
 
         private static string Canonicalize(JsonElement element)
@@ -625,6 +871,15 @@ internal static partial class ProductSmokeRunner
 
             public string? Message { get; set; }
         }
+
+        private sealed class ExpectedPerformance(ProductSmokePerformanceCheckManifestEntry manifest)
+        {
+            public ProductSmokePerformanceCheckManifestEntry Manifest { get; } = manifest;
+
+            public JsonElement? Before { get; set; }
+
+            public JsonElement? After { get; set; }
+        }
     }
 }
 
@@ -648,6 +903,7 @@ internal sealed record ProductSmokeResult(
     string LogPath,
     string? FailureStage,
     IReadOnlyList<ProductSmokeCheckpointResult> Checkpoints,
+    IReadOnlyList<ProductSmokePerformanceResult> Performance,
     IReadOnlyList<string> Tail,
     string? Error);
 
@@ -657,7 +913,20 @@ internal sealed record ProductSmokeCheckpointResult(
     string SuccessMarker,
     string? Message);
 
+internal sealed record ProductSmokePerformanceResult(
+    string Id,
+    bool Success,
+    string SampleSource,
+    int SampleCount,
+    double? P95HostWorkMilliseconds,
+    double? P99HostWorkMilliseconds,
+    double? MaxHostWorkMilliseconds,
+    long? ManagedHeapGrowthBytes,
+    long? AllocatedBytes,
+    IReadOnlyList<string> Errors);
+
 internal sealed record SmokeEvidenceEvaluation(
     IReadOnlyList<ProductSmokeCheckpointResult> Checkpoints,
+    IReadOnlyList<ProductSmokePerformanceResult> Performance,
     IReadOnlyList<string> Errors,
     string? FailureStage);

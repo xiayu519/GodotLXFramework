@@ -620,7 +620,7 @@ Godot Editor/Debug 正在运行时，Codex 可以读取当前会话而不修改�
 .\lx.ps1 validate
 ```
 
-`check` 用于快速迭代，只运行当前修改需要的生成和检查，但不会以“少跑”为目标牺牲完整性：每条产品运行时变更路径必须命中 `productSmokes[].checkPaths`、`visualTargets[].checkPaths`，或以窄 `pattern` 和可审查 `reason` 登记到 `staticCheckPaths`；命中关系会打印出来，未覆盖路径直接失败。产品 smoke 可指定独立 `scenePath`，用 `checkpoints` 在一个进程报告累计流程，并通过 `ProductSmokeProbe`/`statePolicy` 断言资源、UI、Feature、音频、输入、动作与产品池 gauge 回到基线；报告记录耗时、日志大小、失败阶段和有界日志尾部。`validate` 是提交前的完整验证。公开 API 有意改变时，先审查差异，再运行 `.\lx.ps1 api update` 更新版本化基线。
+`check` 用于快速迭代，只运行当前修改需要的生成和检查，但不会以“少跑”为目标牺牲完整性：每条产品运行时变更路径必须命中 `productSmokes[].checkPaths`、`visualTargets[].checkPaths`，或以窄 `pattern` 和可审查 `reason` 登记到 `staticCheckPaths`；命中关系会打印出来，未覆盖路径直接失败。产品 smoke 可指定独立 `scenePath`，用 `checkpoints` 在一个进程报告累计流程，并通过 `ProductSmokeProbe`/`statePolicy` 断言资源、UI、Feature、音频、输入、动作与产品池 gauge 回到基线；代表场景还可用 `performanceChecks` 和 `ProductSmokeProbe.Performance` 在同一进程验证 host work、样本数和内存预算。报告记录耗时、日志大小、失败阶段和有界日志尾部。`validate` 是提交前的完整验证。公开 API 有意改变时，先审查差异，再运行 `.\lx.ps1 api update` 更新版本化基线。
 
 ## Godot 编辑器工具
 
@@ -657,7 +657,7 @@ Godot Editor/Debug 正在运行时，Codex 可以读取当前会话而不修改�
 .\lx.ps1 export windows
 ```
 
-产物固定写入外层 `build/windows/`。产品可在 `game-manifest.json` 声明包内 smoke，验证真实玩法流程和 Luban 等非 Godot 原生文件已进入产物。普通开发和 `validate` 不要求安装导出模板。
+产物固定写入外层 `build/windows/`。产品可在 `game-manifest.json` 声明包内 smoke，并在 `windowsRelease` 声明包体大小与文件数预算；每个实际启动的 Release smoke 都会留下包含 build hash、退出码、超时、错误分类和有界日志尾部的诊断 JSON，框架 smoke 失败时不会继续启动产品场景。`content/res/res-manifest.json` 可声明登记数、源文件、单文件和 Godot import cache 预算：源文件在静态阶段检查，import cache 只在真实 Godot import 后检查，实测值写入 `.lx/asset-budget.json`。普通开发和 `validate` 不要求安装导出模板，当前也不扩展其他平台、网络或服务器工作流。
 
 `.github/workflows/validate.yml` 在 push/PR 运行完整门禁；定时或手动任务可运行 `.\lx.ps1 soak 5`，版本标签或手动任务会安装精确 `4.7.2.stable.mono` templates 并验证 Windows Release。soak 与 export 不进入普通本地 `validate`。
 

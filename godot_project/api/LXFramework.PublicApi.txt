@@ -526,6 +526,7 @@ member LX.Validation.FrameworkStatusScreen protected internal override ValueTask
 member LX.Validation.FrameworkStatusScreen protected override void OnLXInitialized()
 member LX.Validation.ProductSmokeProbe public static void Checkpoint(string id, bool success = true, string? message = null)
 member LX.Validation.ProductSmokeProbe public static void Failed(string id, string message)
+member LX.Validation.ProductSmokeProbe public static void Performance(LXContext context, string id, string stage, double windowSeconds = 15)
 member LX.Validation.ProductSmokeProbe public static void Snapshot(LXContext context, string stage)
 member LX.Validation.ProductSmokeProbe public static void Started(string id)
 member LX.Validation.UIResultProbeScreen protected internal override ValueTask OnHideAsync(CancellationToken cancellationToken)

@@ -60,12 +60,15 @@
       "id": "new-rpg-driving-architecture",
       "suite": "full",
       "setup": "game",
-      "prompt": "只读规划一个从零开发的老式 RPG 第一阶段：预计有数百段剧情、地图事件、人物移动、对话、音乐和战斗入口，来源内容以后可能是 bin、json 或 txt。不要修改文件。先给结论，再说明写第一段剧情前的驱动架构、事件脚本与高频模块边界、一次批量接入和验证；明确场景加载必须完成后继续而音乐可启动后继续，怎样表达 Await、Start、Join/Stop、取消和生命周期所有权；明确同类第二份内容是否修改执行运行时。还要说明内容批量填充未冻结时、单个 bug 修复后各验证什么范围，何时才运行全量 validate。证据充分后停止，最终答案不超过 18 行。",
+      "prompt": "只读规划一个从零开发的老式 RPG 第一阶段：预计有数百段剧情、地图事件、人物移动、对话、音乐和战斗入口，来源内容以后可能是 bin、json 或 txt。不要修改文件。只读取 lx-game 及其 product-architecture reference，不加载或搜索其他 Skill。先给结论，再说明写第一段剧情前的驱动架构、事件脚本与高频模块边界、一次批量接入和验证；明确 GameRoot、事件执行和玩法模块的职责边界，以及继承与组合怎样选择；明确场景加载必须完成后继续而音乐可启动后继续，怎样表达 Await、Start、Join/Stop、取消和生命周期所有权；明确同类第二份内容是否修改执行运行时。还要说明内容批量填充未冻结时、单个 bug 修复后各验证什么范围，何时才运行全量 validate；说明代表性能、资源/import 与 Windows Release 包体预算分别挂到什么现有门禁，并保持 PC 范围，不增加网络、服务器或其他平台。证据充分后停止，最终答案不超过 18 行。",
       "expected_write": false,
       "expected_skills": ["lx-game"],
-      "forbidden_skills": ["lx-migrate", "lx-framework"],
-      "expected_terms": ["事件脚本", "批量"],
+      "forbidden_skills": ["lx-migrate", "lx-framework", "lx-content", "lx-resources", "lx-runtime-observe"],
+      "expected_terms": ["批量"],
       "expected_term_groups": [
+        {
+          "any": ["事件脚本", "事件 IR", "统一事件 IR", "脚本只编排"]
+        },
         {
           "any": ["中间表示", "Event IR", "事件 IR", "字节码"]
         },
@@ -73,10 +76,16 @@
           "any": ["高频", "逐帧", "确定性模块"]
         },
         {
-          "any": ["架构契约", "契约切片", "代表场景"]
+          "any": ["GameRoot", "组合根"]
         },
         {
-          "any": ["只增加脚本", "仅靠脚本", "不修改执行运行时", "不修改运行时代码"]
+          "any": ["继承", "组合"]
+        },
+        {
+          "any": ["架构契约", "契约切片", "代表切片", "代表场景"]
+        },
+        {
+          "any": ["只增加脚本", "只增加内容事实", "只新增内容事实", "只新增内容", "仅靠脚本", "不修改执行运行时", "不修改运行时代码", "不修改解释器"]
         },
         {
           "any": ["Await", "等待完成"]
@@ -92,6 +101,18 @@
         },
         {
           "any": ["内容冻结", "仓库级门禁", "提交", "推送"]
+        },
+        {
+          "any": ["performanceChecks", "性能预算", "host work"]
+        },
+        {
+          "any": ["import cache", "import 预算", "资源预算"]
+        },
+        {
+          "any": ["windowsRelease", "Windows Release", "包体预算"]
+        },
+        {
+          "any": ["不增加网络", "不引入网络", "不扩展网络", "只覆盖 PC", "保持 PC"]
         }
       ],
       "budgets": {

@@ -2,8 +2,9 @@ namespace LXFramework.Tools;
 
 internal static class Validator
 {
-    public static int Run(string root)
+    public static int Run(string root, IReadOnlyList<string>? arguments = null)
     {
+        var changedPaths = ParseChangedPaths(arguments ?? []);
         var errors = new List<string>();
         ValidateProject(root, errors);
         ValidateJson(root, errors);
@@ -11,7 +12,7 @@ internal static class Validator
         ValidateUi(root, errors);
         ValidateResources(root, errors);
         ValidateRegistrations(root, errors);
-        ValidateArchitecture(root, errors);
+        ValidateArchitecture(root, changedPaths, errors);
         ValidatePublicApiDocumentation(root, errors);
         if (PublicApiBaseline.Validate(root) is { } apiError)
         {
@@ -40,6 +41,18 @@ internal static class Validator
         if (ProductSmokeRunner.ValidateProtocol() is { } smokeProtocolError)
         {
             errors.Add(smokeProtocolError);
+        }
+        if (ExportRunner.ValidateProtocol() is { } exportProtocolError)
+        {
+            errors.Add(exportProtocolError);
+        }
+        if (AssetBudgetValidator.ValidateProtocol(root) is { } assetBudgetProtocolError)
+        {
+            errors.Add(assetBudgetProtocolError);
+        }
+        if (ProductSourceStructureAnalyzer.ValidateRules() is { } productStructureError)
+        {
+            errors.Add(productStructureError);
         }
 
         var report = new ValidationReport(DateTimeOffset.UtcNow, errors.Count == 0, errors);
@@ -326,7 +339,10 @@ internal static class Validator
         }
     }
 
-    private static void ValidateArchitecture(string root, ICollection<string> errors)
+    private static void ValidateArchitecture(
+        string root,
+        IReadOnlySet<string>? changedPaths,
+        ICollection<string> errors)
     {
         var gameManifestPath = Path.Combine(root, "content", "game", "game-manifest.json");
         var gameManifest = ToolFiles.ReadJson<GameManifest>(gameManifestPath);
@@ -384,19 +400,47 @@ internal static class Validator
 
         if (productRoot is not null && Directory.Exists(productRoot))
         {
-            foreach (var path in EnumerateSourceFiles(productRoot)
-                         .Where(path => !IsUnderGeneratedDirectory(path)))
+            var productSources = EnumerateSourceFiles(productRoot)
+                .Where(path => !IsUnderGeneratedDirectory(path))
+                .Select(path => new
+                {
+                    AbsolutePath = path,
+                    RelativePath = ToolFiles.Relative(root, path),
+                    Content = File.ReadAllText(path),
+                })
+                .ToArray();
+            foreach (var source in productSources)
             {
-                var content = File.ReadAllText(path);
-                if (!content.Contains($"namespace {gameManifest.RootNamespace};", StringComparison.Ordinal) &&
-                    !content.Contains($"namespace {gameManifest.RootNamespace}.", StringComparison.Ordinal))
+                if (!source.Content.Contains($"namespace {gameManifest.RootNamespace};", StringComparison.Ordinal) &&
+                    !source.Content.Contains($"namespace {gameManifest.RootNamespace}.", StringComparison.Ordinal))
                 {
                     errors.Add(
-                        $"Product source '{ToolFiles.Relative(root, path)}' must use namespace " +
+                        $"Product source '{source.RelativePath}' must use namespace " +
                         $"'{gameManifest.RootNamespace}' or one of its children.");
                 }
                 AddArchitectureDiagnostics(
-                    root, path, content, ArchitectureLayer.Product, gameManifest.RootNamespace, errors);
+                    root,
+                    source.AbsolutePath,
+                    source.Content,
+                    ArchitectureLayer.Product,
+                    gameManifest.RootNamespace,
+                    errors);
+            }
+
+            var initialWorld = gameManifest.Worlds.FirstOrDefault(world =>
+                string.Equals(world.Id, gameManifest.InitialWorldId, StringComparison.Ordinal));
+            var compositionRootType = initialWorld is null
+                ? null
+                : $"{(string.IsNullOrWhiteSpace(initialWorld.Namespace) ? gameManifest.RootNamespace : initialWorld.Namespace)}" +
+                  $".{initialWorld.ClassName}";
+            var documents = productSources.Select(source => new ProductSourceDocument(
+                source.RelativePath,
+                source.Content,
+                changedPaths is null || IsChangedProductSource(source.RelativePath, changedPaths)));
+            foreach (var diagnostic in ProductSourceStructureAnalyzer.Analyze(documents, compositionRootType))
+            {
+                errors.Add(
+                    $"[{diagnostic.Code}] {diagnostic.Path}({diagnostic.Line},{diagnostic.Column}): {diagnostic.Message}");
             }
         }
 
@@ -455,6 +499,42 @@ internal static class Validator
                 $"[{diagnostic.Code}] {ToolFiles.Relative(root, path)}" +
                 $"({diagnostic.Line},{diagnostic.Column}): {diagnostic.Message}");
         }
+    }
+
+    private static IReadOnlySet<string>? ParseChangedPaths(IReadOnlyList<string> arguments)
+    {
+        if (arguments.Count == 0)
+        {
+            return null;
+        }
+        if (arguments.Count < 2 || !string.Equals(arguments[0], "--changed", StringComparison.Ordinal))
+        {
+            throw new ArgumentException("validate accepts either no arguments or '--changed <path> [...]'.");
+        }
+
+        var changedPaths = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var argument in arguments.Skip(1))
+        {
+            if (!ProductSmokeImpact.IsValidChangedPath(argument))
+            {
+                throw new ArgumentException($"validate changed path '{argument}' is not a safe workspace-relative path.");
+            }
+            changedPaths.Add(ProductSmokeImpact.NormalizeChangedPath(argument));
+        }
+        return changedPaths;
+    }
+
+    private static bool IsChangedProductSource(string sourcePath, IReadOnlySet<string> changedPaths)
+    {
+        foreach (var changedPath in changedPaths)
+        {
+            if (string.Equals(sourcePath, changedPath, StringComparison.Ordinal) ||
+                sourcePath.StartsWith(changedPath.TrimEnd('/') + "/", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void ValidatePublicApiDocumentation(string root, ICollection<string> errors)
@@ -582,13 +662,9 @@ internal static class Validator
         {
             errors.Add($"Resource ID '{duplicate.Key}' is duplicated.");
         }
-        foreach (var asset in manifest.Assets)
+        foreach (var budgetError in AssetBudgetValidator.ValidateSource(root, manifest))
         {
-            var assetPath = ToolFiles.ToAbsolutePath(root, asset.Path);
-            if (!File.Exists(assetPath))
-            {
-                errors.Add($"Resource '{asset.Path}' is missing.");
-            }
+            errors.Add(budgetError);
         }
     }
 

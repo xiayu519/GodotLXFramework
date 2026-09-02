@@ -1127,6 +1127,8 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
             throw new InvalidOperationException("Unified runtime diagnostics snapshot was incomplete or not written.");
         }
         GD.Print("LX_RUNTIME_DIAGNOSTICS_PASS");
+        ProductSmokeProbe.Performance(LX, "framework_runtime", "after", 1);
+        GD.Print("LX_PRODUCT_SMOKE_PERFORMANCE_PROBE_PASS");
     }
 
     private sealed class ValidationWorldChunkSource(

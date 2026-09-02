@@ -42,9 +42,25 @@ if ($cases.Count -eq 0) {
     throw "No cases selected."
 }
 
-$codexCommand = Get-Command codex -ErrorAction Stop
+$codexCandidates = @(Get-Command codex -All -ErrorAction Stop | Where-Object {
+    $_.CommandType -eq [System.Management.Automation.CommandTypes]::Application
+})
+# PowerShell can resolve an npm .ps1 shim before the native Codex executable.
+# ProcessStartInfo intentionally bypasses shell execution, so select a native
+# Windows executable when one is available instead of weakening that boundary.
+$isWindowsHost = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
+    [System.Runtime.InteropServices.OSPlatform]::Windows)
+$codexCommand = if ($isWindowsHost) {
+    $codexCandidates | Where-Object {
+        [string]$_.Source -like "*.exe"
+    } | Select-Object -First 1
+}
+else {
+    $codexCandidates | Select-Object -First 1
+}
 $codexExecutable = [string]$codexCommand.Source
-if ($codexCommand.CommandType -ne [System.Management.Automation.CommandTypes]::Application -or
+if ($null -eq $codexCommand -or
+    $codexCommand.CommandType -ne [System.Management.Automation.CommandTypes]::Application -or
     [string]::IsNullOrWhiteSpace($codexExecutable) -or
     -not (Test-Path -LiteralPath $codexExecutable -PathType Leaf)) {
     throw "Codex CLI must resolve to an executable application, got '$($codexCommand.CommandType)' at '$codexExecutable'."
@@ -538,16 +554,18 @@ try {
         "-File", (Join-Path $preflightFixture "lx.ps1"),
         "check", "content/unmapped/value.json"
     ) $preflightNoMatchLog
-    if ($preflightNoMatchExit -ne 0) {
-        throw "Evaluation preflight no-match product smoke failed (exit $preflightNoMatchExit)."
+    if ($preflightNoMatchExit -eq 0) {
+        throw "Evaluation preflight accepted a runtime path without smoke, visual, or static-only coverage."
     }
     $preflightNoMatchOutput = $utf8.GetString(
         [System.IO.File]::ReadAllBytes($preflightNoMatchLog))
     if ($preflightNoMatchOutput.IndexOf(
-            "skipped (no affected scenarios)", [System.StringComparison]::Ordinal) -lt 0 -or
+            "UNMAPPED", [System.StringComparison]::Ordinal) -lt 0 -or
+        $preflightNoMatchOutput.IndexOf(
+            "no smoke, visual, or static-only coverage", [System.StringComparison]::Ordinal) -lt 0 -or
         $preflightNoMatchOutput.IndexOf(
             "product:eval_", [System.StringComparison]::Ordinal) -ge 0) {
-        throw "Evaluation preflight launched a product smoke without an affected mapping."
+        throw "Evaluation preflight did not fail safely for an uncovered runtime path."
     }
     $preflightLifecycleCommands = @(
         [pscustomobject]@{ Name = "coverage"; Arguments = @("inspect", "--product-coverage") },

@@ -1,9 +1,10 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 
 namespace LXFramework.Tools;
 
-internal static class ExportRunner
+internal static partial class ExportRunner
 {
     private static readonly ExportTarget[] Targets =
     [
@@ -48,7 +49,7 @@ internal static class ExportRunner
         {
             var missing = new ExportReport(
                 "lx.export-report",
-                2,
+                3,
                 target.Id,
                 target.Preset,
                 false,
@@ -74,7 +75,7 @@ internal static class ExportRunner
         {
             var failedBuild = new ExportReport(
                 "lx.export-report",
-                2,
+                3,
                 target.Id,
                 target.Preset,
                 false,
@@ -106,7 +107,7 @@ internal static class ExportRunner
         {
             var failed = new ExportReport(
                 "lx.export-report",
-                2,
+                3,
                 target.Id,
                 target.Preset,
                 false,
@@ -125,6 +126,7 @@ internal static class ExportRunner
         var smokeExecutable = File.Exists(Path.ChangeExtension(output, ".console.exe"))
             ? Path.ChangeExtension(output, ".console.exe")
             : output;
+        var buildId = HashFile(output);
         var smokes = new List<ExportSmokeResult>();
         var frameworkSmoke = await RunSmokeAsync(
             root,
@@ -134,7 +136,8 @@ internal static class ExportRunner
             "framework",
             "--lx-export-smoke",
             "LX_FRAMEWORK_SMOKE_PASS",
-            30);
+            30,
+            buildId);
         smokes.Add(frameworkSmoke);
         if (frameworkSmoke.Success)
         {
@@ -148,36 +151,44 @@ internal static class ExportRunner
                     smoke.Id,
                     smoke.Argument,
                     smoke.SuccessMarker,
-                    smoke.TimeoutSeconds));
+                    smoke.TimeoutSeconds,
+                    buildId));
             }
         }
 
         var smokePassed = smokes.All(smoke => smoke.Success) &&
                           smokes.Count == productSmokes.Count + 1;
         var files = CollectFiles(workspaceRoot, outputDirectory);
+        var package = EvaluatePackageBudget(game.WindowsRelease, files);
+        var releasePassed = smokePassed && package.Success;
+        var failureMessages = smokes
+            .Where(smoke => !smoke.Success)
+            .Select(smoke => $"{smoke.Id}: {smoke.Error}")
+            .Concat(package.Errors)
+            .ToArray();
         var report = new ExportReport(
             "lx.export-report",
-            2,
+            3,
             target.Id,
             target.Preset,
-            smokePassed,
+            releasePassed,
             true,
             true,
             version,
             output,
             files,
             smokes,
-            smokePassed
-                ? null
-                : string.Join(
-                    Environment.NewLine,
-                    smokes.Where(smoke => !smoke.Success)
-                        .Select(smoke => $"{smoke.Id}: {smoke.Error}")));
+            releasePassed ? null : string.Join(Environment.NewLine, failureMessages),
+            buildId,
+            package);
         WriteReport(root, target.Id, report);
-        Console.WriteLine($"export {target.Id,-13} {(smokePassed ? "passed" : "failed")}");
+        Console.WriteLine($"export {target.Id,-13} {(releasePassed ? "passed" : "failed")}");
+        Console.WriteLine(
+            $"package budget       {(package.Success ? "passed" : "failed")} " +
+            $"({package.SizeBytes} bytes, {package.FileCount} files)");
         Console.WriteLine($"package              {Path.GetRelativePath(workspaceRoot, outputDirectory).Replace('\\', '/')}/");
         Console.WriteLine($"report               godot_project/.lx/export/{target.Id}.json");
-        return smokePassed ? 0 : 1;
+        return releasePassed ? 0 : 1;
     }
 
     private static async Task<ExportSmokeResult> RunSmokeAsync(
@@ -188,7 +199,8 @@ internal static class ExportRunner
         string id,
         string userArgument,
         string successMarker,
-        int timeoutSeconds)
+        int timeoutSeconds,
+        string buildId)
     {
         var logDirectory = Path.Combine(root, ".lx", "export-smoke", target.Id);
         Directory.CreateDirectory(logDirectory);
@@ -198,30 +210,114 @@ internal static class ExportRunner
             File.Delete(logPath);
         }
 
-        var result = await RunProcessAsync(
-            executable,
-            workingDirectory,
-            [
-                "--headless",
-                "--audio-driver", "Dummy",
-                "--fixed-fps", "60",
-                "--log-file", logPath,
-                "--",
-                userArgument,
-            ],
-            TimeSpan.FromSeconds(timeoutSeconds));
-        var log = File.Exists(logPath) ? await File.ReadAllTextAsync(logPath) : string.Empty;
-        var evidence = string.Join(Environment.NewLine, result.Output, log);
-        var passed = result.ExitCode == 0 &&
-                     evidence.Contains(successMarker, StringComparison.Ordinal);
+        var scanner = new ExportEvidenceScanner(successMarker);
+        var stopwatch = Stopwatch.StartNew();
+        var start = new ProcessStartInfo
+        {
+            FileName = executable,
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+        };
+        foreach (var argument in new[]
+                 {
+                     "--headless",
+                     "--audio-driver", "Dummy",
+                     "--fixed-fps", "60",
+                     "--log-file", logPath,
+                     "--",
+                     userArgument,
+                 })
+        {
+            start.ArgumentList.Add(argument);
+        }
+
+        using var process = Process.Start(start) ??
+                            throw new InvalidOperationException($"Failed to start '{executable}'.");
+        var stdoutTask = ScanReaderAsync(process.StandardOutput, "stdout", scanner);
+        var stderrTask = ScanReaderAsync(process.StandardError, "stderr", scanner);
+        var timedOut = false;
+        using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds)))
+        {
+            try
+            {
+                await process.WaitForExitAsync(timeout.Token);
+            }
+            catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+            {
+                timedOut = true;
+                process.Kill(entireProcessTree: true);
+                await process.WaitForExitAsync();
+            }
+        }
+        await Task.WhenAll(stdoutTask, stderrTask);
+        if (File.Exists(logPath))
+        {
+            foreach (var line in File.ReadLines(logPath))
+            {
+                scanner.Scan("godot-log", line);
+            }
+        }
+        stopwatch.Stop();
+
+        var errors = scanner.Errors.ToList();
+        if (!scanner.MarkerObserved)
+        {
+            errors.Add($"Expected release marker '{successMarker}' was not emitted.");
+        }
+        if (timedOut)
+        {
+            errors.Add($"Exceeded timeout of {timeoutSeconds} seconds.");
+        }
+        else if (process.ExitCode != 0)
+        {
+            errors.Add($"Release process exited with code {process.ExitCode}.");
+        }
+        var passed = !timedOut && process.ExitCode == 0 && errors.Count == 0;
+        var diagnosticPath = Path.Combine(root, ".lx", "export", "diagnostics", target.Id, id + ".json");
+        var diagnostic = new ExportDiagnosticEvidence(
+            "lx.export-diagnostic-evidence",
+            1,
+            DateTimeOffset.UtcNow,
+            target.Id,
+            id,
+            buildId,
+            passed,
+            timedOut ? -1 : process.ExitCode,
+            timedOut,
+            stopwatch.ElapsedMilliseconds,
+            File.Exists(logPath) ? new FileInfo(logPath).Length : 0,
+            ToolFiles.Relative(root, logPath),
+            errors,
+            scanner.Tail);
+        ToolFiles.WriteJson(diagnosticPath, diagnostic);
         return new ExportSmokeResult(
             id,
             passed,
-            result.ExitCode,
+            timedOut ? -1 : process.ExitCode,
             userArgument,
             successMarker,
             ToolFiles.Relative(root, logPath),
-            passed ? null : evidence.Trim());
+            ToolFiles.Relative(root, diagnosticPath),
+            stopwatch.ElapsedMilliseconds,
+            diagnostic.LogBytes,
+            timedOut,
+            errors,
+            scanner.Tail,
+            passed ? null : string.Join(" ", errors));
+    }
+
+    private static async Task ScanReaderAsync(
+        StreamReader reader,
+        string source,
+        ExportEvidenceScanner scanner)
+    {
+        while (await reader.ReadLineAsync() is { } line)
+        {
+            scanner.Scan(source, line);
+        }
     }
 
     private static string PrepareOutputDirectory(string workspaceRoot, string targetDirectory)
@@ -255,8 +351,14 @@ internal static class ExportRunner
             .Select(path => new ExportedFile(
                 Path.GetRelativePath(workspaceRoot, path).Replace('\\', '/'),
                 new FileInfo(path).Length,
-                Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)))))
+                HashFile(path)))
             .ToArray();
+    }
+
+    private static string HashFile(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(SHA256.HashData(stream));
     }
 
     private static string GetSafeProductName(string manifestName)
@@ -286,6 +388,61 @@ internal static class ExportRunner
                Enumerable.Range(1, 9).Any(index =>
                    stem.Equals($"COM{index}", StringComparison.OrdinalIgnoreCase) ||
                    stem.Equals($"LPT{index}", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static ExportPackageBudgetResult EvaluatePackageBudget(
+        WindowsReleasePolicyManifestEntry policy,
+        IReadOnlyList<ExportedFile> files)
+    {
+        var sizeBytes = files.Sum(file => file.SizeBytes);
+        var errors = new List<string>();
+        if (policy.MaxPackageBytes is { } sizeLimit && sizeBytes > sizeLimit)
+        {
+            errors.Add(
+                $"Windows package is {sizeBytes} bytes and exceeds maxPackageBytes of {sizeLimit} bytes.");
+        }
+        if (policy.MaxFileCount is { } fileLimit && files.Count > fileLimit)
+        {
+            errors.Add(
+                $"Windows package contains {files.Count} files and exceeds maxFileCount of {fileLimit}.");
+        }
+        return new ExportPackageBudgetResult(
+            errors.Count == 0,
+            sizeBytes,
+            files.Count,
+            policy.MaxPackageBytes,
+            policy.MaxFileCount,
+            errors);
+    }
+
+    public static string? ValidateProtocol()
+    {
+        var valid = new ExportEvidenceScanner("RELEASE_PASS");
+        valid.Scan("fixture", "RELEASE_PASS");
+        if (!valid.MarkerObserved || valid.Errors.Count != 0)
+        {
+            return "Windows release evidence scanner rejected a valid marker.";
+        }
+
+        var failed = new ExportEvidenceScanner("RELEASE_PASS");
+        failed.Scan("fixture", "ERROR: fixture failure");
+        if (failed.Errors.Count != 1)
+        {
+            return "Windows release evidence scanner did not retain an engine error.";
+        }
+
+        var budget = EvaluatePackageBudget(
+            new WindowsReleasePolicyManifestEntry
+            {
+                MaxPackageBytes = 100,
+                MaxFileCount = 1,
+            },
+            [new ExportedFile("build/windows/game.exe", 101, "FIXTURE")]);
+        if (budget.Success || budget.Errors.Count != 1)
+        {
+            return "Windows package budget protocol accepted an oversized package.";
+        }
+        return null;
     }
 
     private static async Task<ProcessResult> RunProcessAsync(
@@ -346,6 +503,86 @@ internal static class ExportRunner
     private static void WriteReport(string root, string targetId, ExportReport report) =>
         ToolFiles.WriteJson(Path.Combine(root, ".lx", "export", targetId + ".json"), report);
 
+    private sealed class ExportEvidenceScanner(string successMarker)
+    {
+        private const int TailCapacity = 200;
+        private readonly object _gate = new();
+        private readonly HashSet<string> _errors = new(StringComparer.Ordinal);
+        private readonly Queue<string> _tail = new();
+        private bool _markerObserved;
+
+        public bool MarkerObserved
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _markerObserved;
+                }
+            }
+        }
+
+        public IReadOnlyList<string> Errors
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _errors.ToArray();
+                }
+            }
+        }
+
+        public IReadOnlyList<string> Tail
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return _tail.ToArray();
+                }
+            }
+        }
+
+        public void Scan(string source, string rawLine)
+        {
+            var line = AnsiEscapeRegex().Replace(rawLine, string.Empty).Trim();
+            if (line.Length == 0)
+            {
+                return;
+            }
+
+            lock (_gate)
+            {
+                var displayLine = line.Length <= 8192 ? line : line[..8192] + "…";
+                _tail.Enqueue($"[{source}] {displayLine}");
+                while (_tail.Count > TailCapacity)
+                {
+                    _tail.Dequeue();
+                }
+                if (line.Contains(successMarker, StringComparison.Ordinal))
+                {
+                    _markerObserved = true;
+                }
+                if (IsReleaseError(line))
+                {
+                    _errors.Add(displayLine);
+                }
+            }
+        }
+
+        private static bool IsReleaseError(string line) =>
+            line.StartsWith("ERROR:", StringComparison.Ordinal) ||
+            line.StartsWith("SCRIPT ERROR:", StringComparison.Ordinal) ||
+            line.Contains("Unhandled exception", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("fatal error", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("CrashHandler", StringComparison.OrdinalIgnoreCase) ||
+            line.Contains("segmentation fault", StringComparison.OrdinalIgnoreCase);
+    }
+
+    [GeneratedRegex("\\x1B(?:[@-Z\\\\-_]|\\[[0-?]*[ -/]*[@-~])", RegexOptions.CultureInvariant)]
+    private static partial Regex AnsiEscapeRegex();
+
     private sealed record ProcessResult(int ExitCode, string Output);
 
     private sealed record ExportTarget(
@@ -364,7 +601,37 @@ internal sealed record ExportSmokeResult(
     string Argument,
     string SuccessMarker,
     string LogPath,
+    string DiagnosticPath,
+    long DurationMs,
+    long LogBytes,
+    bool TimedOut,
+    IReadOnlyList<string> DetectedErrors,
+    IReadOnlyList<string> Tail,
     string? Error);
+
+internal sealed record ExportDiagnosticEvidence(
+    string Schema,
+    int SchemaVersion,
+    DateTimeOffset CapturedAtUtc,
+    string Target,
+    string Scenario,
+    string BuildId,
+    bool Success,
+    int ExitCode,
+    bool TimedOut,
+    long DurationMs,
+    long LogBytes,
+    string LogPath,
+    IReadOnlyList<string> DetectedErrors,
+    IReadOnlyList<string> Tail);
+
+internal sealed record ExportPackageBudgetResult(
+    bool Success,
+    long SizeBytes,
+    int FileCount,
+    long? MaxPackageBytes,
+    int? MaxFileCount,
+    IReadOnlyList<string> Errors);
 
 internal sealed record ExportReport(
     string Schema,
@@ -378,4 +645,6 @@ internal sealed record ExportReport(
     string? Executable,
     IReadOnlyList<ExportedFile> Files,
     IReadOnlyList<ExportSmokeResult> Smokes,
-    string? Error);
+    string? Error,
+    string? BuildId = null,
+    ExportPackageBudgetResult? Package = null);
