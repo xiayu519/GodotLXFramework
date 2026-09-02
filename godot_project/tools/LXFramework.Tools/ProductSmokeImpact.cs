@@ -177,11 +177,16 @@ internal static class ProductSmokeImpact
         {
             return "Validation impact classifier accepted an uncovered product runtime path.";
         }
-        var framework = Analyze(game, ["src/LXFramework/Media/VideoSequencePlayer.cs"]);
+        var framework = Analyze(game,
+        [
+            "src/LXFramework/Media/VideoSequencePlayer.cs",
+            "lx.ps1",
+        ]);
         if (framework.UnmatchedRuntimePaths.Count != 0 ||
-            framework.Mappings.Single().Gates.All(gate => gate != "not-product-runtime"))
+            framework.Mappings.Any(mapping =>
+                mapping.Gates.All(gate => gate != "not-product-runtime")))
         {
-            return "Validation impact classifier treated framework source as unmapped product runtime content.";
+            return "Validation impact classifier treated framework sources as unmapped product runtime content.";
         }
         return null;
     }
@@ -246,7 +251,7 @@ internal static class ProductSmokeImpact
             path.Contains("/obj/", StringComparison.Ordinal) ||
             path is "AGENTS.md" or "README.md" or "Directory.Build.props" or
                 "LXFramework.csproj" or "LXFramework.sln" or "project.godot" or
-                "export_presets.cfg" or "scene/main.tscn")
+                "export_presets.cfg" or "lx.ps1" or "scene/main.tscn")
         {
             return false;
         }

@@ -359,6 +359,9 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
         }
         GD.Print("LX_SCENE_PRELOAD_PROGRESS_PASS");
 
+        var inputContextsBefore = LX.Input.Snapshot().Contexts
+            .Select(InputContextSignature)
+            .ToArray();
         using (var inputContext = LX.Input.PushContext(new InputContextDescriptor(
                    "validation.menu",
                    new HashSet<InputActionId> { InputCatalog.Confirm, InputCatalog.Cancel },
@@ -366,16 +369,24 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
         {
             var snapshot = LX.Input.Snapshot();
             var prompt = LX.Input.Prompt(InputCatalog.Confirm);
-            if (snapshot.Contexts.Count != 1 ||
-                snapshot.Contexts[0].Id != "validation.menu" ||
+            if (snapshot.Contexts.Count(context =>
+                    context.Id == "validation.menu") != 1 ||
+                snapshot.Contexts.Count != inputContextsBefore.Length + 1 ||
+                !snapshot.Contexts
+                    .Where(context => context.Id != "validation.menu")
+                    .Select(InputContextSignature)
+                    .SequenceEqual(inputContextsBefore) ||
                 string.IsNullOrWhiteSpace(prompt.Text))
             {
                 throw new InvalidOperationException("Input context or human-readable prompt was not observable.");
             }
         }
-        if (LX.Input.Snapshot().Contexts.Count != 0)
+        if (!LX.Input.Snapshot().Contexts
+                .Select(InputContextSignature)
+                .SequenceEqual(inputContextsBefore))
         {
-            throw new InvalidOperationException("Disposed input context remained on the routing stack.");
+            throw new InvalidOperationException(
+                "Disposed validation input context did not restore the routing stack.");
         }
         GD.Print("LX_INPUT_CONTEXT_PASS");
 
@@ -1067,20 +1078,36 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
         }
         GD.Print("LX_UI_LIFECYCLE_PASS");
 
+        var actionSnapshotBefore = LX.Actions.Snapshot();
+        var knownActionIds = actionSnapshotBefore.Active
+            .Concat(actionSnapshotBefore.Recent)
+            .Select(root => root.Id)
+            .ToHashSet();
         var actionOwner = LX.Lifetime.CreateChild("Validation:Actions");
         var actionOrder = new List<int>();
         await LX.Actions.RunAsync(
             LXActions.Sequence(
-                LXActions.Invoke(() => actionOrder.Add(1), "first"),
-                LXActions.Delay(TimeSpan.Zero, "yield"),
-                LXActions.Invoke(() => actionOrder.Add(2), "second")),
+                LXActions.Invoke(() => actionOrder.Add(1), "validation.action.first"),
+                LXActions.Delay(TimeSpan.Zero, "validation.action.yield"),
+                LXActions.Invoke(() => actionOrder.Add(2), "validation.action.second")),
             actionOwner,
             cancellationToken);
         await actionOwner.DisposeAsync();
         var actionSnapshot = LX.Actions.Snapshot();
+        var completedValidationActions = actionSnapshot.Recent.Where(root =>
+            !knownActionIds.Contains(root.Id) &&
+            root.Name == "sequence" &&
+            root.State == ActionNodeState.Completed &&
+            root.Children.Select(child => child.Name)
+                .SequenceEqual([
+                    "validation.action.first",
+                    "validation.action.yield",
+                    "validation.action.second",
+                ]))
+            .ToArray();
         if (!actionOrder.SequenceEqual([1, 2]) ||
-            actionSnapshot.Active.Count != 0 ||
-            actionSnapshot.Recent.LastOrDefault()?.State != ActionNodeState.Completed)
+            completedValidationActions.Length != 1 ||
+            actionSnapshot.Active.Any(root => !knownActionIds.Contains(root.Id)))
         {
             throw new InvalidOperationException("LX.Actions execution or diagnostics were incomplete.");
         }
@@ -1130,6 +1157,10 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
         ProductSmokeProbe.Performance(LX, "framework_runtime", "after", 1);
         GD.Print("LX_PRODUCT_SMOKE_PERFORMANCE_PROBE_PASS");
     }
+
+    private static (string Id, InputContextMode Mode, string Actions, int Order)
+        InputContextSignature(InputContextRecord context) =>
+        (context.Id, context.Mode, string.Join('\u001f', context.Actions), context.Order);
 
     private sealed class ValidationWorldChunkSource(
         IReadOnlyCollection<ChunkCoordinate> coordinates,

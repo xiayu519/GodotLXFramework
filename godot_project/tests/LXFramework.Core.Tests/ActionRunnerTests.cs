@@ -6,6 +6,78 @@ namespace LXFramework.Core.Tests;
 public sealed class ActionRunnerTests
 {
     [Fact]
+    public async Task RunAsyncCompletesSynchronousActionBeforeReturnWithoutLosingDiagnostics()
+    {
+        await using var lifetime = new LifetimeScope("test");
+        await using var runner = new ActionRunner(lifetime);
+        var completed = false;
+
+        var running = runner.RunAsync(
+            LXActions.Invoke(() => completed = true, "immediate"),
+            lifetime);
+
+        Assert.True(completed);
+        Assert.True(running.IsCompletedSuccessfully);
+        Assert.Empty(runner.Snapshot().Active);
+        var recent = Assert.Single(runner.Snapshot().Recent);
+        Assert.Equal("immediate", recent.Name);
+        Assert.Equal(ActionNodeState.Completed, recent.State);
+    }
+
+    [Fact]
+    public async Task RunAsyncStartsAsynchronousActionBeforeReturnAndTracksCompletion()
+    {
+        await using var lifetime = new LifetimeScope("test");
+        await using var runner = new ActionRunner(lifetime);
+        var entered = false;
+        var release = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var running = runner.RunAsync(
+            LXActions.Async(token =>
+            {
+                token.ThrowIfCancellationRequested();
+                entered = true;
+                return new ValueTask(release.Task.WaitAsync(token));
+            }, "inline"),
+            lifetime);
+
+        Assert.True(entered);
+        var active = Assert.Single(runner.Snapshot().Active);
+        Assert.Equal("inline", active.Name);
+        Assert.Equal(ActionNodeState.Running, active.State);
+
+        release.TrySetResult();
+        await running;
+
+        Assert.Empty(runner.Snapshot().Active);
+        var recent = Assert.Single(runner.Snapshot().Recent);
+        Assert.Equal("inline", recent.Name);
+        Assert.Equal(ActionNodeState.Completed, recent.State);
+    }
+
+    [Fact]
+    public async Task UnrelatedCancellationExceptionIsReportedAsFailure()
+    {
+        await using var lifetime = new LifetimeScope("test");
+        await using var runner = new ActionRunner(lifetime);
+
+        var running = runner.RunAsync(
+            LXActions.Async(
+                _ => ValueTask.FromException(
+                    new OperationCanceledException("not linked to the action lifetime")),
+                "unexpected-cancellation"),
+            lifetime);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => running);
+
+        Assert.True(running.IsFaulted);
+        var recent = Assert.Single(runner.Snapshot().Recent);
+        Assert.Equal("unexpected-cancellation", recent.Name);
+        Assert.Equal(ActionNodeState.Failed, recent.State);
+    }
+
+    [Fact]
     public async Task SequenceRunsInDeclaredOrderAndRetainsRecentSnapshot()
     {
         await using var lifetime = new LifetimeScope("test");

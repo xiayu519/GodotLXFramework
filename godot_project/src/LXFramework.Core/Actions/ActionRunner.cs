@@ -138,7 +138,10 @@ public sealed class ActionRunner : IDisposable, IAsyncDisposable
         _recentCapacity = recentCapacity;
     }
 
-    /// <summary>执行一个动作树；取消任一所属令牌都会取消本次执行。</summary>
+    /// <summary>
+    /// 开始执行一个动作树并返回其完成任务；动作会在本方法返回前执行到首次未完成等待。
+    /// 取消任一所属令牌都会取消本次执行；与所属令牌无关的取消异常按失败处理。
+    /// </summary>
     public Task RunAsync(
         LXAction action,
         LifetimeScope owner,
@@ -149,17 +152,21 @@ public sealed class ActionRunner : IDisposable, IAsyncDisposable
         owner.ThrowIfDisposed();
 
         var root = new ActionExecutionNode(NextId(), action.Name);
+        var completion = new TaskCompletionSource<object?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        CancellationTokenSource operation;
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            var operation = CancellationTokenSource.CreateLinkedTokenSource(
+            operation = CancellationTokenSource.CreateLinkedTokenSource(
                 _shutdownToken,
                 owner.Token,
                 cancellationToken);
-            var completion = RunRootAsync(root, action, operation);
-            _active.Add(root.Id, (root, completion));
-            return completion;
+            _active.Add(root.Id, (root, completion.Task));
         }
+
+        _ = RunRootAsync(root, action, operation, completion);
+        return completion.Task;
     }
 
     /// <summary>返回当前活动动作和最近终结动作的稳定快照。</summary>
@@ -256,14 +263,28 @@ public sealed class ActionRunner : IDisposable, IAsyncDisposable
     private async Task RunRootAsync(
         ActionExecutionNode root,
         LXAction action,
-        CancellationTokenSource operation)
+        CancellationTokenSource operation,
+        TaskCompletionSource<object?> completion)
     {
-        await Task.Yield();
+        Exception? failure = null;
+        var cancelled = false;
+        CancellationToken cancelledToken = default;
         using (operation)
         {
             try
             {
                 await ExecuteNodeAsync(root, action, operation.Token);
+            }
+            catch (OperationCanceledException exception) when (operation.Token.IsCancellationRequested)
+            {
+                cancelled = true;
+                cancelledToken = exception.CancellationToken.CanBeCanceled
+                    ? exception.CancellationToken
+                    : operation.Token;
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
             }
             finally
             {
@@ -277,6 +298,19 @@ public sealed class ActionRunner : IDisposable, IAsyncDisposable
                     }
                 }
             }
+        }
+
+        if (failure is not null)
+        {
+            completion.TrySetException(failure);
+        }
+        else if (cancelled)
+        {
+            completion.TrySetCanceled(cancelledToken);
+        }
+        else
+        {
+            completion.TrySetResult(null);
         }
     }
 

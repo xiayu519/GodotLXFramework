@@ -47,6 +47,8 @@
 
 `LX.Actions` 执行由 `LXActions` 创建的纯 C# 动作树。每个根同时观察 ActionRunner、调用方 `LifetimeScope` 与显式取消令牌；Sequence、Parallel、Race、Invoke、Async、Delay、Timeout、Retry 和 Finally 只负责编排现有服务，不替代 GameFlow、StateMachine、Scheduler 或 Tween。
 
+`ActionRunner.RunAsync` 在返回完成任务前同步执行到第一个未完成等待。只有 ActionRunner、owner 或显式令牌请求的取消会把任务标记为 cancelled；动作自行抛出的无关 `OperationCanceledException` 按失败处理。
+
 活动根和最近 32 个终结根保留有界 snapshot。Parallel 任一子项失败会取消兄弟；Race 采用最先终结者的结果并观察全部 loser；Finally 在调用方 owner 取消时仍使用服务关闭令牌尝试清理，但框架根紧急关闭不承诺等待异步清理。
 
 动作节点会为诊断分配执行记录，适合过场、教程、任务步骤和其他中低频流程；每帧、高频战斗和大量实体更新仍直接使用确定性系统、Scheduler 或产品数据循环。
