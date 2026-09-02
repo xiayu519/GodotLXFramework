@@ -8,4 +8,6 @@
 
 运行时路径必须是规范 `res://` 路径：使用 `/`，不含空段、`.`、`..` 或重复分隔符；`ContentRef` 还必须位于 `res://content/`。`Transient` 用于一次性或大资源，`Cached` 使用有界空闲缓存，`Resident` 只用于明确常驻资源。
 
+连续影片使用框架 `VideoSequencePlayer`；它逐项持有 `AssetLease<VideoStream>` 到真实播放完成、跳过或取消，并立即清空 `VideoStreamPlayer.Stream`。产品不复制租约循环，也不增加媒体资源注册表。
+
 只读入口/所有权问题取得 `LXContext`、`AssetRegistry`、`AssetLease` 的直接源码证据后立即回答，不搜索绑定、PackedScene、池或完整资源实现。

@@ -26,5 +26,5 @@ LXFramework 是 Codex 优先的 Godot 4.7.2 C# 框架。
 
 - 新结构使用 `./lx.ps1 create game|world|feature|screen|content|input|res|node`；任意 Godot 原生节点使用 `create node <Class> <GodotBase> [id]` 保留显式 LX 上下文注入。
 - PowerShell 读取中文文本显式指定 UTF-8。
-- 迭代仅运行 `./lx.ps1 check <changed-path> [...]` 与受影响场景；结构不清才 `inspect`。提交/推送、内容冻结/发布、公共框架或门禁变更后才运行一次 `./lx.ps1 validate`。
+- 迭代用 `./lx.ps1 check <changed-path> [...]`；产品路径无 smoke/visual/具理由静态映射则失败。结构不清才 `inspect`；提交/推送、冻结/发布、公共框架或门禁变更后运行 `./lx.ps1 validate`。
 - `./lx.ps1 export windows` 依赖同版本 Godot export templates，不属于无模板环境的默认 `validate`；完整工作流 outcome eval 会产生外部额度消耗，未获得确认只运行 preflight。

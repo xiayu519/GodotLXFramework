@@ -11,6 +11,7 @@ using LX.Features;
 using LX.Generated;
 using LX.Input;
 using LX.Localization;
+using LX.Media;
 using LX.Pooling;
 using LX.Res;
 using LX.Runtime;
@@ -1084,6 +1085,32 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
             throw new InvalidOperationException("LX.Actions execution or diagnostics were incomplete.");
         }
         GD.Print("LX_ACTIONS_LIFETIME_PASS");
+
+        var videoLifetime = LX.Lifetime.CreateChild("Validation:VideoSequence");
+        var videoPlayer = new VideoSequencePlayer { Name = "ValidationVideoSequence" };
+        LXContextInjector.InitializeTree(videoPlayer, LX, videoLifetime);
+        host.AddChild(videoPlayer);
+        var emptyVideoResult = await videoPlayer.PlayAsync([], cancellationToken);
+        var duplicateVideo = new VideoSequenceItem(
+            "duplicate",
+            new AssetRef<VideoStream>("res://icon.svg"));
+        try
+        {
+            await videoPlayer.PlayAsync([duplicateVideo, duplicateVideo], cancellationToken);
+            throw new InvalidOperationException("Video sequence accepted duplicate stable item IDs.");
+        }
+        catch (ArgumentException)
+        {
+        }
+        if (emptyVideoResult.State != VideoSequenceState.Completed ||
+            videoPlayer.Snapshot().State != VideoSequenceState.Completed)
+        {
+            throw new InvalidOperationException("Video sequence did not complete an empty sequence deterministically.");
+        }
+        videoPlayer.QueueFree();
+        await host.ToSignal(host.GetTree(), SceneTree.SignalName.ProcessFrame);
+        await videoLifetime.DisposeAsync();
+        GD.Print("LX_VIDEO_SEQUENCE_CONTRACT_PASS");
 
         LX.Diagnostics.Log(
             DiagnosticSeverity.Information,

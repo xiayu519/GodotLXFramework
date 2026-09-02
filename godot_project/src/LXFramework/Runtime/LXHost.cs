@@ -272,6 +272,7 @@ public partial class LXHost : Node
             var visualMode = GetArgument(userArguments, "--lx-visual-mode=");
             if (visualMode is not null)
             {
+                var visualCaptureMode = RequireArgument(userArguments, "--lx-visual-capture-mode=");
                 var actualPath = RequireArgument(userArguments, "--lx-visual-actual=");
                 var visualTarget = RequireArgument(userArguments, "--lx-visual-target=");
                 var visualScene = RequireArgument(userArguments, "--lx-visual-scene=");
@@ -279,14 +280,40 @@ public partial class LXHost : Node
                     System.Globalization.CultureInfo.InvariantCulture);
                 var visualHeight = int.Parse(RequireArgument(userArguments, "--lx-visual-height="),
                     System.Globalization.CultureInfo.InvariantCulture);
+                var visualReadyFrames = int.Parse(
+                    RequireArgument(userArguments, "--lx-visual-ready-frames="),
+                    System.Globalization.CultureInfo.InvariantCulture);
+                var visualPixelTolerance = float.Parse(
+                    RequireArgument(userArguments, "--lx-visual-pixel-tolerance="),
+                    System.Globalization.CultureInfo.InvariantCulture);
+                var visualMaxChangedRatio = float.Parse(
+                    RequireArgument(userArguments, "--lx-visual-max-changed-ratio="),
+                    System.Globalization.CultureInfo.InvariantCulture);
+                Vector2? visualPointer = null;
+                if (GetArgument(userArguments, "--lx-visual-pointer=") is { } pointerArgument)
+                {
+                    var components = pointerArgument.Split(',', StringSplitOptions.TrimEntries);
+                    if (components.Length != 2)
+                    {
+                        throw new InvalidDataException("Visual pointer must use the form '<x>,<y>'.");
+                    }
+                    visualPointer = new Vector2(
+                        float.Parse(components[0], System.Globalization.CultureInfo.InvariantCulture),
+                        float.Parse(components[1], System.Globalization.CultureInfo.InvariantCulture));
+                }
                 var baselinePath = GetArgument(userArguments, "--lx-visual-baseline=");
                 var diffPath = GetArgument(userArguments, "--lx-visual-diff=");
                 var reportPath = RequireArgument(userArguments, "--lx-visual-report=");
                 var report = await new VisualCaptureRunner(this, LX).RunAsync(
                     visualMode,
+                    visualCaptureMode,
                     visualTarget,
                     visualScene,
                     new Vector2I(visualWidth, visualHeight),
+                    visualReadyFrames,
+                    visualPixelTolerance,
+                    visualMaxChangedRatio,
+                    visualPointer,
                     actualPath,
                     baselinePath,
                     diffPath,

@@ -21,6 +21,7 @@
 | 画面帧时序 | `LX.Clock` / `LX.Scheduler` | 用可变渲染帧模拟确定性物理 |
 | 固定模拟时序 | `LX.PhysicsClock` / `LX.PhysicsScheduler` | 把渲染帧当确定性 Tick |
 | 顺序、并行、竞速、超时或重试流程 | `LX.Actions` 与 `LXActions` 组合 | 再建一套状态机、时钟或无 owner 的异步任务 |
+| 连续影片播放 | 局部 `VideoSequencePlayer`、`ResCatalog` 与 `LX.Actions` | 全局媒体管理器或产品级重复异步循环 |
 
 ## 层级放置
 

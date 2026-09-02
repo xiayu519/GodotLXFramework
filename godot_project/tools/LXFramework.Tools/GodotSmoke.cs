@@ -53,6 +53,7 @@ internal static partial class GodotSmoke
             "LX_UI_COMPONENT_LIFECYCLE_PASS",
             "LX_UI_LIFECYCLE_PASS",
             "LX_ACTIONS_LIFETIME_PASS",
+            "LX_VIDEO_SEQUENCE_CONTRACT_PASS",
             "LX_RUNTIME_DIAGNOSTICS_PASS",
             "LX_RUNTIME_BRIDGE_PASS",
             "LX_FRAMEWORK_SMOKE_PASS",

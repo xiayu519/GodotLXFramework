@@ -6,7 +6,7 @@ using Godot;
 
 namespace LX.Generated;
 
-public static class ResCatalog
+public static partial class ResCatalog
 {
     public static readonly AssetRef<Texture2D> AppIcon = new(
         "res://icon.svg",

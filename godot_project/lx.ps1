@@ -102,7 +102,7 @@ function Invoke-LxOperation {
             if ($CommandArguments.Count -eq 1 -and
                 $CommandArguments[0] -in @("--help", "-h", "help")) {
                 Write-Host "Usage: lx check <changed-path> [changed-path ...]"
-                Write-Host "Runs one deduplicated validation profile, including only product smokes mapped to the changed paths."
+                Write-Host "Runs one deduplicated validation profile and fails uncovered product runtime paths."
                 $lxExitCode = 0
                 break
             }
@@ -189,6 +189,16 @@ function Invoke-LxOperation {
                 ($_ -like "content/*" -and $_ -notlike "*.md")
             })
             $needsProductSmoke = $needsProductSmoke -or $needsData
+            $gameManifestPath = Join-Path $repoRoot "content\game\game-manifest.json"
+            $hasProduct = $false
+            if (Test-Path -LiteralPath $gameManifestPath -PathType Leaf) {
+                $gameManifest = Get-Content -LiteralPath $gameManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                $hasProduct = -not [string]::IsNullOrWhiteSpace([string]$gameManifest.name)
+            }
+            # A declared product must prove every changed path is either mapped to
+            # a runtime gate or classified as non-runtime/static-only. The impact
+            # analyzer exits before launching Godot when no scenario is selected.
+            $needsProductSmoke = $needsProductSmoke -or $hasProduct
             $needsFrameworkVisual = [bool]($changedPaths | Where-Object {
                 ($_ -like "src/LXFramework/UI/*" -and $_ -notlike "*.md") -or
                 ($_ -like "scene/ui/examples/*" -and $_ -notlike "*.md")
@@ -215,6 +225,7 @@ function Invoke-LxOperation {
             if ($needsTests) { $profile += "test" }
             if ($needsFrameworkSmoke) { $profile += "framework-smoke" }
             if ($needsProductSmoke) { $profile += "product-smoke-affected" }
+            if ($needsProductSmoke) { $profile += "product-visual-affected" }
             if ($needsFrameworkVisual) { $profile += "framework-visual" }
             Write-Host "check profile: $($profile -join '+')"
 
@@ -261,6 +272,12 @@ function Invoke-LxOperation {
                     "smoke", "product", "affected"
                 ) + @($changedPaths)
                 dotnet @productSmokeArguments
+                if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
+                $productVisualArguments = @(
+                    "run", "--project", $toolProject, "--no-build", "--",
+                    "visual", "compare", "affected"
+                ) + @($changedPaths)
+                dotnet @productVisualArguments
                 if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
             }
             if ($needsFrameworkVisual) {

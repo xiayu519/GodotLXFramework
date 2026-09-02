@@ -7,7 +7,7 @@
 .\lx.ps1 create res player_sprite Texture2D res://content/art/player.png Cached
 ```
 
-命令更新上游清单并生成强类型 Catalog；禁止直接编辑生成目录。Luban schema、策划数据或二进制表改用 `$lx-data`，动态绑定与释放闭环改用 `$lx-resources`。
+命令更新上游清单并生成强类型 Catalog；禁止直接编辑生成目录。资源字段仍通过兼容的 `LX.Generated.ResCatalog` 访问，但生成文件按 Framework/Product、可选 `catalogPartition`、稳定 hash bucket 与固定条目数拆到各自 `Generated/Res/`；`group` 只表达运行时 `AssetGroup`，不要为减少生成文件重写而滥用它。Luban schema、策划数据或二进制表改用 `$lx-data`，动态绑定与释放闭环改用 `$lx-resources`。
 
 已给出资源 ID、类型和路径时走固定快路径。若目标产品文件未指明，只读 `content/game/game-manifest.json`，使用其 `sourceRoot/GameRoot.cs`，不搜索产品目录。读取 `godot_project/AGENTS.md` 与目标产品目录最近的 `AGENTS.md`，运行一次 `create res`，按命令回显的 `ResCatalog.<Property>` 修改目标文件，然后运行一次 `check`；只有达到根 `AGENTS.md` 的仓库级门禁才运行 `validate`。
 

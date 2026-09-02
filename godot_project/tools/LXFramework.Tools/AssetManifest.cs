@@ -20,4 +20,6 @@ internal sealed class AssetManifestEntry
     public string CachePolicy { get; set; } = "Transient";
 
     public string? Group { get; set; }
+
+    public string? CatalogPartition { get; set; }
 }

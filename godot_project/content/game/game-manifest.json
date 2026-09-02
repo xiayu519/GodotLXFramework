@@ -6,5 +6,6 @@
   "initialWorldId": "",
   "worlds": [],
   "productSmokes": [],
-  "visualTargets": []
+  "visualTargets": [],
+  "staticCheckPaths": []
 }

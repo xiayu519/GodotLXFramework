@@ -47,6 +47,20 @@ internal static class GodotLocator
                     return localExecutable;
                 }
             }
+
+            foreach (var installDirectory in FindKnownWindowsInstallDirectories())
+            {
+                if (!Directory.Exists(installDirectory))
+                {
+                    continue;
+                }
+                var installedExecutable = FindLocalWindowsExecutables(installDirectory, preferConsole)
+                    .FirstOrDefault(IsRequiredVersion);
+                if (installedExecutable is not null)
+                {
+                    return installedExecutable;
+                }
+            }
         }
 
         var pathDirectories = (System.Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
@@ -101,6 +115,43 @@ internal static class GodotLocator
                     ? path.EndsWith("_console.exe", StringComparison.OrdinalIgnoreCase)
                     : !path.EndsWith("_console.exe", StringComparison.OrdinalIgnoreCase))
             .ThenByDescending(path => path, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static IEnumerable<string> FindKnownWindowsInstallDirectories()
+    {
+        const string versionDirectory = "Godot_v4.7.2-stable_mono_win64";
+        var directories = new List<string>();
+        foreach (var drive in DriveInfo.GetDrives())
+        {
+            try
+            {
+                if (!drive.IsReady || drive.DriveType is not (DriveType.Fixed or DriveType.Removable))
+                {
+                    continue;
+                }
+                directories.Add(Path.Combine(drive.RootDirectory.FullName, "Soft", versionDirectory));
+                directories.Add(Path.Combine(drive.RootDirectory.FullName, "Tools", versionDirectory));
+                directories.Add(Path.Combine(drive.RootDirectory.FullName, versionDirectory));
+            }
+            catch (IOException)
+            {
+                // A drive can disappear between enumeration and inspection.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Inaccessible drives are not valid tool sources.
+            }
+        }
+
+        var localPrograms = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Programs",
+            versionDirectory);
+        directories.Add(localPrograms);
+        directories.Add(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            versionDirectory));
+        return directories.Distinct(StringComparer.OrdinalIgnoreCase);
     }
 
     private static IEnumerable<string> EnumerateDirectoriesSafely(string path)

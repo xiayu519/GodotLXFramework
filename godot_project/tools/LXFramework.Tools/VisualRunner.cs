@@ -12,21 +12,26 @@ internal static class VisualRunner
             Console.Error.WriteLine("visual: expected capture, compare, or approve.");
             return 2;
         }
-        if (arguments.Count > 2)
+        var affected = arguments.Count > 1 &&
+                       string.Equals(arguments[1], "affected", StringComparison.OrdinalIgnoreCase);
+        if ((!affected && arguments.Count > 2) || (affected && arguments.Count < 3))
         {
-            Console.Error.WriteLine("visual usage: lx visual capture|compare|approve [ui_components|product|target-id]");
+            Console.Error.WriteLine(
+                "visual usage: lx visual capture|compare|approve [ui_components|product|target-id|affected <changed-path> ...]");
             return 2;
         }
         var requestedTarget = arguments.Count > 1 ? arguments[1] : "ui_components";
-
-        var executable = GodotLocator.Find(root, preferConsole: true);
-        if (executable is null)
+        if (affected && arguments.Skip(2).Any(path => !ProductSmokeImpact.IsValidChangedPath(path)))
         {
-            Console.Error.WriteLine("visual: Godot .NET was not found. Run 'lx doctor'.");
+            Console.Error.WriteLine(
+                "visual affected paths must stay inside the workspace and cannot contain '.' or '..' segments.");
             return 2;
         }
 
-        var targets = ResolveTargets(root, requestedTarget);
+        var targets = ResolveTargets(
+            root,
+            requestedTarget,
+            affected ? arguments.Skip(2).ToArray() : []);
         if (targets is null)
         {
             return 2;
@@ -35,6 +40,13 @@ internal static class VisualRunner
         {
             Console.WriteLine("visual product      skipped (no product visual targets)");
             return 0;
+        }
+
+        var executable = GodotLocator.Find(root, preferConsole: true);
+        if (executable is null)
+        {
+            Console.Error.WriteLine("visual: Godot .NET was not found. Run 'lx doctor'.");
+            return 2;
         }
 
         var success = true;
@@ -68,23 +80,39 @@ internal static class VisualRunner
             RedirectStandardError = true,
             CreateNoWindow = true,
         };
-        foreach (var argument in new[]
-                 {
-                     "--path", root,
-                     "--headless",
-                     "--audio-driver", "Dummy",
-                     "--quit-after", "120",
-                     "--",
-                     $"--lx-visual-mode={runtimeMode}",
-                     $"--lx-visual-target={target.Id}",
-                     $"--lx-visual-scene={target.ScenePath}",
-                     $"--lx-visual-width={target.Width}",
-                     $"--lx-visual-height={target.Height}",
-                     $"--lx-visual-actual={actual}",
-                     $"--lx-visual-baseline={baseline}",
-                     $"--lx-visual-diff={diff}",
-                     $"--lx-visual-report={report}",
-                 })
+        var processArguments = new List<string>
+        {
+            "--path", root,
+        };
+        if (target.CaptureMode == "SemanticControl")
+        {
+            processArguments.Add("--headless");
+        }
+        processArguments.AddRange([
+            "--audio-driver", "Dummy",
+            "--quit-after", "120",
+            "--",
+            $"--lx-visual-mode={runtimeMode}",
+            $"--lx-visual-capture-mode={target.CaptureMode}",
+            $"--lx-visual-target={target.Id}",
+            $"--lx-visual-scene={target.ScenePath}",
+            $"--lx-visual-width={target.Width}",
+            $"--lx-visual-height={target.Height}",
+            $"--lx-visual-ready-frames={target.ReadyFrames}",
+            $"--lx-visual-pixel-tolerance={target.PixelTolerance.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"--lx-visual-max-changed-ratio={target.MaxChangedPixelRatio.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            $"--lx-visual-actual={actual}",
+            $"--lx-visual-baseline={baseline}",
+            $"--lx-visual-diff={diff}",
+            $"--lx-visual-report={report}",
+        ]);
+        if (target.Pointer is { } pointer)
+        {
+            processArguments.Add(
+                $"--lx-visual-pointer={pointer.X.ToString(System.Globalization.CultureInfo.InvariantCulture)}," +
+                pointer.Y.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+        foreach (var argument in processArguments)
         {
             start.ArgumentList.Add(argument);
         }
@@ -115,7 +143,10 @@ internal static class VisualRunner
         return success;
     }
 
-    private static IReadOnlyList<ResolvedVisualTarget>? ResolveTargets(string root, string requested)
+    private static IReadOnlyList<ResolvedVisualTarget>? ResolveTargets(
+        string root,
+        string requested,
+        IReadOnlyList<string> changedPaths)
     {
         if (string.Equals(requested, "ui_components", StringComparison.Ordinal))
         {
@@ -126,7 +157,29 @@ internal static class VisualRunner
                     "res://scene/ui/examples/ui_components_showcase.tscn",
                     "tests/Visual/Baselines/ui_components.png",
                     1280,
-                    720),
+                    720,
+                    "SemanticControl",
+                    4,
+                    0,
+                    0,
+                    null),
+            ];
+        }
+        if (string.Equals(requested, "rendered_probe", StringComparison.Ordinal))
+        {
+            return
+            [
+                new ResolvedVisualTarget(
+                    "rendered_probe",
+                    "res://scene/ui/examples/ui_components_showcase.tscn",
+                    "tests/Visual/Baselines/rendered_probe.png",
+                    1280,
+                    720,
+                    "RenderedViewport",
+                    4,
+                    0.01f,
+                    0.001f,
+                    new VisualPointerManifestEntry { X = 640, Y = 360 }),
             ];
         }
 
@@ -138,7 +191,19 @@ internal static class VisualRunner
             target.ScenePath,
             target.BaselinePath,
             target.Width,
-            target.Height)).ToArray();
+            target.Height,
+            target.CaptureMode,
+            target.ReadyFrames,
+            target.PixelTolerance,
+            target.MaxChangedPixelRatio,
+            target.Pointer)).ToArray();
+        if (string.Equals(requested, "affected", StringComparison.OrdinalIgnoreCase))
+        {
+            var selectedIds = ProductSmokeImpact.SelectAffectedVisuals(game.VisualTargets, changedPaths)
+                .Select(target => target.Id)
+                .ToHashSet(StringComparer.Ordinal);
+            return productTargets.Where(target => selectedIds.Contains(target.Id)).ToArray();
+        }
         if (string.Equals(requested, "product", StringComparison.Ordinal))
         {
             return productTargets;
@@ -152,7 +217,7 @@ internal static class VisualRunner
         }
 
         Console.Error.WriteLine(
-            $"visual: unknown target '{requested}'. Available: ui_components, product" +
+            $"visual: unknown target '{requested}'. Available: ui_components, rendered_probe, product" +
             (productTargets.Length == 0 ? string.Empty : ", " + string.Join(", ", productTargets.Select(target => target.Id))));
         return null;
     }
@@ -162,5 +227,10 @@ internal static class VisualRunner
         string ScenePath,
         string BaselinePath,
         int Width,
-        int Height);
+        int Height,
+        string CaptureMode,
+        int ReadyFrames,
+        float PixelTolerance,
+        float MaxChangedPixelRatio,
+        VisualPointerManifestEntry? Pointer);
 }

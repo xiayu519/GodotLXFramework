@@ -51,6 +51,6 @@
 
 状态型产品应通过现有 `LX.Metrics`/结构化日志暴露少量业务事实，例如游戏状态、生命、分数、关键库存/冷却、活动实体和池借出数；不新建诊断服务。用户或开发会话已经启动可持续运行的 Editor/Debug 实例时，AI 应主动运行 `runtime status --json`，再按任务读取 `runtime snapshot ui|features|resources|input|metrics --json`，而不是只凭截图或日志推测；运行时桥只读并要求当前 `sessionId/generation`。没有活动会话时明确说明未取得实时快照，并以可退出的 product smoke 验证确定场景，不能声称已经观察运行状态。
 
-产品 smoke 由 `game-manifest.json` 的 `productSmokes` 声明，Debug 与 export 共用同一 marker/timeout 契约；每项通过 `checkPaths` 把产品或公共机制路径映射到受影响场景，`check` 只运行命中项。旧清单的 `exportSmokes` 仍兼容，但不能与新字段同时声明。产品视觉由 `visualTargets` 声明，迭代比较明确的 target ID，基准只有人工确认后才能 approve。
+产品 smoke 由 `game-manifest.json` 的 `productSmokes` 声明，Debug 与 export 共用总体 marker/timeout 契约；Debug 可用独立 `scenePath`，累计流程用 `checkpoints` 在一个进程报告多个阶段，并以 `statePolicy`/`ProductSmokeProbe` 比较资源、UI、Feature、音频、输入、动作和产品池 gauge 的前后基线。每项通过 `checkPaths` 把产品或公共机制路径映射到受影响场景。产品视觉同样通过 `visualTargets[].checkPaths` 映射；真实 Sprite/shader/字体/hover/`VideoStream` 使用 `RenderedViewport`，纯 Control 快速证据保留 `SemanticControl`。有产品的运行时路径必须命中 smoke、visual 或显式 `staticCheckPaths`；静态项必须声明窄 `pattern` 与可审查 `reason`，否则 `check` 失败。旧清单的 `exportSmokes` 仍兼容，但不能与新字段同时声明；基准只有人工确认后才能 approve。
 
 内容冻结后的交付证据至少包括：框架所有文件未被来源覆盖、生成/构建产物未迁移、来源与目标驱动架构有据可查、架构契约行为通过、同类第二份内容可仅靠脚本/数据接入、全部脚本可解析且引用闭合、批量行为验证、全部产品 smoke、需要的实时快照、产品视觉结果、重开资源闭合和最终 `validate`。无法合法读取来源、关键行为无判定标准或资产授权不明时停止并请求方向。

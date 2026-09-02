@@ -26,6 +26,12 @@ enum LX.Input.PointerPhase.Moved
 enum LX.Input.PointerPhase.Pressed
 enum LX.Input.PointerPhase.Released
 enum LX.Input.PointerPhase.Wheel
+enum LX.Media.VideoSequenceState.Cancelled
+enum LX.Media.VideoSequenceState.Completed
+enum LX.Media.VideoSequenceState.Failed
+enum LX.Media.VideoSequenceState.Idle
+enum LX.Media.VideoSequenceState.Playing
+enum LX.Media.VideoSequenceState.Skipped
 enum LX.Res.AssetCachePolicy.Cached = 1
 enum LX.Res.AssetCachePolicy.Resident = 2
 enum LX.Res.AssetCachePolicy.Transient = 0
@@ -291,6 +297,11 @@ member LX.Localization.LocalizationService public string Text(StringName key)
 member LX.Localization.LocalizationService public string Text(StringName key, StringName context)
 member LX.Localization.LocalizationService public void ClearMissingKeys()
 member LX.Localization.LocalizationService public void SetLocale(string locale)
+member LX.Media.VideoSequencePlayer protected override void OnLXInitialized()
+member LX.Media.VideoSequencePlayer public NodePath PlayerPath { get; set; }
+member LX.Media.VideoSequencePlayer public ValueTask<VideoSequenceResult> PlayAsync(IReadOnlyList<VideoSequenceItem> items, CancellationToken cancellationToken = default)
+member LX.Media.VideoSequencePlayer public VideoSequenceSnapshot Snapshot()
+member LX.Media.VideoSequencePlayer public void Skip()
 member LX.Pooling.NodePool public NodePool(Func<TNode> factory, Action<TNode>? reset = null, int maxRetained = 64, Action<TNode>? beforeDiscard = null)
 member LX.Pooling.NodePool public PoolStatistics Statistics { get; }
 member LX.Pooling.NodePool public PooledNode<TNode> RentLease(Node parent, Action<TNode> configure, LifetimeScope? lifetime = null)
@@ -513,6 +524,10 @@ member LX.Validation.ContextProbeNode public void OnReturn()
 member LX.Validation.FrameworkStatusScreen protected internal override ValueTask OnHideAsync(CancellationToken cancellationToken)
 member LX.Validation.FrameworkStatusScreen protected internal override ValueTask OnShowAsync(object? payload, CancellationToken cancellationToken)
 member LX.Validation.FrameworkStatusScreen protected override void OnLXInitialized()
+member LX.Validation.ProductSmokeProbe public static void Checkpoint(string id, bool success = true, string? message = null)
+member LX.Validation.ProductSmokeProbe public static void Failed(string id, string message)
+member LX.Validation.ProductSmokeProbe public static void Snapshot(LXContext context, string stage)
+member LX.Validation.ProductSmokeProbe public static void Started(string id)
 member LX.Validation.UIResultProbeScreen protected internal override ValueTask OnHideAsync(CancellationToken cancellationToken)
 member LX.Validation.UIResultProbeScreen protected internal override ValueTask OnShowAsync(object? payload, CancellationToken cancellationToken)
 member LX.Validation.UIResultProbeScreen protected internal override ValueTask OnTransitionAsync(UITransitionPhase phase, CancellationToken cancellationToken)
@@ -665,6 +680,11 @@ type LX.Input.PointerPhase public enum PointerPhase
 type LX.Localization.LocaleChanged public readonly record struct LocaleChanged(string Previous, string Current)
 type LX.Localization.LocalizationService public sealed class LocalizationService
 type LX.Localization.LocalizationSnapshot public sealed record LocalizationSnapshot(string CurrentLocale, bool PseudoLocalizationEnabled, IReadOnlyList<string> MissingKeys)
+type LX.Media.VideoSequenceItem public sealed record VideoSequenceItem(string Id, AssetRef<VideoStream> Video, TimeSpan? Timeout = null)
+type LX.Media.VideoSequencePlayer public class VideoSequencePlayer : LXNode
+type LX.Media.VideoSequenceResult public sealed record VideoSequenceResult(VideoSequenceState State, int CompletedItems, TimeSpan Elapsed)
+type LX.Media.VideoSequenceSnapshot public sealed record VideoSequenceSnapshot(VideoSequenceState State, string? CurrentItemId, int CurrentIndex, int ItemCount, double PositionSeconds, double DurationSeconds)
+type LX.Media.VideoSequenceState public enum VideoSequenceState
 type LX.Pooling.IPooledNodeLifecycle public interface IPooledNodeLifecycle
 type LX.Pooling.NodePool public sealed class NodePool<TNode> : IDisposable where TNode : Node
 type LX.Pooling.PackedSceneNodePool public sealed class PackedSceneNodePool<TNode> : IDisposable where TNode : Node
@@ -734,6 +754,8 @@ type LX.UI.UITransitionPhase public enum UITransitionPhase
 type LX.UI.UIVisualState public enum UIVisualState
 type LX.Validation.ContextProbeNode public class ContextProbeNode : LXNode, IPooledNodeLifecycle
 type LX.Validation.FrameworkStatusScreen public class FrameworkStatusScreen : UIScreen
+type LX.Validation.IVisualCaptureReady public interface IVisualCaptureReady
+type LX.Validation.ProductSmokeProbe public static class ProductSmokeProbe
 type LX.Validation.UIResultProbeScreen public class UIResultProbeScreen : UIScreen
 type LX.World.IWorldChunkSource public interface IWorldChunkSource : IAsyncDisposable
 type LX.World.WorldChunkEntry public sealed record WorldChunkEntry(int X, int Y, string ScenePath)

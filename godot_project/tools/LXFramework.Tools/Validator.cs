@@ -29,6 +29,18 @@ internal static class Validator
         {
             errors.Add(migrationError);
         }
+        if (ProductSmokeImpact.ValidateClassifier() is { } impactError)
+        {
+            errors.Add(impactError);
+        }
+        if (ResGenerator.ValidatePartitioning() is { } resPartitionError)
+        {
+            errors.Add(resPartitionError);
+        }
+        if (ProductSmokeRunner.ValidateProtocol() is { } smokeProtocolError)
+        {
+            errors.Add(smokeProtocolError);
+        }
 
         var report = new ValidationReport(DateTimeOffset.UtcNow, errors.Count == 0, errors);
         var output = Path.Combine(root, ".lx", "validation.json");

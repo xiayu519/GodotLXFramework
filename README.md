@@ -297,6 +297,8 @@ await LX.Actions.RunAsync(
     Lifetime);
 ```
 
+连续影片使用局部 `VideoSequencePlayer`，它通过 `LX.Res` 持有每段 `VideoStream` 的租约，以真实 `Finished` 信号完成等待，并把稳定影片 ID 记录到 `LX.Actions`；产品只保留影片数据、UI 样式和跳过输入，不需要再写产品级播放循环或全局媒体管理器。
+
 ### 世界和场景切换
 
 创建世界：
@@ -426,6 +428,8 @@ res://scene/ui/examples/ui_components_showcase.tscn
 using var icon = Lifetime.Own(LX.Res.Acquire(ResCatalog.InventoryIcon));
 Texture2D texture = icon.Resource;
 ```
+
+`ResCatalog` 的调用方式保持不变；生成器会按 Framework/Product、可选 `catalogPartition`、稳定 SHA-256 bucket 与固定条目数写入多个 `Generated/Res/*.g.cs` partial 文件。`group` 仍只表示运行时 `AssetGroup`，因此批量加入地图、图集或音效时通常只重写命中的字段/group 块，不会反复重写一个 1MB 级目录文件。
 
 会动态替换的资源属性使用 `AssetBinding<T>`。它会在替换或生命周期结束时先清空目标引用，再归还旧租约，避免材质、字体、Mesh 等资源在重开流程中不断叠加：
 
@@ -616,7 +620,7 @@ Godot Editor/Debug 正在运行时，Codex 可以读取当前会话而不修改�
 .\lx.ps1 validate
 ```
 
-`check` 用于快速迭代，只运行当前修改需要的生成和检查；`validate` 是提交前的完整验证。公开 API 有意改变时，先审查差异，再运行 `.\lx.ps1 api update` 更新版本化基线。
+`check` 用于快速迭代，只运行当前修改需要的生成和检查，但不会以“少跑”为目标牺牲完整性：每条产品运行时变更路径必须命中 `productSmokes[].checkPaths`、`visualTargets[].checkPaths`，或以窄 `pattern` 和可审查 `reason` 登记到 `staticCheckPaths`；命中关系会打印出来，未覆盖路径直接失败。产品 smoke 可指定独立 `scenePath`，用 `checkpoints` 在一个进程报告累计流程，并通过 `ProductSmokeProbe`/`statePolicy` 断言资源、UI、Feature、音频、输入、动作与产品池 gauge 回到基线；报告记录耗时、日志大小、失败阶段和有界日志尾部。`validate` 是提交前的完整验证。公开 API 有意改变时，先审查差异，再运行 `.\lx.ps1 api update` 更新版本化基线。
 
 ## Godot 编辑器工具
 
@@ -638,6 +642,8 @@ Godot Editor/Debug 正在运行时，Codex 可以读取当前会话而不修改�
 ```powershell
 .\lx.ps1 visual compare ui_components
 ```
+
+产品目标需在 `game-manifest.json` 明确选择模式：`SemanticControl` 提供快速、确定性的 Control 语义图；`RenderedViewport` 启动真实渲染器并捕获 Godot Viewport，可覆盖 `Sprite2D`、shader、真实字体、hover 和 `VideoStream`。后者可用 `IVisualCaptureReady` 固定异步状态，并声明 pointer、像素容差和最大变化比例；两种证据不会互相冒充。
 
 只有人工确认差异符合设计时才更新基准：
 

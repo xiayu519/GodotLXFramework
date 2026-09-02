@@ -24,6 +24,8 @@ internal sealed class GameManifest
 
     public List<VisualTargetManifestEntry> VisualTargets { get; set; } = [];
 
+    public List<StaticCheckPathManifestEntry> StaticCheckPaths { get; set; } = [];
+
     public IReadOnlyList<ProductSmokeManifestEntry> GetProductSmokes()
     {
         if (ProductSmokes.Count != 0 && ExportSmokes is { Count: > 0 })
@@ -53,11 +55,33 @@ internal sealed class ProductSmokeManifestEntry
 
     public string Argument { get; set; } = string.Empty;
 
+    public string? ScenePath { get; set; }
+
     public string SuccessMarker { get; set; } = string.Empty;
 
     public int TimeoutSeconds { get; set; } = 30;
 
     public List<string> CheckPaths { get; set; } = [];
+
+    public List<ProductSmokeCheckpointManifestEntry> Checkpoints { get; set; } = [];
+
+    public ProductSmokeStatePolicyManifestEntry? StatePolicy { get; set; }
+}
+
+internal sealed class ProductSmokeCheckpointManifestEntry
+{
+    public string Id { get; set; } = string.Empty;
+
+    public string SuccessMarker { get; set; } = string.Empty;
+}
+
+internal sealed class ProductSmokeStatePolicyManifestEntry
+{
+    public bool Required { get; set; }
+
+    public List<string> Compare { get; set; } = [];
+
+    public List<string> MetricGauges { get; set; } = [];
 }
 
 internal sealed class VisualTargetManifestEntry
@@ -71,4 +95,30 @@ internal sealed class VisualTargetManifestEntry
     public int Width { get; set; } = 1280;
 
     public int Height { get; set; } = 720;
+
+    public string CaptureMode { get; set; } = "SemanticControl";
+
+    public List<string> CheckPaths { get; set; } = [];
+
+    public int ReadyFrames { get; set; } = 4;
+
+    public float PixelTolerance { get; set; }
+
+    public float MaxChangedPixelRatio { get; set; }
+
+    public VisualPointerManifestEntry? Pointer { get; set; }
+}
+
+internal sealed class VisualPointerManifestEntry
+{
+    public float X { get; set; }
+
+    public float Y { get; set; }
+}
+
+internal sealed class StaticCheckPathManifestEntry
+{
+    public string Pattern { get; set; } = string.Empty;
+
+    public string Reason { get; set; } = string.Empty;
 }

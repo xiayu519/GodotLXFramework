@@ -54,11 +54,13 @@ internal static class ResScaffolder
         manifest.Assets = manifest.Assets.OrderBy(asset => asset.Id, StringComparer.Ordinal).ToList();
         ToolFiles.WriteJson(manifestPath, manifest);
         ProjectGenerator.Run(root);
+        var game = ToolFiles.ReadJson<GameManifest>(
+            Path.Combine(root, "content", "game", "game-manifest.json"));
         Console.WriteLine($"registered resource '{id}' ({resourceType})");
         Console.WriteLine(
             $"typed reference      LX.Generated.ResCatalog.{CodeNames.ToPascalCase(id)}");
         Console.WriteLine(
-            "generated catalog    src/LXFramework/Generated/ResCatalog.g.cs (do not inspect or edit)");
+            $"generated catalog    {ProductLayout.GetSourceRoot(game)}/Generated/Res/ (do not inspect or edit)");
         return 0;
     }
 }

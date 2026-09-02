@@ -20,7 +20,7 @@ Godot 适配程序集。`LXHost` 只负责显式组合、帧驱动与启动编�
 
 ## LXFramework.Tools
 
-`lx.ps1` 背后的命令行工作流。游戏/世界、功能、UI、资源、输入和内容清单是事实源；生成目录会检查漂移并清除失去事实源的生成文件。`Validator` 还检查架构边界、公开枚举/常量注释、人工 README、编辑器插件、导出 preset 和视觉基准。`VisualRunner`、`ExportRunner` 与 `BenchmarkRunner` 分别负责 UI 回归、Windows 产物 smoke 和性能报告。
+`lx.ps1` 背后的命令行工作流。游戏/世界、功能、UI、资源、输入和内容清单是事实源；生成目录会检查漂移并清除失去事实源的生成文件。资源目录按 Framework/Product、`catalogPartition`、稳定 hash bucket 和固定大小生成 partial 文件。`Validator` 还检查架构边界、公开枚举/常量注释、人工 README、编辑器插件、导出 preset 和视觉基准。`ProductSmokeRunner` 支持独立场景、多结构化检查点、流式日志、失败阶段及声明式状态闭合；`VisualRunner` 明确区分确定性 `SemanticControl` 与真实 Godot 合成的 `RenderedViewport`；`ExportRunner` 与 `BenchmarkRunner` 分别负责 Windows 产物 smoke 和性能报告。
 
 ## LXFramework.Core.Tests
 
@@ -28,4 +28,4 @@ Godot 适配程序集。`LXHost` 只负责显式组合、帧驱动与启动编�
 
 ## 产品层
 
-由 `lx create game` 创建的可选产品层，默认位于 `script/<GameName>`，准确路径由游戏清单的 `sourceRoot` 声明。游戏代码可以依赖 LX；生成的 UI 绑定和内容目录位于产品根目录的 `Generated/`。
+由 `lx create game` 创建的可选产品层，默认位于 `script/<GameName>`，准确路径由游戏清单的 `sourceRoot` 声明。游戏代码可以依赖 LX；生成的 UI 绑定、内容目录和 Product 资源 partial Catalog 位于产品根目录的 `Generated/`。

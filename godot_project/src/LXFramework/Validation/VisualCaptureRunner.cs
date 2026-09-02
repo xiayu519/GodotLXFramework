@@ -20,9 +20,14 @@ internal sealed class VisualCaptureRunner
 
     public async ValueTask<VisualComparisonReport> RunAsync(
         string mode,
+        string captureMode,
         string target,
         string scenePath,
         Vector2I captureSize,
+        int readyFrames,
+        float pixelTolerance,
+        float maxChangedPixelRatio,
+        Vector2? pointerPosition,
         string actualPath,
         string? baselinePath,
         string? diffPath,
@@ -32,35 +37,83 @@ internal sealed class VisualCaptureRunner
         {
             throw new ArgumentException($"Unsupported visual mode '{mode}'.", nameof(mode));
         }
+        if (captureMode is not ("SemanticControl" or "RenderedViewport"))
+        {
+            throw new ArgumentException($"Unsupported visual capture mode '{captureMode}'.", nameof(captureMode));
+        }
 
         Directory.CreateDirectory(Path.GetDirectoryName(actualPath)!);
         if (captureSize.X is < 64 or > 4096 || captureSize.Y is < 64 or > 4096)
         {
             throw new ArgumentOutOfRangeException(nameof(captureSize));
         }
+        if (readyFrames is < 1 or > 300 ||
+            pixelTolerance is < 0 or > 1 ||
+            maxChangedPixelRatio is < 0 or > 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(readyFrames));
+        }
         using var lease = _context.Res.Acquire<PackedScene>(scenePath, AssetCachePolicy.Cached);
         using var visualLifetime = _context.Lifetime.CreateChild($"VisualCapture:{target}");
-        var viewport = new SubViewport
+        SubViewport? semanticViewport = null;
+        Viewport captureViewport;
+        Node captureParent;
+        if (captureMode == "RenderedViewport")
         {
-            Name = "LXVisualCapture",
-            Size = captureSize,
-            RenderTargetUpdateMode = SubViewport.UpdateMode.Always,
-            TransparentBg = false,
-        };
-        viewport.World2D = new World2D();
-        _host.AddChild(viewport);
+            var window = _host.GetWindow();
+            window.ContentScaleSize = captureSize;
+            window.Size = captureSize;
+            captureViewport = _host.GetViewport();
+            captureParent = _host;
+        }
+        else
+        {
+            semanticViewport = new SubViewport
+            {
+                Name = "LXVisualCapture",
+                Size = captureSize,
+                RenderTargetUpdateMode = SubViewport.UpdateMode.Always,
+                TransparentBg = false,
+            };
+            semanticViewport.World2D = new World2D();
+            _host.AddChild(semanticViewport);
+            captureViewport = semanticViewport;
+            captureParent = semanticViewport;
+        }
         var instance = lease.Resource.Instantiate();
         LXContextInjector.InitializeTree(instance, _context, visualLifetime);
-        viewport.AddChild(instance);
+        captureParent.AddChild(instance);
         try
         {
-            for (var frame = 0; frame < 4; frame++)
+            cancellationToken.ThrowIfCancellationRequested();
+            await _host.ToSignal(_host.GetTree(), SceneTree.SignalName.ProcessFrame);
+            foreach (var readiness in FindReadinessBarriers(instance))
+            {
+                await readiness.WaitForVisualCaptureReadyAsync(cancellationToken);
+            }
+            if (pointerPosition is { } pointer)
+            {
+                captureViewport.PushInput(new InputEventMouseMotion
+                {
+                    Position = pointer,
+                    GlobalPosition = pointer,
+                }, inLocalCoords: true);
+            }
+            for (var frame = 0; frame < readyFrames; frame++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 await _host.ToSignal(_host.GetTree(), SceneTree.SignalName.ProcessFrame);
             }
 
-            using var actual = RenderSemanticSnapshot(instance, captureSize);
+            using var actual = captureMode == "RenderedViewport"
+                ? await CaptureRenderedViewportAsync(captureViewport, cancellationToken)
+                : RenderSemanticSnapshot(instance, captureSize);
+            if (actual.GetWidth() != captureSize.X || actual.GetHeight() != captureSize.Y)
+            {
+                throw new IOException(
+                    $"Visual capture produced {actual.GetWidth()}x{actual.GetHeight()} instead of " +
+                    $"the declared {captureSize.X}x{captureSize.Y} target.");
+            }
             var saveError = actual.SavePng(actualPath);
             if (saveError != Error.Ok)
             {
@@ -71,34 +124,44 @@ internal sealed class VisualCaptureRunner
             {
                 return new VisualComparisonReport(
                     "lx.visual-report",
-                    1,
+                    2,
                     target,
+                    captureMode,
                     true,
-                    captureSize.X,
-                    captureSize.Y,
+                    actual.GetWidth(),
+                    actual.GetHeight(),
                     0,
+                    0,
+                    pixelTolerance,
+                    maxChangedPixelRatio,
                     ComputeHash(actualPath),
                     null,
                     actualPath,
                     baselinePath,
-                    diffPath);
+                    diffPath,
+                    CaptureEnvironment());
             }
 
             if (string.IsNullOrWhiteSpace(baselinePath) || !File.Exists(baselinePath))
             {
                 return new VisualComparisonReport(
                     "lx.visual-report",
-                    1,
+                    2,
                     target,
+                    captureMode,
                     false,
-                    captureSize.X,
-                    captureSize.Y,
+                    actual.GetWidth(),
+                    actual.GetHeight(),
                     -1,
+                    1,
+                    pixelTolerance,
+                    maxChangedPixelRatio,
                     ComputeHash(actualPath),
                     null,
                     actualPath,
                     baselinePath,
-                    diffPath);
+                    diffPath,
+                    CaptureEnvironment());
             }
 
             using var baseline = Image.LoadFromFile(baselinePath);
@@ -106,17 +169,22 @@ internal sealed class VisualCaptureRunner
             {
                 return new VisualComparisonReport(
                     "lx.visual-report",
-                    1,
+                    2,
                     target,
+                    captureMode,
                     false,
                     actual.GetWidth(),
                     actual.GetHeight(),
                     -1,
+                    1,
+                    pixelTolerance,
+                    maxChangedPixelRatio,
                     ComputeHash(actualPath),
                     ComputeHash(baselinePath),
                     actualPath,
                     baselinePath,
-                    diffPath);
+                    diffPath,
+                    CaptureEnvironment());
             }
 
             using var diff = Image.CreateEmpty(actual.GetWidth(), actual.GetHeight(), false, Image.Format.Rgba8);
@@ -127,7 +195,7 @@ internal sealed class VisualCaptureRunner
                 {
                     var actualPixel = actual.GetPixel(x, y);
                     var baselinePixel = baseline.GetPixel(x, y);
-                    var changed = !actualPixel.IsEqualApprox(baselinePixel);
+                    var changed = MaxChannelDelta(actualPixel, baselinePixel) > pixelTolerance;
                     if (changed)
                     {
                         changedPixels++;
@@ -137,6 +205,8 @@ internal sealed class VisualCaptureRunner
                         : new Color(actualPixel.R, actualPixel.G, actualPixel.B, 0.12f));
                 }
             }
+
+            var changedPixelRatio = changedPixels / (double)(actual.GetWidth() * actual.GetHeight());
 
             if (!string.IsNullOrWhiteSpace(diffPath))
             {
@@ -150,23 +220,74 @@ internal sealed class VisualCaptureRunner
 
             return new VisualComparisonReport(
                 "lx.visual-report",
-                1,
+                2,
                 target,
-                changedPixels == 0,
+                captureMode,
+                changedPixelRatio <= maxChangedPixelRatio,
                 actual.GetWidth(),
                 actual.GetHeight(),
                 changedPixels,
+                changedPixelRatio,
+                pixelTolerance,
+                maxChangedPixelRatio,
                 ComputeHash(actualPath),
                 ComputeHash(baselinePath),
                 actualPath,
                 baselinePath,
-                diffPath);
+                diffPath,
+                CaptureEnvironment());
         }
         finally
         {
             instance.QueueFree();
-            viewport.QueueFree();
+            semanticViewport?.QueueFree();
         }
+    }
+
+    private async ValueTask<Image> CaptureRenderedViewportAsync(
+        Viewport viewport,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await _host.ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+        cancellationToken.ThrowIfCancellationRequested();
+        return viewport.GetTexture().GetImage();
+    }
+
+    private static IReadOnlyList<IVisualCaptureReady> FindReadinessBarriers(Node root)
+    {
+        var barriers = new List<IVisualCaptureReady>();
+        CollectReadinessBarriers(root, barriers);
+        return barriers;
+    }
+
+    private static void CollectReadinessBarriers(Node node, ICollection<IVisualCaptureReady> barriers)
+    {
+        if (node is IVisualCaptureReady barrier)
+        {
+            barriers.Add(barrier);
+        }
+        for (var index = 0; index < node.GetChildCount(); index++)
+        {
+            CollectReadinessBarriers(node.GetChild(index), barriers);
+        }
+    }
+
+    private static float MaxChannelDelta(Color left, Color right) =>
+        Math.Max(
+            Math.Max(Math.Abs(left.R - right.R), Math.Abs(left.G - right.G)),
+            Math.Max(Math.Abs(left.B - right.B), Math.Abs(left.A - right.A)));
+
+    private static VisualCaptureEnvironment CaptureEnvironment()
+    {
+        var version = Engine.GetVersionInfo();
+        return new VisualCaptureEnvironment(
+            version.TryGetValue("string", out var engineVersion)
+                ? engineVersion.AsString()
+                : "unknown",
+            ProjectSettings.GetSetting("rendering/renderer/rendering_method").AsString(),
+            OS.GetName(),
+            TranslationServer.GetLocale());
     }
 
     public static void WriteReport(string path, VisualComparisonReport report)
@@ -290,12 +411,23 @@ internal sealed record VisualComparisonReport(
     string Schema,
     int SchemaVersion,
     string Target,
+    string CaptureMode,
     bool Success,
     int Width,
     int Height,
     long ChangedPixels,
+    double ChangedPixelRatio,
+    float PixelTolerance,
+    float MaxChangedPixelRatio,
     string ActualSha256,
     string? BaselineSha256,
     string ActualPath,
     string? BaselinePath,
-    string? DiffPath);
+    string? DiffPath,
+    VisualCaptureEnvironment Environment);
+
+internal sealed record VisualCaptureEnvironment(
+    string EngineVersion,
+    string RenderingMethod,
+    string OperatingSystem,
+    string Locale);

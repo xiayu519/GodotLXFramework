@@ -29,7 +29,7 @@ godot_project/**/AGENTS.md       工程及目录职责与依赖边界
 
 需要确认可用命令、副作用或验收方式时，运行 `./lx.ps1 capabilities <id> --json`；完整能力目录由 `inspect` 写到 `.lx/capabilities.json`，不进入常驻提示。Godot Editor/Debug 已运行时，通过 `./lx.ps1 runtime snapshot <section> --json` 读取当前会话的 UI、资源、Actions 等有界状态，响应必须匹配当前 `sessionId/generation`。
 
-旧 LX 游戏升级、其他 Godot 项目移植和跨引擎/行为复刻先运行 `./lx.ps1 migrate plan --source <directory|git-ref> --mode upgrade|port|remake`。计划先把框架、产品、生成物和构建产物分开；源码可读时继续有界分析启动入口、模块、脚本解释/编译、内容 schema、状态和存档，优先语义复刻合理架构。无源码或新游戏先建立目标驱动骨架；重复剧情、任务、场景、对话和战斗入口经统一事件中间表示驱动通用模块，高频玩法保留确定性代码系统。代表切片只验证架构契约；批量填充期间静态验证全部脚本/数据，运行时只验证受影响契约组。`productSmokes[].checkPaths` 把路径映射到受影响场景；`smoke product all` 与 `visual compare product` 只用于内容冻结和完整门禁，`inspect --product-coverage` 用于 LX 服务静态映射。
+旧 LX 游戏升级、其他 Godot 项目移植和跨引擎/行为复刻先运行 `./lx.ps1 migrate plan --source <directory|git-ref> --mode upgrade|port|remake`。计划先把框架、产品、生成物和构建产物分开；源码可读时继续有界分析启动入口、模块、脚本解释/编译、内容 schema、状态和存档，优先语义复刻合理架构。无源码或新游戏先建立目标驱动骨架；重复剧情、任务、场景、对话和战斗入口经统一事件中间表示驱动通用模块，高频玩法保留确定性代码系统。每条命令以 `{recordId}:{opcode}` 接入 `LX.Actions`，连续影片复用局部 `VideoSequencePlayer`，而不是复制异步循环。代表切片只验证架构契约；批量填充期间静态验证全部脚本/数据，运行时只验证受影响契约组。`productSmokes[].checkPaths` 和 `visualTargets[].checkPaths` 把路径映射到受影响门禁；运行时路径未映射且未以窄 `pattern` 和可审查 `reason` 声明为 `staticCheckPaths` 时 `check` 失败。累计流程由一个独立 smoke 进程报告多个 checkpoint，并可断言状态闭合；`smoke product all` 与 `visual compare product` 只用于内容冻结和完整门禁，`inspect --product-coverage` 用于 LX 服务静态映射。
 
 Luban 保留 JSON 作为可审查的策划源，但运行时统一生成 C# 强类型代码与 `.bytes` 二进制表。Windows 可双击 `game_design/build.bat` 一键安装到产品 `Generated/Luban/` 与 `content/data/luban/`；Codex 和 CI 使用等价的 `./lx.ps1 data`。产品通过已有 `LX.Content.LoadLubanTables` 读取，不建立全局配置单例。
 

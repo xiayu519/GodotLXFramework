@@ -51,6 +51,8 @@
 
 动作节点会为诊断分配执行记录，适合过场、教程、任务步骤和其他中低频流程；每帧、高频战斗和大量实体更新仍直接使用确定性系统、Scheduler 或产品数据循环。
 
+`VideoSequencePlayer` 是局部 Godot 适配组件：每段影片通过 `LX.Res` 租约加载，每项作为稳定命名的 `LX.Actions` 节点执行，只有收到 `VideoStreamPlayer.Finished` 才完成；跳过取消整段序列并观察收尾。产品继续拥有影片目录、UI 样式、输入动作和原格式迁移，不建立全局媒体管理器。
+
 ## AI 运行时诊断
 
 Godot Editor/Debug 运行时在 `.lx/runtime/` 发布带心跳的本地只读桥；Release 不启用。请求必须匹配当前 `sessionId` 和 `generation`，响应按领域返回有界 snapshot。桥由 `LXHost._Process` 在主线程泵送，因此 UI、资源、场景等快照不跨线程访问 Godot 对象；它不提供任意代码执行，也不是第二套服务通信机制。

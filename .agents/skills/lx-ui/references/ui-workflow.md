@@ -12,7 +12,7 @@
 
 UI 优先接收只读 payload/view data，不直接绑定尚未确定的领域实现。普通 payload 不触发 Luban；只有用户明确要求配置表或上游 schema 时才使用 `$lx-data`。
 
-已确定实现后只编辑产品页面、场景和清单，不手改生成 Catalog。状态型 UI 在活动 Editor/Debug 会话中可用 `$lx-runtime-observe` 查询 `runtime snapshot ui --json`；视觉目标登记到 `visualTargets`，然后运行：
+已确定实现后只编辑产品页面、场景和清单，不手改生成 Catalog。状态型 UI 在活动 Editor/Debug 会话中可用 `$lx-runtime-observe` 查询 `runtime snapshot ui --json`；视觉目标登记到 `visualTargets` 并用 `checkPaths` 声明影响范围。纯 Control 快速门禁使用确定性 `SemanticControl`；需要 `Sprite2D`、shader、真实字体、hover、`VideoStream` 或 Godot 合成结果时使用 `RenderedViewport`，通过 `IVisualCaptureReady` 固定异步/视频状态，并按目标声明 pointer、像素容差与最大变化比例。两种结果不得互相冒充，然后运行：
 
 ```powershell
 .\lx.ps1 check <changed-path> [...]
