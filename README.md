@@ -26,7 +26,7 @@ LXFramework 是一个 **Codex 优先、面向全 AI 游戏开发** 的 Godot 4.7
 
 ## 示例项目
 
-完整的飞机大战第一关示例已经发布在 [`sample` 分支](https://github.com/xiayu519/LXFramework/tree/sample)。它实际使用 Luban、Feature、UI、类型化资源、输入、音频、`NodePool<TNode>` 和统一生命周期，并验证胜利、死亡、连续重开与资源释放闭环；需要安装匹配 Godot 版本的 export templates 后，可在该分支运行 `./lx.ps1 export windows` 生成 Windows PC 包。
+完整的飞机大战第一关示例已经发布在 [`sample` 分支](https://github.com/xiayu519/GodotLXFramework/tree/sample)。它实际使用 Luban、Feature、UI、类型化资源、输入、音频、`NodePool<TNode>` 和统一生命周期，并验证胜利、死亡、连续重开与资源释放闭环；需要安装匹配 Godot 版本的 export templates 后，可在该分支运行 `./lx.ps1 export windows` 生成 Windows PC 包。
 
 ## Codex 优先的开发体验
 
