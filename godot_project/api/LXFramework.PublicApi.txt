@@ -468,6 +468,13 @@ member LX.UI.UIHandle public bool IsClosed { get; }
 member LX.UI.UIId public UIId(string value)
 member LX.UI.UIId public override string ToString()
 member LX.UI.UIId public string Value { get; }
+member LX.UI.UIPopupScreen protected internal override ValueTask OnTransitionAsync(UITransitionPhase phase, CancellationToken cancellationToken)
+member LX.UI.UIPopupScreen public NodePath MotionTargetPath { get; set; }
+member LX.UI.UIPopupScreen public NodePath ScrimPath { get; set; }
+member LX.UI.UIPopupScreen public double EnterDurationSeconds { get; set; }
+member LX.UI.UIPopupScreen public double ExitDurationSeconds { get; set; }
+member LX.UI.UIPopupScreen public float EnterScale { get; set; }
+member LX.UI.UIPopupScreen public float ExitScale { get; set; }
 member LX.UI.UIScreen protected LXContext LX { get; }
 member LX.UI.UIScreen protected LifetimeScope Activation { get; }
 member LX.UI.UIScreen protected LifetimeScope Lifetime { get; }
@@ -746,6 +753,7 @@ type LX.UI.UIHandle public sealed class UIHandle : IAsyncDisposable
 type LX.UI.UIId public readonly record struct UIId
 type LX.UI.UIInputPolicy public enum UIInputPolicy
 type LX.UI.UILayer public enum UILayer
+type LX.UI.UIPopupScreen public abstract class UIPopupScreen : UIScreen
 type LX.UI.UIRecord public sealed record UIRecord(Guid InstanceId, string UIId, UILayer Layer, UICachePolicy CachePolicy, UICoverPolicy CoverPolicy, UIInputPolicy InputPolicy, UIFocusPolicy FocusPolicy, UIVisualState State, long OpenSequence)
 type LX.UI.UIResult public readonly record struct UIResult<TResult>(bool HasValue, TResult? Value)
 type LX.UI.UIScreen public abstract class UIScreen : Control, ILXContextReceiver
@@ -757,7 +765,7 @@ type LX.Validation.ContextProbeNode public class ContextProbeNode : LXNode, IPoo
 type LX.Validation.FrameworkStatusScreen public class FrameworkStatusScreen : UIScreen
 type LX.Validation.IVisualCaptureReady public interface IVisualCaptureReady
 type LX.Validation.ProductSmokeProbe public static class ProductSmokeProbe
-type LX.Validation.UIResultProbeScreen public class UIResultProbeScreen : UIScreen
+type LX.Validation.UIResultProbeScreen public class UIResultProbeScreen : UIPopupScreen
 type LX.World.IWorldChunkSource public interface IWorldChunkSource : IAsyncDisposable
 type LX.World.WorldChunkEntry public sealed record WorldChunkEntry(int X, int Y, string ScenePath)
 type LX.World.WorldChunkLoaded public readonly record struct WorldChunkLoaded(ChunkCoordinate Coordinate, Node Node)

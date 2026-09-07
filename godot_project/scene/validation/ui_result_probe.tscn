@@ -9,4 +9,40 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 0
 script = ExtResource("1_result")
+EnterDurationSeconds = 0.0
+ExitDurationSeconds = 0.0
+
+[node name="Scrim" type="ColorRect" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 0
+color = Color(0, 0, 0, 0.55)
+
+[node name="MidLayer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="MotionPivot" type="PanelContainer" parent="MidLayer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(320, 180)
+layout_mode = 2
+
+[node name="Content" type="VBoxContainer" parent="MidLayer/MotionPivot"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MidLayer/MotionPivot/Content"]
+layout_mode = 2
+text = "UI result probe"
+horizontal_alignment = 1

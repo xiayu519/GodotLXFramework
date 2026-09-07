@@ -69,6 +69,7 @@ internal static class Program
               create input <Name> <action>   创建并生成输入动作。
               create res <id> <type> <path>  注册资源并生成类型化引用。
               create screen <Class> [id]     创建 Godot UI 页面。
+              create popup <Class> [id]      创建带标准动效的模态弹窗。
               create content <Name> [table]  创建类型化 JSON 内容表。
               create feature <Name> [id]     创建 Godot 功能场景。
               create node <Class> <Base> [id] 创建任意 Godot 原生节点与 LX 注入脚手架。

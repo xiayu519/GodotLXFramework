@@ -1,6 +1,11 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://src/LXFramework/UI/Components/UIComponentsShowcase.cs" id="1_showcase"]
+[ext_resource type="Script" path="res://src/LXFramework/UI/Components/ToastView.cs" id="2_toast"]
+[ext_resource type="Script" path="res://src/LXFramework/UI/Components/ConfirmDialogView.cs" id="3_confirm"]
+[ext_resource type="Script" path="res://src/LXFramework/UI/Components/LoadingView.cs" id="4_loading"]
+[ext_resource type="Script" path="res://src/LXFramework/UI/Components/TooltipView.cs" id="5_tooltip"]
+[ext_resource type="Script" path="res://src/LXFramework/UI/Components/VirtualListView.cs" id="6_list"]
 
 [node name="UIComponentsShowcase" type="Control"]
 layout_mode = 3
@@ -10,3 +15,92 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_showcase")
+
+[node name="FullLayer" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.937, 0.965, 1, 1)
+
+[node name="SafeArea" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 24
+
+[node name="PageLayout" type="VBoxContainer" parent="SafeArea"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="TopLayer" type="VBoxContainer" parent="SafeArea/PageLayout"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Title" type="Label" parent="SafeArea/PageLayout/TopLayer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.145, 0.388, 0.922, 1)
+theme_override_font_sizes/font_size = 30
+text = "LXFramework UI Components"
+
+[node name="Subtitle" type="Label" parent="SafeArea/PageLayout/TopLayer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.392, 0.455, 0.553, 1)
+theme_override_font_sizes/font_size = 16
+text = "Reusable, lifecycle-friendly building blocks"
+
+[node name="MidLayer" type="ScrollContainer" parent="SafeArea/PageLayout"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Content" type="VBoxContainer" parent="SafeArea/PageLayout/MidLayer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="ToastPreview" type="PanelContainer" parent="SafeArea/PageLayout/MidLayer/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+script = ExtResource("2_toast")
+
+[node name="ConfirmPreview" type="PanelContainer" parent="SafeArea/PageLayout/MidLayer/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+script = ExtResource("3_confirm")
+
+[node name="LoadingPreview" type="PanelContainer" parent="SafeArea/PageLayout/MidLayer/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+script = ExtResource("4_loading")
+
+[node name="SectionTitle" type="Label" parent="SafeArea/PageLayout/MidLayer/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.086, 0.639, 0.29, 1)
+theme_override_font_sizes/font_size = 24
+text = "Tooltip & Virtual List"
+
+[node name="TooltipPreview" type="PanelContainer" parent="SafeArea/PageLayout/MidLayer/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+script = ExtResource("5_tooltip")
+
+[node name="VirtualListPreview" type="ScrollContainer" parent="SafeArea/PageLayout/MidLayer/Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 300)
+layout_mode = 2
+script = ExtResource("6_list")
+
+[node name="BottomLayer" type="Label" parent="SafeArea/PageLayout"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.392, 0.455, 0.553, 1)
+text = "Only visible rows own Control nodes."

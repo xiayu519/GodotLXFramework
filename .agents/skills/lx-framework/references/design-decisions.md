@@ -8,7 +8,8 @@
 | 可复用场景能力 | `lx create feature` 与 `FeatureCatalog` | 未注册的动态 `PackedScene` 加载 |
 | 局部一次性场景模板 | `ResCatalog` 与 `PackedSceneInstance<TNode>` | 裸 `Instantiate()` 后自行拼接释放逻辑 |
 | 完整可玩世界 | `lx create world` 与 `WorldCatalog` | 直接调用 `SceneTree.ChangeScene*` |
-| 页面、弹窗、覆盖层 | `lx create screen`，再编辑 UI 清单层级 | 第二个 UI 管理器 |
+| 页面、覆盖层 | `lx create screen`，再编辑 UI 清单层级 | 第二个 UI 管理器 |
+| 带标准动效的模态弹窗 | `lx create popup` 与 `UIPopupScreen` | 每个弹窗复制独立 Tween 或自行释放节点 |
 | 动态 Godot 资源 | 资源清单、`ResCatalog`、`LX.Res`、`AssetLease<T>`/`AssetBinding<T>` | 游戏代码中的 `GD.Load`/`ResourceLoader.Load` |
 | 场景已序列化的静态资源 | 导出属性或场景引用 | 不必要的资源租约 |
 | 数据表 | `lx create content` 与生成的 `ContentCatalog` | 游戏逻辑中的临时 JSON 路径 |

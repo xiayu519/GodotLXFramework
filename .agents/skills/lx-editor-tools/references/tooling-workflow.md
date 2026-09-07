@@ -5,6 +5,7 @@
 | 需求 | Godot 编辑器 | 仓库外层命令 |
 |---|---|---|
 | 创建 UI 页面 | 底部 `LX Tools` 的 **LX 开发工具** → **创建内容…** → `UIScreen` | `./lx.ps1 create screen <ClassName> [id]` |
+| 创建 UI 弹窗 | 底部 `LX Tools` 的 **LX 开发工具** → **创建内容…** → `UI 弹窗` | `./lx.ps1 create popup <ClassName> [id]` |
 | 检查当前场景资源 | **LX 开发工具** → **场景依赖** | 日常 `./lx.ps1 check <changed-path> [...]`；完整门禁 `./lx.ps1 validate` |
 | 比较 UI 视觉基准 | 普通工具栏不提供 | 框架：`./lx.ps1 visual compare ui_components`；产品迭代：`./lx.ps1 visual compare <target-id>`；完整门禁：`visual compare product` |
 

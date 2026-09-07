@@ -3,7 +3,7 @@ using LX.UI;
 namespace LX.Validation;
 
 /// <summary>仅供框架 smoke 验证 UI 过渡与强类型结果闭环的页面。</summary>
-public partial class UIResultProbeScreen : UIScreen
+public partial class UIResultProbeScreen : UIPopupScreen
 {
     /// <summary>进入过渡实际执行的次数。</summary>
     public int EnterTransitions { get; private set; }
@@ -31,11 +31,11 @@ public partial class UIResultProbeScreen : UIScreen
     }
 
     /// <inheritdoc />
-    protected internal override ValueTask OnTransitionAsync(
+    protected internal override async ValueTask OnTransitionAsync(
         UITransitionPhase phase,
         CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();
+        await base.OnTransitionAsync(phase, cancellationToken);
         if (phase == UITransitionPhase.Entering)
         {
             EnterTransitions++;
@@ -44,7 +44,6 @@ public partial class UIResultProbeScreen : UIScreen
         {
             ExitTransitions++;
         }
-        return ValueTask.CompletedTask;
     }
 
     /// <summary>模拟用户确认并向打开者返回结果。</summary>

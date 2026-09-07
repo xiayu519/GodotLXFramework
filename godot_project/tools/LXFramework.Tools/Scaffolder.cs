@@ -22,6 +22,7 @@ internal static class Scaffolder
             "input" => InputScaffolder.Run(root, args),
             "res" => ResScaffolder.Run(root, args),
             "screen" => ScreenScaffolder.Run(root, args),
+            "popup" => ScreenScaffolder.Run(root, args),
             "content" => ContentScaffolder.Run(root, args),
             "feature" => FeatureScaffolder.Run(root, args),
             "node" => NodeScaffolder.Run(root, args),
@@ -40,6 +41,7 @@ internal static class Scaffolder
                 "world" => "lx create world <Name> [snake_case_id]",
                 "feature" => "lx create feature <Name> [snake_case_id]",
                 "screen" => "lx create screen <ClassName> [snake_case_id]",
+                "popup" => "lx create popup <ClassName> [snake_case_id]",
                 "input" => "lx create input <Name> <godot_action> [DefaultPhysicalKey]",
                 "res" => "lx create res <snake_case_id> <ResourceType> <res://path> [Transient|Cached|Resident] [snake_case_group]",
                 "content" => "lx create content <Name> [snake_case_table]",
@@ -63,6 +65,7 @@ internal static class Scaffolder
               lx create world <Name> [snake_case_id]
               lx create feature <Name> [snake_case_id]
               lx create screen <ClassName> [snake_case_id]
+              lx create popup <ClassName> [snake_case_id]
               lx create input <Name> <godot_action> [DefaultPhysicalKey]
               lx create res <snake_case_id> <ResourceType> <res://path> [Transient|Cached|Resident] [snake_case_group]
               lx create content <Name> [snake_case_table]

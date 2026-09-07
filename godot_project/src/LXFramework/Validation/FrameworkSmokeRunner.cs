@@ -892,6 +892,15 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
         {
             throw new InvalidOperationException("UI transition or modal input policy was not applied.");
         }
+        var popupMotionTarget = resultScreen.GetNode<Control>("%MotionPivot");
+        var popupScrim = resultScreen.GetNode<CanvasItem>("%Scrim");
+        if (!popupMotionTarget.Scale.IsEqualApprox(Vector2.One) ||
+            !Mathf.IsEqualApprox(popupMotionTarget.Modulate.A, 1f) ||
+            !Mathf.IsEqualApprox(popupScrim.Modulate.A, 1f) ||
+            popupMotionTarget.PivotOffset != popupMotionTarget.Size * 0.5f)
+        {
+            throw new InvalidOperationException("Popup enter transition did not settle at its responsive center state.");
+        }
         var resultTask = resultHandle.WaitForResultAsync<string>(cancellationToken).AsTask();
         resultScreen.Complete("accepted");
         var result = await resultTask;
@@ -902,6 +911,12 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
         {
             throw new InvalidOperationException(
                 "UI strong-type result, exit transition, or handle closure did not complete.");
+        }
+        if (!popupMotionTarget.Scale.IsEqualApprox(Vector2.One * resultScreen.ExitScale) ||
+            !Mathf.IsEqualApprox(popupMotionTarget.Modulate.A, 0f) ||
+            !Mathf.IsEqualApprox(popupScrim.Modulate.A, 0f))
+        {
+            throw new InvalidOperationException("Popup exit transition did not settle at its hidden state.");
         }
         GD.Print("LX_UI_RESULT_TRANSITION_PASS");
 

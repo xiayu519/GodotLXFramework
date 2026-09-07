@@ -18,6 +18,7 @@ public partial class LXToolsPlugin : EditorPlugin
         ("world", "世界", "创建并注册可以由 LX.Scenes 切换的世界场景。"),
         ("feature", "功能模块", "创建可以独立生成和释放的 Feature 场景。"),
         ("screen", "UI 页面", "创建 UIScreen、场景并注册类型化 UI 目录。"),
+        ("popup", "UI 弹窗", "创建带全屏遮罩、居中内容和标准动效的 UIPopupScreen。"),
         ("node", "Godot 节点", "创建继承 Godot 原生类型并接收 LX 上下文的节点。"),
         ("content", "JSON 内容表", "创建适合少量简单数据的类型化 JSON 内容表。"),
         ("input", "输入动作", "注册 Godot Input Map 动作并生成类型化输入目录。"),
@@ -603,6 +604,10 @@ public partial class LXToolsPlugin : EditorPlugin
                 AddTextField("name", "页面类名 *", "例如：MainMenu");
                 AddTextField("id", "页面 ID", "可选，例如：main_menu");
                 break;
+            case "popup":
+                AddTextField("name", "弹窗类名 *", "例如：ConfirmPurchase");
+                AddTextField("id", "弹窗 ID", "可选，例如：confirm_purchase");
+                break;
             case "node":
                 AddTextField("name", "节点类名 *", "例如：PlayerBody");
                 AddTextField("base", "Godot 基类 *", "例如：CharacterBody2D");
@@ -702,7 +707,7 @@ public partial class LXToolsPlugin : EditorPlugin
         var required = kind switch
         {
             "game" => new[] { "name" },
-            "world" or "feature" or "screen" or "content" => ["name"],
+            "world" or "feature" or "screen" or "popup" or "content" => ["name"],
             "node" => ["name", "base"],
             "input" => ["name", "action"],
             "res" => ["id", "type", "path"],
@@ -729,6 +734,7 @@ public partial class LXToolsPlugin : EditorPlugin
             case "world":
             case "feature":
             case "screen":
+            case "popup":
             case "content":
                 arguments.Add(InputValue("name"));
                 AddOptionalArgument(arguments, InputValue("id"));

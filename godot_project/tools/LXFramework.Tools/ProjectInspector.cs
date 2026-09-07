@@ -256,7 +256,7 @@ internal static partial class ProjectInspector
     [GeneratedRegex("^(?<type>[A-Za-z_][A-Za-z0-9_.<>]*)\\s+(?<name>[A-Za-z_][A-Za-z0-9_]*),?$", RegexOptions.CultureInvariant)]
     private static partial Regex ContextParameterRegex();
 
-    [GeneratedRegex("class\\s+(?<class>[A-Za-z_][A-Za-z0-9_]*)\\s*:\\s*(?<base>LXNode|UIScreen)", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("class\\s+(?<class>[A-Za-z_][A-Za-z0-9_]*)\\s*:\\s*(?<base>LXNode|UIScreen|UIPopupScreen)", RegexOptions.CultureInvariant)]
     private static partial Regex ExtensionTypeRegex();
 }
 

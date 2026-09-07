@@ -7,7 +7,18 @@ namespace LX.UI.Components;
 
 public partial class UIComponentsShowcase
 {
+    protected PanelContainer ToastPreview { get; private set; } = null!;
+    protected PanelContainer ConfirmPreview { get; private set; } = null!;
+    protected PanelContainer LoadingPreview { get; private set; } = null!;
+    protected PanelContainer TooltipPreview { get; private set; } = null!;
+    protected ScrollContainer VirtualListPreview { get; private set; } = null!;
+
     protected override void BindGeneratedNodes()
     {
+        ToastPreview = GetNode<PanelContainer>("%ToastPreview");
+        ConfirmPreview = GetNode<PanelContainer>("%ConfirmPreview");
+        LoadingPreview = GetNode<PanelContainer>("%LoadingPreview");
+        TooltipPreview = GetNode<PanelContainer>("%TooltipPreview");
+        VirtualListPreview = GetNode<ScrollContainer>("%VirtualListPreview");
     }
 }

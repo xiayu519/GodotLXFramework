@@ -255,6 +255,7 @@ using var texture = Lifetime.Own(LX.Res.Acquire(ResCatalog.PlayerSprite));
 | 创建世界 | `.\lx.ps1 create world Dungeon dungeon` |
 | 创建可装卸功能 | `.\lx.ps1 create feature Player player` |
 | 创建 UI 页面 | `.\lx.ps1 create screen MainMenu main_menu` |
+| 创建 UI 弹窗 | `.\lx.ps1 create popup ConfirmPurchase confirm_purchase` |
 | 创建 Godot 原生节点 | `.\lx.ps1 create node PlayerBody CharacterBody2D player_body` |
 | 创建普通 JSON 内容表 | `.\lx.ps1 create content Item items` |
 | 注册输入动作 | `.\lx.ps1 create input Jump game_jump Space` |
@@ -264,7 +265,8 @@ using var texture = Lifetime.Own(LX.Res.Acquire(ResCatalog.PlayerSprite));
 
 - **World**：游戏当前运行的主要世界，例如主菜单世界、城镇、地牢或战斗关卡。
 - **Feature**：可以独立生成和释放的功能场景，例如玩家、任务系统、战斗模块或调试工具。
-- **Screen**：由 UI 栈管理的页面、弹窗或覆盖层。
+- **Screen**：由 UI 栈管理的全屏页面或覆盖层。
+- **Popup**：带全屏模态外壳、居中内容和标准进入/退出动效的弹窗。
 - **Node**：必须继承特定 Godot 原生节点，并且需要调用 LX 服务的普通场景节点。
 
 ## 框架功能与调用方式
@@ -368,6 +370,12 @@ Feature 适合有独立节点树和生命周期的模块。纯数据或纯算法
 
 ```powershell
 .\lx.ps1 create screen InventoryScreen inventory
+```
+
+创建带标准缩放淡入动效的模态弹窗：
+
+```powershell
+.\lx.ps1 create popup ConfirmPurchase confirm_purchase
 ```
 
 打开页面并等待强类型结果：
@@ -603,7 +611,7 @@ Godot Editor/Debug 正在运行时，Codex 可以读取当前会话而不修改�
 
 一次常见功能开发可以按下面的顺序进行：
 
-1. 使用 `create world|feature|screen|node|input|res|content` 创建结构。
+1. 使用 `create world|feature|screen|popup|node|input|res|content` 创建结构。
 2. 在产品目录中实现 C# 逻辑，在 Godot 编辑器中编辑场景。
 3. 修改内容清单或 `game_design/` 中的策划源数据。
 4. 把本次明确改动的路径一次交给 `check`。
@@ -626,7 +634,7 @@ Godot Editor/Debug 正在运行时，Codex 可以读取当前会话而不修改�
 
 打开工程后，Godot 底部的 `LX Tools` 插件显示为 **LX 开发工具**，默认只提供面向人工开发者的操作：
 
-- **创建内容…**：通过中文表单创建游戏产品层、World、Feature、UIScreen、Godot 节点、JSON 内容表、输入动作和资源引用。
+- **创建内容…**：通过中文表单创建游戏产品层、World、Feature、UIScreen、UI 弹窗、Godot 节点、JSON 内容表、输入动作和资源引用。
 - **生成策划数据**：修改 `game_design/schema` 或 `game_design/data` 后生成 Luban C# 和 `.bytes`。
 - **场景依赖**：检查当前已保存场景引用的资源，并标出缺失项。
 - **打开策划数据目录**：打开 Godot `res://` 之外的 `game_design/`。
