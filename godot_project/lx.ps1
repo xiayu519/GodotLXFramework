@@ -28,45 +28,53 @@ foreach ($argument in @($CommandArguments)) {
 }
 $CommandArguments = $filteredArguments.ToArray()
 
-$requiredDotnetSdk = "8.0.416"
-$dotnetCommand = Get-Command "dotnet" -ErrorAction SilentlyContinue
-$detectedDotnetSdk = $null
-if ($null -ne $dotnetCommand) {
-    $detectedDotnetSdk = (& $dotnetCommand.Source --version 2>$null | Select-Object -First 1)
-    if ($null -ne $detectedDotnetSdk) { $detectedDotnetSdk = $detectedDotnetSdk.Trim() }
-}
-if ($detectedDotnetSdk -ne $requiredDotnetSdk) {
-    $message = "LXFramework requires .NET SDK $requiredDotnetSdk; found " +
-        $(if ([string]::IsNullOrWhiteSpace($detectedDotnetSdk)) { "none" } else { $detectedDotnetSdk }) +
-        ". Install the exact SDK, then rerun '.\lx.ps1 doctor'."
-    if ($jsonMode) {
-        [Console]::Out.WriteLine(([ordered]@{
-            schema = "lx.command-report"
-            schemaVersion = 1
-            command = $Command.ToLowerInvariant()
-            arguments = @($CommandArguments)
-            success = $false
-            exitCode = 1
-            code = "LX_DOTNET_SDK_MISSING"
-            startedAtUtc = [DateTimeOffset]::UtcNow.ToString("O", [System.Globalization.CultureInfo]::InvariantCulture)
-            durationMs = 0
-            diagnostics = @([ordered]@{
-                code = "LX_DOTNET_SDK_MISSING"
-                severity = "error"
-                message = $message
-            })
-        } | ConvertTo-Json -Depth 6))
+. (Join-Path $repoRoot "tools/LXFramework.Tools/CheckPlan.ps1")
+
+function Assert-LxDotnet {
+    $requiredSdk = "8.0.416"
+    $dotnet = Get-Command "dotnet" -ErrorAction SilentlyContinue
+    $actualSdk = if ($null -ne $dotnet) { (& $dotnet.Source --version 2>$null | Select-Object -First 1) } else { $null }
+    if ([string]$actualSdk -ne $requiredSdk) {
+        $script:lxFailureCode = "LX_DOTNET_SDK_MISSING"
+        throw "LXFramework requires .NET SDK $requiredSdk; found '$actualSdk'. Install it for engine/code tasks."
     }
-    else {
-        [Console]::Error.WriteLine($message)
-    }
-    exit 1
 }
 
 function Invoke-LxOperation {
     Push-Location $repoRoot
     $lxExitCode = 0
     try {
+    # Native processes update the global automatic variable; do not shadow it locally.
+    $global:LASTEXITCODE = 0
+    $checkPlan = $null
+    if ($Command.ToLowerInvariant() -eq 'check') {
+        if ($CommandArguments.Count -eq 1 -and $CommandArguments[0] -in @('--help','-h','help')) {
+            Write-Host 'Usage: lx check [--plan] <changed-path> [changed-path ...]'
+            Write-Host '--plan reports selected stages without SDK checks, generation or execution.'
+            $script:lxResultExitCode = 0
+            return
+        }
+        $planOnly = '--plan' -in $CommandArguments
+        $paths = @($CommandArguments | Where-Object { $_ -ne '--plan' })
+        if ($paths.Count -eq 0) { $script:lxResultExitCode=2; Write-Error 'check requires one or more changed paths.'; return }
+        $checkPlan = Get-LxCheckPlan $repoRoot $paths
+        if ($planOnly) {
+            Write-Output ($checkPlan | ConvertTo-Json -Depth 5)
+            $script:lxResultExitCode = 0
+            return
+        }
+        Write-Host "check profile: $($checkPlan.stages -join '+')"
+        if (-not $checkPlan.requiresDotnet) {
+            Test-LxChangedText $repoRoot $paths
+            if ($checkPlan.needs.workflow) {
+                & $workflowCheck
+                $script:lxResultExitCode = $LASTEXITCODE
+            }
+            else { $script:lxResultExitCode = 0 }
+            return
+        }
+    }
+    Assert-LxDotnet
     switch ($Command.ToLowerInvariant()) {
         "build" {
             dotnet build "LXFramework.sln" @CommandArguments
@@ -80,11 +88,15 @@ function Invoke-LxOperation {
         "validate" {
             & $workflowCheck
             if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
+            & (Join-Path $repoRoot 'tools/LXFramework.Tools/TestCheckPlan.ps1')
+            if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
             & $designBuild
             if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
             dotnet run --project $toolProject -- validate @CommandArguments
             if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
             dotnet build "LXFramework.sln" --nologo --verbosity quiet
+            if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
+            & (Join-Path $repoRoot 'tools/LXFramework.Tools/TestIncrementalValidation.ps1')
             if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
             dotnet test "LXFramework.sln" --no-build --nologo --verbosity quiet
             if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
@@ -99,156 +111,20 @@ function Invoke-LxOperation {
             dotnet run --project $toolProject --no-build -- visual compare product
         }
         "check" {
-            if ($CommandArguments.Count -eq 1 -and
-                $CommandArguments[0] -in @("--help", "-h", "help")) {
-                Write-Host "Usage: lx check <changed-path> [changed-path ...]"
-                Write-Host "Runs one deduplicated validation profile and fails uncovered product runtime paths."
-                $lxExitCode = 0
-                break
+            $changedPaths = $checkPlan.changedPaths
+            $needsData = $checkPlan.needs.data
+            $needsGenerate = $checkPlan.needs.generate
+            $needsSolutionBuild = $checkPlan.needs.solutionBuild
+            $needsProductBuild = $checkPlan.needs.productBuild
+            $needsTests = $checkPlan.needs.tests
+            $needsFrameworkSmoke = $checkPlan.needs.frameworkSmoke
+            $needsProductSmoke = $checkPlan.needs.productSmoke
+            $needsFrameworkVisual = $checkPlan.needs.frameworkVisual
+            if ($checkPlan.needs.documents) { Test-LxChangedText $repoRoot $paths }
+            if ($checkPlan.needs.workflow) {
+                & $workflowCheck
+                if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
             }
-            if ($CommandArguments.Count -eq 0) {
-                Write-Error "check requires one or more changed paths."
-                $lxExitCode = 2
-                break
-            }
-
-            $changedPaths = $CommandArguments | ForEach-Object {
-                $candidate = $_
-                if ([System.IO.Path]::IsPathRooted($candidate)) {
-                    $absolute = [System.IO.Path]::GetFullPath($candidate)
-                    $rootPrefix = [System.IO.Path]::GetFullPath($repoRoot).TrimEnd("\", "/") +
-                        [System.IO.Path]::DirectorySeparatorChar
-                    $workspacePrefix = [System.IO.Path]::GetFullPath($workspaceRoot).TrimEnd("\", "/") +
-                        [System.IO.Path]::DirectorySeparatorChar
-                    if ($absolute.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
-                        $candidate = $absolute.Substring($rootPrefix.Length)
-                    }
-                    elseif ($absolute.StartsWith($workspacePrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
-                        $candidate = $absolute.Substring($workspacePrefix.Length)
-                    }
-                    else {
-                        throw "check path '$candidate' is outside the LXFramework workspace."
-                    }
-                }
-                $normalized = $candidate.Replace("\", "/")
-                while ($normalized.StartsWith("./", [System.StringComparison]::Ordinal)) {
-                    $normalized = $normalized.Substring(2)
-                }
-                if ($normalized.StartsWith("godot_project/", [System.StringComparison]::OrdinalIgnoreCase)) {
-                    $normalized = $normalized.Substring("godot_project/".Length)
-                }
-                if ([string]::IsNullOrWhiteSpace($normalized) -or
-                    $normalized.StartsWith("/", [System.StringComparison]::Ordinal) -or
-                    $normalized.IndexOf(":", [System.StringComparison]::Ordinal) -ge 0 -or
-                    @($normalized.Split("/") | Where-Object { $_ -in @("", ".", "..") }).Count -ne 0) {
-                    throw "check path '$candidate' must be a normalized path inside the LXFramework workspace."
-                }
-                $normalized
-            }
-            $needsData = [bool]($changedPaths | Where-Object {
-                $_ -like "game_design/schema/*" -or
-                $_ -like "game_design/data/*" -or
-                $_ -like "game_design/fixtures/*" -or
-                $_ -in @(
-                    "game_design/build.bat",
-                    "game_design/build.ps1",
-                    "game_design/install-luban.ps1",
-                    "game_design/luban.conf",
-                    "game_design/toolchain.json",
-                    "game_design/validation.json"
-                ) -or
-                $_ -like "content/data/luban/*" -or
-                $_ -like "script/*/Generated/Luban/*" -or
-                $_ -like "src/LXFramework.Core/Data/Luban*" -or
-                $_ -eq "src/LXFramework/Content/ContentService.cs"
-            })
-            # A clean clone has no ignored .lx report or generated product-side
-            # Luban output. Static validation requires both, so any cold check
-            # must establish that prerequisite instead of failing and asking the
-            # caller to discover and retry `lx data` manually.
-            $needsData = $needsData -or -not (Test-Path -LiteralPath ".lx\luban\report.json" -PathType Leaf)
-            $needsGenerate = [bool]($changedPaths | Where-Object {
-                $_ -like "content/*/*-manifest.json" -or
-                ($_ -like "scene/ui/*" -and $_ -notlike "*.md") -or
-                $_ -like "tools/LXFramework.Tools/*Generator.cs" -or
-                $_ -like "tools/LXFramework.Tools/*Manifest.cs"
-            })
-            $needsTests = [bool]($changedPaths | Where-Object {
-                ($_ -like "src/LXFramework.Core/*" -and $_ -notlike "*.md") -or
-                ($_ -like "tests/LXFramework.Core.Tests/*" -and $_ -notlike "*.md")
-            })
-            $needsFrameworkSmoke = [bool]($changedPaths | Where-Object {
-                ($_ -like "src/LXFramework/*" -and $_ -notlike "*.md") -or
-                ($_ -like "content/res/*" -and $_ -notlike "*.md") -or
-                $_ -eq "scene/main.tscn" -or
-                $_ -eq "project.godot"
-            })
-            $resourceManifestPath = Join-Path $repoRoot "content\res\res-manifest.json"
-            if (-not $needsFrameworkSmoke -and
-                (Test-Path -LiteralPath $resourceManifestPath -PathType Leaf)) {
-                $resourceManifest = Get-Content -LiteralPath $resourceManifestPath -Raw -Encoding UTF8 |
-                    ConvertFrom-Json
-                $registeredResourcePaths = @($resourceManifest.assets | ForEach-Object {
-                    ([string]$_.path).Replace("res://", "")
-                })
-                $needsFrameworkSmoke = [bool]($changedPaths | Where-Object {
-                    $changedResourcePath = $_
-                    $registeredResourcePaths | Where-Object {
-                        $_ -eq $changedResourcePath -or
-                        $_.StartsWith($changedResourcePath.TrimEnd("/") + "/", [System.StringComparison]::OrdinalIgnoreCase) -or
-                        $changedResourcePath.StartsWith($_.TrimEnd("/") + "/", [System.StringComparison]::OrdinalIgnoreCase)
-                    }
-                })
-            }
-            $needsProductSmoke = [bool]($changedPaths | Where-Object {
-                ($_ -like "scene/*" -and $_ -notlike "*.md") -or
-                $_ -like "script/*.cs" -or
-                $_ -like "script/*.tscn" -or
-                ($_ -like "content/*" -and $_ -notlike "*.md")
-            })
-            $needsProductSmoke = $needsProductSmoke -or $needsData
-            $gameManifestPath = Join-Path $repoRoot "content\game\game-manifest.json"
-            $hasProduct = $false
-            if (Test-Path -LiteralPath $gameManifestPath -PathType Leaf) {
-                $gameManifest = Get-Content -LiteralPath $gameManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-                $hasProduct = -not [string]::IsNullOrWhiteSpace([string]$gameManifest.name)
-            }
-            # A declared product must prove every changed path is either mapped to
-            # a runtime gate or classified as non-runtime/static-only. The impact
-            # analyzer exits before launching Godot when no scenario is selected.
-            $needsProductSmoke = $needsProductSmoke -or $hasProduct
-            $needsFrameworkVisual = [bool]($changedPaths | Where-Object {
-                ($_ -like "src/LXFramework/UI/*" -and $_ -notlike "*.md") -or
-                ($_ -like "scene/ui/examples/*" -and $_ -notlike "*.md")
-            })
-            $needsSolutionBuild = [bool]($changedPaths | Where-Object {
-                ($_ -like "src/LXFramework.Core/*" -and $_ -notlike "*.md") -or
-                $_ -eq "src/LXFramework.Core/LXFramework.Core.csproj" -or
-                $_ -like "*.sln" -or
-                $_ -eq "Directory.Build.props"
-            })
-            $needsProductBuild = [bool]($changedPaths | Where-Object {
-                ($_ -like "src/LXFramework/*" -and $_ -notlike "*.md") -or
-                $_ -like "script/*.cs" -or
-                $_ -eq "LXFramework.csproj"
-            })
-            $needsProductBuild = $needsProductBuild -or $needsGenerate -or $needsData
-            $profile = @()
-            $profile += "workflow"
-            if ($needsData) { $profile += "data" }
-            if ($needsGenerate) { $profile += "generate" }
-            $profile += "static"
-            if ($needsSolutionBuild) { $profile += "solution-build" }
-            elseif ($needsProductBuild) { $profile += "product-build" }
-            if ($needsTests) { $profile += "test" }
-            if ($needsFrameworkSmoke) { $profile += "framework-smoke" }
-            if ($needsProductSmoke) { $profile += "product-smoke-affected" }
-            if ($needsProductSmoke) { $profile += "product-visual-affected" }
-            if ($needsFrameworkVisual) { $profile += "framework-visual" }
-            Write-Host "check profile: $($profile -join '+')"
-
-            & $workflowCheck
-            if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
             if ($needsData) {
                 & $designBuild
                 if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
@@ -278,6 +154,7 @@ function Invoke-LxOperation {
                     "quiet"
                 )
                 if ($needsSolutionBuild) { $testArguments += "--no-build" }
+                if ($checkPlan.testFilter) { $testArguments += @("--filter",$checkPlan.testFilter) }
                 dotnet @testArguments
                 if ($LASTEXITCODE -ne 0) { $lxExitCode = $LASTEXITCODE; break }
             }
@@ -318,6 +195,7 @@ function Invoke-LxOperation {
 }
 
 $lxResultExitCode = 0
+$lxFailureCode = $null
 $startedAt = [DateTimeOffset]::UtcNow
 $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 if ($jsonMode) {
@@ -333,7 +211,7 @@ if ($jsonMode) {
         $stopwatch.Stop()
     }
 
-    $failureCode = if ($lxResultExitCode -eq 2) { "LX_CLI_USAGE" } else { "LX_COMMAND_FAILED" }
+    $failureCode = if ($lxFailureCode) { $lxFailureCode } elseif ($lxResultExitCode -eq 2) { "LX_CLI_USAGE" } else { "LX_COMMAND_FAILED" }
     $diagnostics = @($records | ForEach-Object {
         $isError = $_ -is [System.Management.Automation.ErrorRecord]
         $message = if ($isError) { $_.Exception.Message.Trim() } else { ($_ | Out-String).Trim() }

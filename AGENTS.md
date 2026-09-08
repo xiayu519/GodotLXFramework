@@ -30,6 +30,7 @@ LXFramework 是 Codex 优先的 Godot 4.7.2 C# 框架。
 - 验证范围由改动风险决定，不因推理档位降低。不得以空实现、削弱断言或未运行的检查代替完成；已通过的检查仅在相关改动、新失败或未决风险出现后重跑。最终说明结果、证据和未验证范围。
 - 新结构使用 `./lx.ps1 create game|world|feature|screen|popup|content|input|res|node`；任意 Godot 原生节点使用 `create node <Class> <GodotBase> [id]` 保留显式 LX 上下文注入。
 - PowerShell 读取中文文本显式指定 UTF-8。
-- 迭代用 `./lx.ps1 check <changed-path> [...]`；产品路径无 smoke/visual/具理由静态映射则失败。结构不清才 `inspect`；提交/推送、冻结/发布、公共框架或门禁变更后运行 `./lx.ps1 validate`。
+- 迭代用 `./lx.ps1 check <changed-path> [...]` 一次覆盖明确变更；范围不清才加 `--plan`。产品路径无 smoke/visual/具理由静态映射则失败，结构不清才 `inspect`。
+- 冻结/发布、公共契约、跨域框架或验证门禁变更才运行 `./lx.ps1 validate`；提交/推送不升级范围，GitHub 验证仅手动触发。
 - 首次 `check` 前补齐所有受影响运行时路径的验证映射（包括登记清单自身）；`validate` 通过不能抵消未解决的路径级 `check` 失败。
 - `./lx.ps1 export windows` 依赖同版 Godot export templates，不属于无模板环境的默认 `validate`；完整 outcome eval 会消耗外部额度，未确认只运行 preflight。

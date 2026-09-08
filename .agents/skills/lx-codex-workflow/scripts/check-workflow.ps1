@@ -100,6 +100,9 @@ if ($errors.Count -eq 0) {
         ".agents/skills/lx-model-eval/scripts/summarize-acceptance.ps1",
         "lx.ps1",
         "godot_project/lx.ps1",
+        "godot_project/tools/LXFramework.Tools/CheckPlan.ps1",
+        "godot_project/tools/LXFramework.Tools/TestCheckPlan.ps1",
+        "godot_project/tools/LXFramework.Tools/TestIncrementalValidation.ps1",
         ".agents/skills/lx-codex-workflow/scripts/check-workflow.ps1",
         ".agents/skills/lx-model-eval/scripts/run-model-evals.ps1"
     )) {
@@ -157,6 +160,15 @@ if ($errors.Count -eq 0) {
         }
     }
 
+    # Remote engine provisioning is opt-in, independent of a normal Git push.
+    $ci = Read-WorkflowText '.github/workflows/validate.yml'
+    $events = [regex]::Match($ci, '(?ms)^on:\s*\r?\n(?<events>.*?)(?=^\S|\z)')
+    $triggers = @([regex]::Matches($events.Groups['events'].Value, '(?m)^  ([a-z_]+):') |
+        ForEach-Object { $_.Groups[1].Value })
+    if (-not $events.Success -or $triggers.Count -ne 1 -or $triggers[0] -ne 'workflow_dispatch') {
+        Add-WorkflowError 'Remote validation must have only an explicit workflow_dispatch trigger.'
+    }
+
     $budgets = @{
         "AGENTS.md" = 4096
         ".codex/memory/INDEX.md" = 1536
@@ -167,9 +179,24 @@ if ($errors.Count -eq 0) {
             Write-Warning "'$($item.Key)' is $length bytes; review the $($item.Value)-byte context target."
         }
     }
-    Push-Location $repoRoot
-    try { $agentFiles = @(& rg --files --hidden -g AGENTS.md -g '!.lx/**' -g '!**/bin/**' -g '!**/obj/**' -g '!**/.godot/**') }
-    finally { Pop-Location }
+    # Repository validation must not require an editor-bundled search executable.
+    # Prune generated/cache directories before traversal, not after enumeration.
+    $agentFiles = [System.Collections.Generic.List[string]]::new()
+    $pendingDirectories = [System.Collections.Generic.Stack[string]]::new()
+    $pendingDirectories.Push($repoRoot)
+    while ($pendingDirectories.Count -gt 0) {
+        foreach ($entry in Get-ChildItem -LiteralPath $pendingDirectories.Pop() -Force) {
+            if ($entry.Attributes -band [System.IO.FileAttributes]::ReparsePoint) { continue }
+            if ($entry.PSIsContainer) {
+                if ($entry.Name -notin @('.git','.lx','.godot','.mono','.tools','bin','obj','build','artifacts','research')) {
+                    $pendingDirectories.Push($entry.FullName)
+                }
+            }
+            elseif ($entry.Name -eq 'AGENTS.md') {
+                $agentFiles.Add($entry.FullName.Substring($repoRoot.Length + 1).Replace('\','/'))
+            }
+        }
+    }
     foreach ($relativeAgent in $agentFiles) {
         $path = Get-Item -LiteralPath (Resolve-RepoPath $relativeAgent)
         if ($relativeAgent -ne 'AGENTS.md' -and $path.Length -gt 1800) {

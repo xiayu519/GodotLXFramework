@@ -5,66 +5,86 @@ internal static class Validator
     public static int Run(string root, IReadOnlyList<string>? arguments = null)
     {
         var changedPaths = ParseChangedPaths(arguments ?? []);
+        var scope = new ValidationScope(changedPaths);
         var errors = new List<string>();
-        ValidateProject(root, errors);
-        ValidateJson(root, errors);
-        ValidateLuban(root, errors);
-        ValidateUi(root, errors);
-        ValidateResources(root, errors);
-        ValidateRegistrations(root, errors);
-        ValidateArchitecture(root, changedPaths, errors);
-        ValidatePublicApiDocumentation(root, errors);
-        if (PublicApiBaseline.Validate(root) is { } apiError)
+        var checks = new List<string>();
+        void Check(string name, Action action) { checks.Add(name); action(); }
+        Check("project", () => ValidateProject(root, errors));
+        Check("json", () => ValidateJson(root, errors, scope.Full ? null : changedPaths));
+        if (scope.Luban) { Check("luban", () => ValidateLuban(root, errors)); }
+        if (scope.Ui) { Check("ui", () => ValidateUi(root, errors)); }
+        if (scope.Resources(root)) { Check("resources", () => ValidateResources(root, errors)); }
+        if (scope.Registrations) { Check("registrations", () => ValidateRegistrations(root, errors)); }
+        if (scope.Architecture)
         {
-            errors.Add(apiError);
+            Check("architecture", () => ValidateArchitecture(root,
+                scope.Touches("content/game", "content/features") ? null : changedPaths, errors));
         }
-        ValidateBrandAndApi(root, errors);
-        ValidateHumanTooling(root, errors);
-        ValidateGenerated(root, errors);
-        ValidateCapabilities(root, errors);
-        if (MaintenancePlanner.ValidateTransactionEngine() is { } transactionError)
+        if (scope.PublicApi)
         {
-            errors.Add(transactionError);
+            Check("public-api", () =>
+            {
+                ValidatePublicApiDocumentation(root, errors, scope.Full ? null : changedPaths);
+                if (PublicApiBaseline.Validate(root) is { } apiError) { errors.Add(apiError); }
+            });
         }
-        if (MigrationPlanner.ValidateClassifier() is { } migrationError)
+        Check("brand", () => ValidateBrandAndApi(root, errors, scope.Full ? null : changedPaths));
+        if (scope.Generated) { Check("generated", () => ValidateGenerated(root, errors)); }
+        if (scope.Full)
         {
-            errors.Add(migrationError);
-        }
-        if (ProductSmokeImpact.ValidateClassifier() is { } impactError)
-        {
-            errors.Add(impactError);
-        }
-        if (ResGenerator.ValidatePartitioning() is { } resPartitionError)
-        {
-            errors.Add(resPartitionError);
-        }
-        if (ProductSmokeRunner.ValidateProtocol() is { } smokeProtocolError)
-        {
-            errors.Add(smokeProtocolError);
-        }
-        if (ExportRunner.ValidateProtocol() is { } exportProtocolError)
-        {
-            errors.Add(exportProtocolError);
-        }
-        if (VisualRunner.ValidateProtocol() is { } visualProtocolError)
-        {
-            errors.Add(visualProtocolError);
-        }
-        if (AssetBudgetValidator.ValidateProtocol(root) is { } assetBudgetProtocolError)
-        {
-            errors.Add(assetBudgetProtocolError);
-        }
-        if (ProductSourceStructureAnalyzer.ValidateRules() is { } productStructureError)
-        {
-            errors.Add(productStructureError);
+            Check("human-tooling", () => ValidateHumanTooling(root, errors));
+            Check("capabilities", () => ValidateCapabilities(root, errors));
+            checks.Add("tool-protocols");
+            if (MaintenancePlanner.ValidateTransactionEngine() is { } transactionError)
+            {
+                errors.Add(transactionError);
+            }
+            if (MigrationPlanner.ValidateClassifier() is { } migrationError)
+            {
+                errors.Add(migrationError);
+            }
+            if (ProductSmokeImpact.ValidateClassifier() is { } impactError)
+            {
+                errors.Add(impactError);
+            }
+            if (ResGenerator.ValidatePartitioning() is { } resPartitionError)
+            {
+                errors.Add(resPartitionError);
+            }
+            if (ProductSmokeRunner.ValidateProtocol() is { } smokeProtocolError)
+            {
+                errors.Add(smokeProtocolError);
+            }
+            if (ExportRunner.ValidateProtocol() is { } exportProtocolError)
+            {
+                errors.Add(exportProtocolError);
+            }
+            if (VisualRunner.ValidateProtocol() is { } visualProtocolError)
+            {
+                errors.Add(visualProtocolError);
+            }
+            if (AssetBudgetValidator.ValidateProtocol(root) is { } assetBudgetProtocolError)
+            {
+                errors.Add(assetBudgetProtocolError);
+            }
+            if (ProductSourceStructureAnalyzer.ValidateRules() is { } productStructureError)
+            {
+                errors.Add(productStructureError);
+            }
         }
 
-        var report = new ValidationReport(DateTimeOffset.UtcNow, errors.Count == 0, errors);
-        var output = Path.Combine(root, ".lx", "validation.json");
+        var report = new ValidationReport(DateTimeOffset.UtcNow, errors.Count == 0, errors)
+        {
+            Scope = scope.Full ? "full-static" : "changed-static",
+            ChangedPaths = changedPaths?.Order(StringComparer.Ordinal).ToArray() ?? [],
+            Checks = checks,
+        };
+        // A successful incremental check must not overwrite full-gate evidence.
+        var output = Path.Combine(root, ".lx", changedPaths is null ? "validation.json" : "validation-changed.json");
         ToolFiles.WriteJson(output, report);
         if (errors.Count == 0)
         {
-            Console.WriteLine($"LXFramework static validation passed -> {ToolFiles.Relative(root, output)}");
+            Console.WriteLine($"LXFramework static validation passed ({report.Scope}: {string.Join(",", checks)}) -> {ToolFiles.Relative(root, output)}");
             return 0;
         }
 
@@ -162,7 +182,7 @@ internal static class Validator
         }
     }
 
-    private static void ValidateJson(string root, ICollection<string> errors)
+    private static void ValidateJson(string root, ICollection<string> errors, IReadOnlySet<string>? changedPaths = null)
     {
         var contentRoot = Path.Combine(root, "content");
         if (!Directory.Exists(contentRoot))
@@ -171,7 +191,12 @@ internal static class Validator
             return;
         }
 
-        foreach (var path in Directory.EnumerateFiles(contentRoot, "*.json", SearchOption.AllDirectories))
+        var jsonPaths = changedPaths is null
+            ? Directory.EnumerateFiles(contentRoot, "*.json", SearchOption.AllDirectories)
+            : EnumerateChangedFiles(root, changedPaths).Where(path =>
+                path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) &&
+                path.StartsWith(contentRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase));
+        foreach (var path in jsonPaths)
         {
             try
             {
@@ -363,7 +388,8 @@ internal static class Validator
             }
         }
         var coreRoot = Path.Combine(root, "src", "LXFramework.Core");
-        foreach (var path in EnumerateSourceFiles(coreRoot))
+        foreach (var path in EnumerateSourceFiles(coreRoot)
+                     .Where(path => changedPaths is null || IsChangedProductSource(ToolFiles.Relative(root, path), changedPaths)))
         {
             var content = File.ReadAllText(path);
             AddArchitectureDiagnostics(
@@ -395,14 +421,16 @@ internal static class Validator
 
         var frameworkRoot = Path.Combine(root, "src", "LXFramework");
         foreach (var path in EnumerateSourceFiles(frameworkRoot)
-                     .Where(path => !IsUnderGeneratedDirectory(path)))
+                     .Where(path => !IsUnderGeneratedDirectory(path))
+                     .Where(path => changedPaths is null || IsChangedProductSource(ToolFiles.Relative(root, path), changedPaths)))
         {
             var content = File.ReadAllText(path);
             AddArchitectureDiagnostics(
                 root, path, content, ArchitectureLayer.Adapter, gameManifest.RootNamespace, errors);
         }
 
-        if (productRoot is not null && Directory.Exists(productRoot))
+        if (productRoot is not null && Directory.Exists(productRoot) &&
+            (changedPaths is null || changedPaths.Any(path => ValidationScope.Related(path, ToolFiles.Relative(root, productRoot)))))
         {
             var productSources = EnumerateSourceFiles(productRoot)
                 .Where(path => !IsUnderGeneratedDirectory(path))
@@ -415,6 +443,7 @@ internal static class Validator
                 .ToArray();
             foreach (var source in productSources)
             {
+                if (changedPaths is not null && !IsChangedProductSource(source.RelativePath, changedPaths)) { continue; }
                 if (!source.Content.Contains($"namespace {gameManifest.RootNamespace};", StringComparison.Ordinal) &&
                     !source.Content.Contains($"namespace {gameManifest.RootNamespace}.", StringComparison.Ordinal))
                 {
@@ -532,8 +561,8 @@ internal static class Validator
     {
         foreach (var changedPath in changedPaths)
         {
-            if (string.Equals(sourcePath, changedPath, StringComparison.Ordinal) ||
-                sourcePath.StartsWith(changedPath.TrimEnd('/') + "/", StringComparison.Ordinal))
+            if (string.Equals(sourcePath, changedPath, StringComparison.OrdinalIgnoreCase) ||
+                sourcePath.StartsWith(changedPath.TrimEnd('/') + "/", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
@@ -541,7 +570,7 @@ internal static class Validator
         return false;
     }
 
-    private static void ValidatePublicApiDocumentation(string root, ICollection<string> errors)
+    private static void ValidatePublicApiDocumentation(string root, ICollection<string> errors, IReadOnlySet<string>? changedPaths = null)
     {
         foreach (var sourceRoot in new[]
                  {
@@ -550,7 +579,8 @@ internal static class Validator
                  })
         {
             foreach (var path in EnumerateSourceFiles(sourceRoot)
-                         .Where(path => !IsUnderGeneratedDirectory(path)))
+                         .Where(path => !IsUnderGeneratedDirectory(path))
+                         .Where(path => changedPaths is null || IsChangedProductSource(ToolFiles.Relative(root, path), changedPaths)))
             {
                 foreach (var diagnostic in PublicApiDocumentationAnalyzer.Analyze(File.ReadAllText(path)))
                 {
@@ -821,7 +851,7 @@ internal static class Validator
         }
     }
 
-    private static void ValidateBrandAndApi(string root, ICollection<string> errors)
+    private static void ValidateBrandAndApi(string root, ICollection<string> errors, IReadOnlySet<string>? changedPaths = null)
     {
         var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -832,7 +862,10 @@ internal static class Validator
         {
             ".cs", ".csproj", ".sln", ".ps1", ".md", ".json", ".godot", ".tscn", ".tres",
         };
-        foreach (var path in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories)
+        var candidates = changedPaths is null
+            ? EnumeratePrunedFiles(root, excluded)
+            : EnumerateChangedFiles(root, changedPaths);
+        foreach (var path in candidates
                      .Where(path => textExtensions.Contains(Path.GetExtension(path)))
                      .Where(path => !ToolFiles.Relative(root, path).Split('/').Any(excluded.Contains)))
         {
@@ -878,6 +911,38 @@ internal static class Validator
             File.Exists(Path.Combine(root, "peach" + "wind.ps1")))
         {
             errors.Add("LXFramework resource module or root tool naming is inconsistent.");
+        }
+    }
+
+    private static IEnumerable<string> EnumerateChangedFiles(string root, IReadOnlySet<string> paths)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var excluded = new HashSet<string>([".git", ".godot", ".lx", ".tools", "bin", "obj"], StringComparer.OrdinalIgnoreCase);
+        foreach (var relative in paths)
+        {
+            var path = Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(path)) { if (seen.Add(path)) { yield return path; } }
+            else if (Directory.Exists(path))
+            {
+                foreach (var file in EnumeratePrunedFiles(path, excluded))
+                {
+                    if (seen.Add(file)) { yield return file; }
+                }
+            }
+        }
+    }
+
+    private static IEnumerable<string> EnumeratePrunedFiles(string directory, IReadOnlySet<string> excluded)
+    {
+        foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
+        {
+            var attributes = File.GetAttributes(entry);
+            if ((attributes & FileAttributes.ReparsePoint) != 0) { continue; }
+            if ((attributes & FileAttributes.Directory) == 0) { yield return entry; }
+            else if (!excluded.Contains(Path.GetFileName(entry)))
+            {
+                foreach (var child in EnumeratePrunedFiles(entry, excluded)) { yield return child; }
+            }
         }
     }
 
@@ -964,7 +1029,12 @@ internal static class Validator
 internal sealed record ValidationReport(
     DateTimeOffset ValidatedAtUtc,
     bool Success,
-    IReadOnlyList<string> Errors);
+    IReadOnlyList<string> Errors)
+{
+    public string Scope { get; init; } = "full-static";
+    public IReadOnlyList<string> ChangedPaths { get; init; } = [];
+    public IReadOnlyList<string> Checks { get; init; } = [];
+}
 
 internal sealed record LubanToolchain(
     int SchemaVersion,

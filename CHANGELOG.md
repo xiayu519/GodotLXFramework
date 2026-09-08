@@ -6,6 +6,8 @@
 
 ### Changed
 
+- 验证改为本地优先、按实际路径和风险分级；提交/推送不再单独触发全量验证，GitHub Actions 只保留人工运行及可选 soak/export。
+- `check` 增加无工具链探测的 `--plan`，普通文档及指令配置走无引擎通道；代码静态检查按域收窄，独立测试文件可按类运行，共享 Core 变更保留回归覆盖。局部报告与完整报告分开保存。
 - Codex 工作流迁移至 GPT-6 Astra，默认 `low`（Light），配置支持 `medium/high/xhigh/max`；普通与 Plan 档位可通过项目启动器显式统一，不自动修改全局配置或切换已有会话。
 - 精简并明确 `AGENTS.md` 与语义 Skill 的主动执行、只读边界、脚手架范围和按风险验证规则；保留按需 Project Knowledge，旧 Sol 基线归档为已替代的历史证据。
 - 模型评测扩展为 16 项路由、6 项实施和 2 项独立行为用例。2026-09-08 的 Astra Light 基础套件最终 23/23，xhigh 复杂代表 3/3 功能通过；包含原实现重放及一次 Light 同档位复测，xhigh 脚手架用例保留效率预算告警。medium/high/max 仅配置验证，未新增 Sol 回归或 token 性价比承诺。
@@ -13,13 +15,14 @@
 
 ### Added
 
-- 版本化公开 API 基线、push/PR CI、可选多轮 Godot soak，以及标签/手动 Windows Release export。
+- 版本化公开 API 基线、手动 CI、可选多轮 Godot soak 与 Windows Release export。
 - 可恢复维护事务状态机与 `doctor|upgrade --recover`。
 - Astra 项目启动器、冻结评测输入和逐文件指纹、原始改动归档、无模型调用的确定性重放及跨批次验收汇总。
 - 回合状态与异步奖励的独立 C# 行为断言，以及 25 项离线验收契约回归；功能正确性和 token/工具效率预算分别报告。
 
 ### Fixed
 
+- 移除工作流检查对 `rg` 的隐式依赖，避免 GitHub runner 缺少搜索工具导致门禁失败；增加无外部 CLI 的文本/指令检查及隔离源文件增量正负向回归。
 - PackedScene 池、ActionRunner、GameFlow、LXHost 与 WorldChunkStreamer 的关闭、清理和所有权边界。
 - AssetRegistry 共享 inflight 进度观察者隔离、RuntimeBridge I/O 容错、诊断分区按需采集和设置按键默认值恢复。
 - Capability 副作用分类、Mono export template 版本识别和无 .NET SDK 时的 PowerShell 前置诊断。

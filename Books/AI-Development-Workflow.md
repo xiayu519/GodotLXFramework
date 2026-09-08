@@ -26,7 +26,7 @@ godot_project/**/AGENTS.md       工程及目录职责与依赖边界
 3. 跨模块且需要结构概览时运行 `./lx.ps1 inspect`；新结构统一使用 `./lx.ps1 create ...`。
 4. 修改事实源和非生成代码；生成目录由工具维护。
 5. 迭代时把本次明确变更路径一次传给 `./lx.ps1 check`；产品 smoke 由清单路径映射自动收窄，缺陷复现只补跑失败场景和同契约代表样本。
-6. 提交/推送、内容冻结/发布、公共框架或验证基础设施变更时运行一次 `./lx.ps1 validate`；普通内容填充和局部缺陷修复不重复全量验证。
+6. 按 `AGENTS.md` 的风险边界决定完整 `./lx.ps1 validate`；提交/推送本身不升级范围，相关输入未变且无新失败/风险时复用证据。范围不清才用 `check --plan`，不把预览变成每次必跑步骤。
 
 需要确认可用命令、副作用或验收方式时，运行 `./lx.ps1 capabilities <id> --json`；完整能力目录由 `inspect` 写到 `.lx/capabilities.json`，不进入常驻提示。Godot Editor/Debug 已运行时，通过 `./lx.ps1 runtime snapshot <section> --json` 读取当前会话的 UI、资源、Actions 等有界状态，响应必须匹配当前 `sessionId/generation`。
 
@@ -42,7 +42,9 @@ Luban 保留 JSON 作为可审查的策划源，但运行时统一生成 C# 强�
 
 环境修复和当前 checkout 派生状态升级使用 `doctor|upgrade --plan`，再按计划 `--apply`；文件写入前先保存哈希、备份和事务 journal，验证失败自动回滚。进程中断用 `--recover <plan-id>`，apply 后的人工修改发生哈希冲突时停止恢复而不覆盖。.NET/Godot 等系统安装只作为外部阻塞报告，没有明确授权不自动执行。
 
-普通 push/PR CI 运行完整 `validate`。多轮 `./lx.ps1 soak` 只在定时或手动 CI 运行；Windows Release export 只在版本标签或手动触发时安装精确 Mono templates 并产出 artifact，因此不会拖慢日常 Codex 迭代。
+GitHub Actions 仅手动触发，不在 push、PR、标签或定时任务中启动验证。手动运行保留完整 `validate`，可额外选择 soak 和 Windows Release export；仅 export 安装精确 Mono templates 并产出 artifact。日常质量证据来自本地按范围检查，不把本地模型 CLI 或云端工具安装当作每次提交条件。
+
+纯文档 `check` 不探测 .NET/Godot；指令配置增加纯 PowerShell 工作流检查。代码静态门禁按领域和文件选择，单个 Core 测试文件可只跑对应测试类；Core 生产代码仍保留共享回归测试。普通产品改动不重复工具协议自测，未知路径保守保留全静态域，产品 smoke/visual 仍严格按路径映射。局部报告写入 `.lx/validation-changed.json`，不覆盖全静态报告；普通提交不需要重跑完整模型验收。
 
 运行时复杂顺序由 `LX.Actions` 组合已有 UI、Scene、Audio 等服务。Actions 属于调用方 `LifetimeScope`，其活动和最近终结树进入运行时 snapshot；它不替代 GameFlow、StateMachine、Scheduler 或 Tween。
 

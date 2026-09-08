@@ -52,7 +52,7 @@ internal static class Program
               capabilities [id]              写入机器可读能力、前置条件、副作用与验收配方。
               data                            用固定版本 Luban 生成强类型 C# 与 .bytes 二进制表。
               generate [--verbose]           生成目录与绑定；默认只报告汇总。
-              check <changed-path> [...]      执行最小去重检查组合（仅 lx.ps1）。
+              check [--plan] <changed-path> [...]  按路径验证；--plan 只读预览，不探测工具环境（仅 lx.ps1）。
               validate                       校验事实源、生成结果并完成最终门禁。
               smoke                          用 Godot 无窗口导入并启动框架。
               smoke product [id|all|affected <path> ...] 运行指定、全部或受变更路径影响的产品烟测。
