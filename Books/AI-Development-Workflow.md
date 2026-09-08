@@ -1,6 +1,6 @@
 # LXFramework AI 开发工作流
 
-LXFramework 把 Codex 视为第一开发者，把手动编程视为第二入口。唯一保证环境是 `gpt-5.6-sol/high`，普通任务与 Plan mode 使用同一配置；其他模型或 reasoning 不进入兼容承诺。
+LXFramework 把 Codex 视为第一开发者，把手动编程视为第二入口。项目默认 `gpt-6-astra/low`（Light），复杂任务可选 `xhigh`（Extra High）；各档位沿用同一套质量门禁，实际验收覆盖看模型报告。
 
 ## 文件布局
 
@@ -12,6 +12,7 @@ godot_project/                   唯一 Godot 工程与 res:// 根
 godot_project/**/AGENTS.md       工程及目录职责与依赖边界
 .agents/skills/                  按框架、玩法、UI、输入、内容、资源、数据和 Codex 控制面分开的语义 Skill
 .codex/config.toml               默认模型与 reasoning
+.codex/start-codex.ps1           Astra 启动入口，显式设置普通与 Plan 档位
 .codex/memory/                   可版本化 Project Knowledge
 .codex/work/                     未完成的跨会话临时状态
 ```
@@ -37,7 +38,7 @@ Luban 保留 JSON 作为可审查的策划源，但运行时统一生成 C# 强�
 
 静态门禁使用 C# 12 语法树输出 `LX_ARCH_001` 至 `LX_ARCH_004`，覆盖 Core/Godot、adapter/product、产品动态加载和静态服务状态边界；`LX_DOC_001` 保证公开枚举、枚举成员与常量具备人工可读注释，版本化 API 基线阻止未审查的公开签名漂移。Godot headless 门禁把每个运行时场景断言作为独立 scenario 写入 `.lx/smoke.json`，不会只依赖一条笼统的启动成功日志。`validate` 还会执行已声明的 Debug 产品 smoke、EventHub 严格零分配 benchmark，并比较框架与已声明产品 UI 视觉基准；语义视觉使用 headless，真实 Viewport 证据使用隐藏、不可聚焦的渲染窗口并只强制绘制声明帧，所有自动验收均不显示 GUI。
 
-回答、审查和诊断默认只读；明确要求修改时，Codex 可直接完成范围内的本地非破坏性操作。只有会改变结果的重要歧义、外部写入、破坏性操作或实质扩展范围才需要确认。这比固定的“大中小任务等级”更直接，也减少 Sol/high 在路由阶段消耗的 token。
+回答、审查和诊断默认只读；明确要求修改时，Codex 可直接完成范围内的本地非破坏性操作。只有会改变结果的重要歧义、外部写入、破坏性操作或实质扩展范围才需要确认。这比固定的“大中小任务等级”更直接，也避免在路由阶段重复消耗 token。
 
 环境修复和当前 checkout 派生状态升级使用 `doctor|upgrade --plan`，再按计划 `--apply`；文件写入前先保存哈希、备份和事务 journal，验证失败自动回滚。进程中断用 `--recover <plan-id>`，apply 后的人工修改发生哈希冲突时停止恢复而不覆盖。.NET/Godot 等系统安装只作为外部阻塞报告，没有明确授权不自动执行。
 
@@ -47,10 +48,54 @@ Luban 保留 JSON 作为可审查的策划源，但运行时统一生成 C# 强�
 
 ## 项目记忆
 
-Project Knowledge 不是源码索引。能够从源码、清单或 `inspect` 重新得到的信息不记录；只有无法直接推导、但会影响未来决策的问题、取舍、用户反馈和外部参考结论才进入 `.codex/memory/`。模型先读索引，再按任务最多读取少量相关条目。
+Project Knowledge 不是源码索引。能够从源码、清单或 `inspect` 重新得到的信息不记录；只有无法直接推导、但会影响未来决策的问题、取舍、用户反馈和外部参考结论才进入 `.codex/memory/`。模型先读 [INDEX.md](../.codex/memory/INDEX.md)，再按任务读取最相关的 1–3 条；当前源码与生效指令优先于历史记忆。
 
-## 模型兼容验证
+升级保留原有架构决策和用户反馈，新增 Astra 验收基线；旧 Sol 基线保留历史并标为 `superseded`。同一仓库中的新会话和不同模型可以读取这些文件，但这不是自动永久保存或加载全部聊天记录的功能，临时进度也不进入稳定知识。
 
-工作流静态检查负责发现文件缺失、错误默认模型、超长常驻提示、失效链接、Skill 描述预算和旧入口残留；真实模型评测只运行 Sol/high。通过与否由仓库状态和 `./lx.ps1 validate` 决定，同时记录 Skill 正负路由、token、工具调用、重试和延迟，不能用模型自评代替。当前 schema 有 21 个用例并覆盖全部语义 Skill；完整套件消耗外部模型额度，未确认时只运行 `-PreflightOnly`。
+## Astra 档位与模型验收
+
+日常明确小改从 Light 开始；希望固定一个日常档位时可以选择 medium，复杂架构、跨轮异步或迁移任务选择 high/xhigh，max 用于确有必要的困难任务。参数是 `low/medium/high/xhigh/max`，不要写 `light`、`exhigh` 或把 Ultra 当 API effort。更高档位不豁免测试，也不扩大操作授权。固定 medium 仍保留按风险选择验证范围的流程，并不意味着所有小改都执行全量检查。
+
+```powershell
+# Inspect the native CLI and effective settings without a model call.
+.\.codex\start-codex.ps1 -Effort low -PrintOnly
+# Start Astra Light with low effort for both normal and Plan modes.
+.\.codex\start-codex.ps1 -Effort low
+# Use medium for both modes; this profile is configuration-tested only.
+.\.codex\start-codex.ps1 -Effort medium
+# Use xhigh for complex tasks in both modes.
+.\.codex\start-codex.ps1 -Effort xhigh
+```
+
+脚本不改变全局配置。直接在桌面/IDE 选择模型和档位也可；已有会话不会因项目配置被自动切换。项目只固定普通默认档位，Plan 未显式设置时采用客户端内置预设；需要可复现的同档位 Plan 时用上述启动脚本。
+
+### Sol 的使用边界
+
+开发规则、Skill、本地记忆和 Godot/C# 工具不依赖 Astra 专有 API。在客户端选择 `gpt-5.6-sol/high` 或 `xhigh` 后，可以继续使用同一套开发规则；当前会话的模型以客户端实际选择为准。这表示工程机制可以复用，不表示新版套件已经完成 Sol 回归验收。
+
+- 当前 `start-codex.ps1 -Effort high|xhigh` 选择的是 Astra 对应档位，不会切到 Sol。
+- 项目默认值必须与 `evals/evals.json` 中的默认 profile 一致。仅把 `.codex/config.toml` 改成 Sol，或只把默认 effort 改成 medium，会导致 `check` 和 `validate` 的工作流配置检查失败；临时选择应使用客户端或启动参数。
+- 当前 eval schema 和 runner 只接受 Astra。正式增加 Sol 启动/验收 profile 需要同步调整配置契约、脚本和回归用例，再获得额度授权完成真实模型验收；旧 Sol 报告不能代替新版验证。
+
+### 已验证范围与证据
+
+验收分三层：工作流结构检查；无额度消耗的确定性 preflight；用户授权后的真实 Astra 任务评测。当前目录 24 项，Light 基础套件 23 项、xhigh 复杂代表 3 项，其中包含真正执行的状态与异步竞争断言；路由题和代码结果分开计数。静态合格不能替代真实模型验收，骨架生成不能代表完整玩法。
+
+2026-09-08 的发布基线使用 Codex CLI `0.153.0`、Windows PowerShell 5.1 和 Godot 4.7.2 .NET：
+
+| 配置 | 验收结果 | 限定范围 |
+| --- | --- | --- |
+| Astra Light / `low` | 基础套件最终 23/23，效率预算通过 | 16 路由、6 实施、1 行为；一项首次未完成，同档位复测通过 |
+| Astra / `xhigh` | 复杂代表 3/3 功能通过 | 跨域脚手架、回合状态、异步奖励；脚手架题存在工具次数、输入和输出预算告警 |
+| Astra / `medium/high/max` | 配置验证通过 | 未运行这些档位的完整真实模型套件；Plan 档位映射也只验证配置 |
+| Sol / `high/xhigh` | 新版未验收 | 历史 19/19 仅属于旧版 Sol/high，不可外推 |
+
+Light 与 xhigh 套件有重叠，不是 26 个不同任务；路由题也不是完整玩法。行为题中 RoundState 各通过 510 条独立断言，RewardLedger 在 xhigh 通过 23 条断言。验收器通过 25 项离线契约回归，16 个 Skill 通过结构检查，仓库完整 `validate` 通过；这不涵盖长期 soak、Windows export、实际产品美术或 tileset 验收。
+
+报告给出完整/部分覆盖、源指纹、CLI、token（区分缓存）、工具失败、耗时、改动快照与测试日志。旧 Sol 数据只保留为历史；没有同条件 A/B 不承诺省多少 token，也不承诺所有未来游戏任务一次成功。命令和判读见 [模型验收说明](../.agents/skills/lx-model-eval/references/model-evaluation.md)。
+
+版本化摘要见 [Astra 验收基线](../.agents/skills/lx-model-eval/evals/baselines/2026-09-08-astra.json)。本地详细汇总为 `.lx/model-evals/latest-acceptance.json`，原始日志、快照和重放凭据位于 Git 忽略的 `.lx/`，新克隆不会自带这些本地文件。不要把最后一个局部运行的 `latest.json` 当作全套通过。每轮冻结输入；验收器修复可无模型额度重放原实现，真实任务失败则同档位局部复测，所有原始失败记录保留。版本化结果是指定输入与日期的历史证据，后续文档收尾或新提交不会被表述为重新跑过模型。
+
+所列 token 仅统计最终接受的尝试，不是包含全部诊断、中断与失败调用的账单。API 单价、缓存计价和 Codex 套餐额度并不等价；完成任务的成本还取决于上下文、工具往返和返工，不能只凭模型代际或 reasoning 名称判断性价比。
 
 Skill 分层由 `$lx-codex-workflow` 维护，模型 eval 由 `$lx-model-eval` 维护；本书只解释公开使用方式，避免形成第二套指令源。

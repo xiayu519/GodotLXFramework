@@ -5,7 +5,7 @@ description: 创建或修改 Game 产品页面、导航、UI payload 与视觉�
 
 # LX 产品 UI
 
-完整读取 `references/ui-workflow.md`。UI 层级、导航方式或数据契约会改变实现且未确定时，集中提出最多两个问题并停止，不先创建页面。
+完整读取 `references/ui-workflow.md`。先沿用明确的需求和现有 UI 约定；只有无法从现有事实解决、且会改变导航、模态/暂停或数据契约的选择才询问，未决部分不先创建。
 
 产品 UI 通过注入上下文使用 `LX.UI`，不建立 UI 管理器或全局上下文。修改框架 UI 公开 API 才额外使用 `$lx-framework`；真正涉及 Luban 上游表时才使用 `$lx-data`。
 

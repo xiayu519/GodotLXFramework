@@ -1,6 +1,6 @@
 ---
 name: lx-editor-tools
-description: 维护 Godot 编辑器 LX Tools 面板及 CLI 等价入口；不处理游戏场景。
+description: 维护或说明 Godot 编辑器 LX Tools 面板、人工操作与 CLI 等价入口；不处理游戏场景。
 ---
 
 # LX Godot 编辑器工具

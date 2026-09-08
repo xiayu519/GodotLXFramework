@@ -7,7 +7,7 @@ description: 开发 Game 产品的驱动架构、玩法、世界、Feature、场
 
 按任务只读取必要 reference：新游戏驱动架构、事件脚本、通用模块、批量内容或产品缺陷归因用 `references/product-architecture.md`；创建游戏、世界、Feature 或原生节点用 `references/product-structure.md`；玩法、架构契约切片、重开和产品 smoke 用 `references/gameplay-validation.md`。
 
-只读驱动判断先给结论并保持有界：读取本 Skill 与对应的一份 reference 后，只有现有产品事实会改变结论时才查看入口或清单；证据足够即停止，不为提出方案遍历 UI、输入、场景、Public API 或加载其他 Skill。无重复流程和批量内容的小游戏应明确写出“不需要事件脚本”，给出少量类型化模块或确定性状态方案后停止。
+只读驱动判断先给结论并保持有界：从对应 reference 开始，仅为影响决策的事实读取入口、清单或必要的其他领域；证据足够即停止。无重复流程和批量内容的小游戏通常使用少量类型化模块或确定性状态，不为了统一形式增加事件脚本。
 
 只读产品架构方案附带 PC 性能、资源/import 或 Windows Release 预算归属时，`product-architecture.md` 已包含完整决策；不追加内容、资源、运行时观测或框架 Skill，也不搜索 `.agents`。只有任务要求修改对应事实源、动态资源生命周期、活动会话采样或框架实现时才切换或组合这些职责。
 

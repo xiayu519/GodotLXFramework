@@ -19,7 +19,8 @@
 
 ## References
 
-- [语义隔离 Skill 的 Sol/high 19/19 基线](references/2026-08-30-semantic-skill-sol-high-baseline.md)
+- [Astra Light/xhigh 验收基线](references/2026-09-08-astra-workflow-baseline.md)
+- [历史 Sol/high 19/19 基线](references/2026-08-30-semantic-skill-sol-high-baseline.md)
 - [已替代的原 11 项 Sol/high 基线](references/2026-08-30-sol-high-baseline.md)
 
 稳定官方入口维护在 `lx-codex-workflow/references/codex-native-workflow.md`，模型基线由 `lx-model-eval` 维护，不在这里重复镜像。

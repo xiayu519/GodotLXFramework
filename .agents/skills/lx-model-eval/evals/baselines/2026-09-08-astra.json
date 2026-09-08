@@ -1,0 +1,277 @@
+{
+  "all_required_passed": true,
+  "task_inputs_consistent": true,
+  "task_input_hash": "7F6CBC4FCF7E0155209DA2B069EDFB7AF51AB11D8A413C1B3BC992548D43387B",
+  "profiles": [
+    {
+      "profile": "astra-light",
+      "model": "gpt-6-astra",
+      "reasoning": "low",
+      "coverage": {
+        "suite": "foundation",
+        "expected": 23,
+        "executed": 23,
+        "missing": [],
+        "unexpected": [],
+        "complete": true,
+        "passed": true
+      },
+      "passed": true,
+      "functional_passes": 23,
+      "efficiency_budget_passed": true,
+      "input_tokens": 2698826,
+      "cached_input_tokens": 2197760,
+      "uncached_input_tokens": 501066,
+      "output_tokens": 22671,
+      "tool_calls": 117,
+      "duration_seconds": 1686.65
+    },
+    {
+      "profile": "astra-xhigh",
+      "model": "gpt-6-astra",
+      "reasoning": "xhigh",
+      "coverage": {
+        "suite": "complex",
+        "expected": 3,
+        "executed": 3,
+        "missing": [],
+        "unexpected": [],
+        "complete": true,
+        "passed": true
+      },
+      "passed": true,
+      "functional_passes": 3,
+      "efficiency_budget_passed": false,
+      "input_tokens": 1743224,
+      "cached_input_tokens": 1546496,
+      "uncached_input_tokens": 196728,
+      "output_tokens": 26298,
+      "tool_calls": 63,
+      "duration_seconds": 1132.26
+    }
+  ],
+  "cases": [
+    {
+      "profile": "astra-light",
+      "case": "create-game",
+      "kind": "implementation",
+      "passed": true,
+      "rechecked": true,
+      "run_id": "20260908-035442-761"
+    },
+    {
+      "profile": "astra-light",
+      "case": "cross-engine-remake-plan",
+      "kind": "routing",
+      "passed": true,
+      "rechecked": false,
+      "run_id": "20260908-042602-917"
+    },
+    {
+      "profile": "astra-light",
+      "case": "explicit-ui-followthrough",
+      "kind": "implementation",
+      "passed": true,
+      "rechecked": false,
+      "run_id": "20260908-042602-917"
+    },
+    {
+      "profile": "astra-light",
+      "case": "generated-input-discipline",
+      "kind": "implementation",
+      "passed": true,
+      "rechecked": true,
+      "run_id": "20260908-040952-285"
+    },
+    {
+      "profile": "astra-light",
+      "case": "important-ui-ambiguity",
+      "kind": "routing",
+      "passed": true,
+      "rechecked": true,
+      "run_id": "20260908-035442-761"
+    },
+    {
+      "profile": "astra-light",
+      "case": "legacy-lx-upgrade-plan",
+      "kind": "routing",
+      "passed": true,
+      "rechecked": true,
+      "run_id": "20260908-040952-285"
+    },
+    {
+      "profile": "astra-light",
+      "case": "native-node-context",
+      "kind": "implementation",
+      "passed": true,
+      "rechecked": true,
+      "run_id": "20260908-035442-761"
+    },
+    {
+      "profile": "astra-light",
+      "case": "new-rpg-driving-architecture",
+      "kind": "routing",
+      "passed": true,
+      "rechecked": false,
+      "run_id": "20260908-035442-761"
+    },
+    {
+      "profile": "astra-light",
+      "case": "readonly-capability-catalog",
+      "kind": "routing",
+      "passed": true,
+      "rechecked": false,
+      "run_id": "20260908-040952-285"
+    },
+    {
+      "profile": "astra-light",
+      "case": "readonly-framework-boundary",
+      "kind": "routing",
+      "passed": true,
+      "rechecked": false,
+      "run_id": "20260908-042602-917"
+    },
+    {
+      "profile": "astra-light",
+      "case": "readonly-human-tooling",
+      "kind": "routing",
+      "passed": true,
+      "rechecked": false,
+      "run_id": "20260908-040952-285"
+    },
+    {
+      "profile": "astra-light",
+      "case": "readonly-luban-route",
+      "kind": "routing",
+      "passed": true,
+      "rechecked": false,
+      "run_id": "20260908-040952-285"
+    },
+    {
+      "profile": "astra-light",
+      "case": "readonly-maintenance-transaction",
+      "kind": "routing",
+      "passed": true,
+      "rechecked": false,
+      "run_id": "20260908-040952-285"
+    },
+    {
+      "profile": "astra-light",
+      "case": "readonly-model-eval-contract",
+      "kind": "routing",
+      "passed": true,
+      "rechecked": false,
+      "run_id": "20260908-042602-917"
+    },
+    {
+      "profile": "astra-light",
+      "case": "readonly-project-knowledge-route",
+      "kind": "routing",
+      "passed": true,
+      "rechecked": false,
+      "run_id": "20260908-042602-917"
+    },
+    {
+      "profile": "astra-light",
+      "case": "readonly-res-audit",
+      "kind": "routing",
+      "passed": true,
+      "rechecked": false,
+      "run_id": "20260908-035442-761"
+    },
+    {
+      "profile": "astra-light",
+      "case": "readonly-runtime-diagnostics",
+      "kind": "routing",
+      "passed": true,
+      "rechecked": false,
+      "run_id": "20260908-040952-285"
+    },
+    {
+      "profile": "astra-light",
+      "case": "readonly-skill-isolation",
+      "kind": "routing",
+      "passed": true,
+      "rechecked": false,
+      "run_id": "20260908-043202-004"
+    },
+    {
+      "profile": "astra-light",
+      "case": "resource-registration",
+      "kind": "implementation",
+      "passed": true,
+      "rechecked": false,
+      "run_id": "20260908-040952-285"
+    },
+    {
+      "profile": "astra-light",
+      "case": "save-migration-audit",
+      "kind": "routing",
+      "passed": true,
+      "rechecked": false,
+      "run_id": "20260908-040952-285"
+    },
+    {
+      "profile": "astra-light",
+      "case": "small-game-no-script-overdesign",
+      "kind": "routing",
+      "passed": true,
+      "rechecked": false,
+      "run_id": "20260908-035442-761"
+    },
+    {
+      "profile": "astra-light",
+      "case": "stateful-round",
+      "kind": "behavior",
+      "passed": true,
+      "rechecked": false,
+      "run_id": "20260908-042602-917"
+    },
+    {
+      "profile": "astra-light",
+      "case": "vertical-slice",
+      "kind": "implementation",
+      "passed": true,
+      "rechecked": true,
+      "run_id": "20260908-040952-285"
+    },
+    {
+      "profile": "astra-xhigh",
+      "case": "async-reward-restart",
+      "kind": "behavior",
+      "passed": true,
+      "rechecked": true,
+      "run_id": "20260908-035703-222"
+    },
+    {
+      "profile": "astra-xhigh",
+      "case": "stateful-round",
+      "kind": "behavior",
+      "passed": true,
+      "rechecked": true,
+      "run_id": "20260908-035703-222"
+    },
+    {
+      "profile": "astra-xhigh",
+      "case": "vertical-slice",
+      "kind": "implementation",
+      "passed": true,
+      "rechecked": true,
+      "run_id": "20260908-035703-222"
+    }
+  ],
+  "attempt_count": 27,
+  "schema_version": 1,
+  "verified_on": "2026-09-08",
+  "model": "gpt-6-astra",
+  "codex_cli": "0.153.0",
+  "report": ".lx/model-evals/latest-acceptance.json",
+  "method": "Frozen task inputs; evaluator scripts repaired between runs; original implementations deterministically replayed without model calls; latest actual attempt retained for each profile/case.",
+  "limitations": [
+    "Light readonly-skill-isolation returned an unfinished placeholder on its first attempt; the same-effort rerun passed. This is not a first-attempt 100% claim.",
+    "xhigh vertical-slice passed functionality but exceeded three legacy efficiency thresholds. Budgets were not inflated to erase this warning.",
+    "medium/high/max and explicit Plan-effort mapping were configuration-tested, not complete behavioral-suite-tested.",
+    "Routing is not gameplay completion; scaffold UI is not an active-world visual acceptance; no Windows export, long soak or tileset art acceptance is claimed.",
+    "Reported usage covers selected acceptance attempts, excluding diagnosis and interrupted calls; it is not total billing or a controlled Sol/Astra comparison."
+  ]
+}

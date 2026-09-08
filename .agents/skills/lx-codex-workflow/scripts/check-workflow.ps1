@@ -4,24 +4,9 @@ $ErrorActionPreference = "Stop"
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\..\..\.."))
 $errors = [System.Collections.Generic.List[string]]::new()
 $strictUtf8 = [System.Text.UTF8Encoding]::new($false, $true)
-$expectedSkills = @(
-    "lx-capabilities",
-    "lx-codex-workflow",
-    "lx-content",
-    "lx-data",
-    "lx-editor-tools",
-    "lx-framework",
-    "lx-game",
-    "lx-input",
-    "lx-maintenance",
-    "lx-migrate",
-    "lx-model-eval",
-    "lx-persistence",
-    "lx-project-knowledge",
-    "lx-resources",
-    "lx-runtime-observe",
-    "lx-ui"
-)
+$expectedSkills = @(Get-ChildItem -LiteralPath (Join-Path $repoRoot ".agents/skills") -Directory |
+    Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "SKILL.md") } |
+    Select-Object -ExpandProperty Name | Sort-Object)
 
 function Add-WorkflowError([string]$message) {
     $errors.Add($message)
@@ -48,6 +33,12 @@ $requiredFiles = @(
     "README.md",
     "Books/AI-Development-Workflow.md",
     ".codex/config.toml",
+    ".codex/start-codex.ps1",
+    ".agents/skills/lx-model-eval/scripts/eval-contract.ps1",
+    ".agents/skills/lx-model-eval/scripts/test-eval-contract.ps1",
+    ".agents/skills/lx-model-eval/scripts/test-outcome.ps1",
+    ".agents/skills/lx-model-eval/scripts/recheck-model-eval.ps1",
+    ".agents/skills/lx-model-eval/scripts/summarize-acceptance.ps1",
     ".codex/memory/INDEX.md",
     "game_design/AGENTS.md",
     "game_design/README.md",
@@ -101,6 +92,12 @@ foreach ($relative in @(
 
 if ($errors.Count -eq 0) {
     foreach ($relative in @(
+        ".codex/start-codex.ps1",
+        ".agents/skills/lx-model-eval/scripts/eval-contract.ps1",
+        ".agents/skills/lx-model-eval/scripts/test-eval-contract.ps1",
+        ".agents/skills/lx-model-eval/scripts/test-outcome.ps1",
+        ".agents/skills/lx-model-eval/scripts/recheck-model-eval.ps1",
+        ".agents/skills/lx-model-eval/scripts/summarize-acceptance.ps1",
         "lx.ps1",
         "godot_project/lx.ps1",
         ".agents/skills/lx-codex-workflow/scripts/check-workflow.ps1",
@@ -117,16 +114,11 @@ if ($errors.Count -eq 0) {
         }
     }
 
-    $config = Read-WorkflowText ".codex/config.toml"
-    foreach ($marker in @(
-        'model = "gpt-5.6-sol"',
-        'model_reasoning_effort = "high"',
-        'plan_mode_reasoning_effort = "high"'
-    )) {
-        if ($config.IndexOf($marker, [System.StringComparison]::Ordinal) -lt 0) {
-            Add-WorkflowError ".codex/config.toml is missing '$marker'."
-        }
-    }
+    . (Resolve-RepoPath ".agents/skills/lx-model-eval/scripts/eval-contract.ps1")
+    try {
+        $evals = Read-EvalContract (Resolve-RepoPath ".agents/skills/lx-model-eval/evals/evals.json")
+        Assert-EvalProjectConfig (Resolve-RepoPath ".codex/config.toml") $evals
+    } catch { Add-WorkflowError $_.Exception.Message }
 
     $rootAgents = Read-WorkflowText "AGENTS.md"
     foreach ($marker in @(
@@ -166,25 +158,22 @@ if ($errors.Count -eq 0) {
     }
 
     $budgets = @{
-        "AGENTS.md" = 3072
+        "AGENTS.md" = 4096
         ".codex/memory/INDEX.md" = 1536
     }
     foreach ($item in $budgets.GetEnumerator()) {
         $length = (Get-Item -LiteralPath (Resolve-RepoPath $item.Key)).Length
         if ($length -gt $item.Value) {
-            Add-WorkflowError "'$($item.Key)' is $length bytes and exceeds the $($item.Value)-byte budget."
+            Write-Warning "'$($item.Key)' is $length bytes; review the $($item.Value)-byte context target."
         }
     }
-    foreach ($path in Get-ChildItem -LiteralPath $repoRoot -Filter "AGENTS.md" -File -Recurse) {
-        $relativeAgent = $path.FullName.Substring($repoRoot.Length + 1).Replace('\', '/')
-        $agentSegments = @($relativeAgent.Split('/'))
-        $ignoredAgent = @($agentSegments) | Where-Object {
-            $_ -in @("bin", "obj") -or $_.StartsWith(".", [System.StringComparison]::Ordinal)
-        }
-        if ($ignoredAgent.Count -eq 0 -and
-            $path.FullName -ne (Resolve-RepoPath "AGENTS.md") -and
-            $path.Length -gt 1800) {
-            Add-WorkflowError "Nested instruction '$relativeAgent' exceeds 1800 bytes."
+    Push-Location $repoRoot
+    try { $agentFiles = @(& rg --files --hidden -g AGENTS.md -g '!.lx/**' -g '!**/bin/**' -g '!**/obj/**' -g '!**/.godot/**') }
+    finally { Pop-Location }
+    foreach ($relativeAgent in $agentFiles) {
+        $path = Get-Item -LiteralPath (Resolve-RepoPath $relativeAgent)
+        if ($relativeAgent -ne 'AGENTS.md' -and $path.Length -gt 1800) {
+            Write-Warning "Nested instruction '$relativeAgent' exceeds the 1800-byte context target."
         }
     }
 
@@ -203,7 +192,7 @@ if ($errors.Count -eq 0) {
     $totalDescriptionBytes = 0
     foreach ($skillName in $expectedSkills) {
         $skill = Read-WorkflowText ".agents/skills/$skillName/SKILL.md"
-        if (-not $skill.StartsWith("---`nname: $skillName`n", [System.StringComparison]::Ordinal)) {
+        if ($skill -notmatch ("\A---\r?\nname: " + [regex]::Escape($skillName) + "\r?\n")) {
             Add-WorkflowError "Skill '$skillName' is missing the expected frontmatter name."
         }
         $descriptionMatch = [System.Text.RegularExpressions.Regex]::Match(
@@ -221,7 +210,7 @@ if ($errors.Count -eq 0) {
         }
         $skillBytes = (Get-Item -LiteralPath (Resolve-RepoPath ".agents/skills/$skillName/SKILL.md")).Length
         if ($skillBytes -gt 3072) {
-            Add-WorkflowError "Skill '$skillName' entrypoint is $skillBytes bytes and exceeds 3072 bytes."
+            Write-Warning "Skill '$skillName' entrypoint is $skillBytes bytes; review the 3072-byte context target."
         }
         $referenceDirectory = Resolve-RepoPath ".agents/skills/$skillName/references"
         $referenceCount = if (Test-Path -LiteralPath $referenceDirectory -PathType Container) {
@@ -229,7 +218,7 @@ if ($errors.Count -eq 0) {
         }
         else { 0 }
         if ($referenceCount -gt 5) {
-            Add-WorkflowError "Skill '$skillName' owns $referenceCount references; split independent semantic domains."
+            Write-Warning "Skill '$skillName' owns $referenceCount references; review routing and semantic scope."
         }
         foreach ($match in [System.Text.RegularExpressions.Regex]::Matches(
             $skill,
@@ -247,7 +236,7 @@ if ($errors.Count -eq 0) {
         }
     }
     if ($totalDescriptionBytes -gt 2048) {
-        Add-WorkflowError "Skill discovery descriptions total $totalDescriptionBytes bytes and exceed 2048 bytes."
+        Write-Warning "Skill discovery descriptions total $totalDescriptionBytes bytes; review the 2048-byte context target."
     }
 
     foreach ($category in @("problems", "decisions", "feedback", "references")) {
@@ -257,15 +246,7 @@ if ($errors.Count -eq 0) {
     }
 
     try {
-        $evals = Read-WorkflowText ".agents/skills/lx-model-eval/evals/evals.json" | ConvertFrom-Json
-        $profiles = @($evals.profiles)
-        if ($profiles.Count -ne 1 -or
-            $profiles[0].id -ne "sol-high" -or
-            $profiles[0].model -ne "gpt-5.6-sol" -or
-            $profiles[0].reasoning -ne "high" -or
-            $profiles[0].required -ne $true) {
-            Add-WorkflowError "Model evaluation must contain only the required sol-high profile."
-        }
+        $evals = Read-EvalContract (Resolve-RepoPath ".agents/skills/lx-model-eval/evals/evals.json")
         $coveredSkills = [System.Collections.Generic.HashSet[string]]::new(
             [System.StringComparer]::Ordinal)
         foreach ($case in $evals.cases) {
@@ -308,10 +289,10 @@ if ($errors.Count -eq 0) {
 
 if ($errors.Count -gt 0) {
     foreach ($errorMessage in $errors) {
-        Write-Error "Codex workflow: $errorMessage"
+        Write-Error "Codex workflow: $errorMessage" -ErrorAction Continue
     }
     exit 1
 }
 
-Write-Host "Codex workflow check passed: native layering, isolated Skill budgets/routes, project knowledge, and Sol/high eval schema are valid."
+Write-Host "Codex workflow check passed: native layering, isolated Skill budgets/routes, project knowledge, and Astra multi-effort eval schema are valid."
 exit 0

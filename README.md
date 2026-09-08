@@ -37,7 +37,11 @@ LXFramework 是一个 **Codex 优先、面向全 AI 游戏开发** 的 Godot 4.7
 - **交付结果可以验证**：Codex 使用 `lx create` 创建结构，通过类型化 API 实现功能，并以 `check`、`validate` 和实际导出结果作为完成证据。
 - **人与 AI 使用同一套事实源**：Codex 和 CI 使用完整 CLI；Godot 中的 `LX Tools` 只呈现开发者真正需要的中文操作，两者共用相同的清单和生成器。
 
-使用 Codex 时，在仓库根目录打开项目并描述要实现的游戏功能即可。当前唯一保证配置是 `gpt-5.6-sol/high`。具体指令分层和推荐提问方式见 [AI 开发工作流](Books/AI-Development-Workflow.md)。
+Codex 工作流已适配 GPT-6 Astra，项目默认 `gpt-6-astra/low`（Light），可选择 `medium/high/xhigh/max`。任务仍按影响范围和风险决定实施、验证深度；模型档位不改变质量门禁，也不会触发自动升降档。版本化的本地 Project Knowledge 保留架构取舍、稳定用户偏好和历史经验，按任务读取相关条目。
+
+2026-09-08 在 Codex CLI `0.153.0` 下，Light 基础套件最终通过 **23/23**，xhigh 复杂代表套件通过 **3/3**；包含原始实现的确定性重放和一次 Light 同档位复测，xhigh 有一项效率预算告警。`medium/high/max` 仅完成配置验证，不代表所有 Godot 游戏、视觉成品或 Windows 导出均已验收。可复核的摘要见 [Astra 验收基线](.agents/skills/lx-model-eval/evals/baselines/2026-09-08-astra.json)。
+
+运行 `.\.codex\start-codex.ps1 -Effort low -PrintOnly` 查看启动配置。Sol 可在客户端中手动选择并沿用开发规则，但当前启动器和模型验收仅配置 Astra；切换方式、限制及完整使用说明见 [AI 开发工作流](Books/AI-Development-Workflow.md)。
 
 ## 为什么使用 LXFramework
 
@@ -125,7 +129,7 @@ godot_project/
 
 ### 4. 验证项目
 
-日常编辑和运行仍然使用 Godot。完成一项功能后，从仓库外层运行完整检查：
+日常编辑和运行仍然使用 Godot。局部迭代时把本次实际变更路径一次交给 `.\lx.ps1 check`；提交/推送、冻结/发布、公共框架或门禁变更时，再从仓库外层运行完整检查：
 
 ```powershell
 .\lx.ps1 validate
@@ -615,7 +619,7 @@ Godot Editor/Debug 正在运行时，Codex 可以读取当前会话而不修改�
 2. 在产品目录中实现 C# 逻辑，在 Godot 编辑器中编辑场景。
 3. 修改内容清单或 `game_design/` 中的策划源数据。
 4. 把本次明确改动的路径一次交给 `check`。
-5. 功能完成后运行 `validate`。
+5. 提交/推送、冻结/发布、公共框架或门禁变更时运行 `validate`；普通局部迭代通过相关 `check` 后即可结束。
 
 例如：
 
@@ -625,8 +629,11 @@ Godot Editor/Debug 正在运行时，Codex 可以读取当前会话而不修改�
 .\lx.ps1 create input OpenInventory game_open_inventory I
 
 .\lx.ps1 check godot_project/script/MyGame godot_project/content/ui/ui-manifest.json godot_project/content/input/input-manifest.json
+# Run the full gate when preparing this change for commit or release.
 .\lx.ps1 validate
 ```
+
+上例覆盖首次跨域搭建，因此传入整个产品目录；日常修改应尽量传入准确文件路径，避免不必要地扩大烟测和视觉目标。已通过的检查只在相关内容改变、新失败或未决风险出现时重跑，不因多问一句或切换模型档位而重跑。
 
 `check` 用于快速迭代，只运行当前修改需要的生成和检查，但不会以“少跑”为目标牺牲完整性：每条产品运行时变更路径必须命中 `productSmokes[].checkPaths`、`visualTargets[].checkPaths`，或以窄 `pattern` 和可审查 `reason` 登记到 `staticCheckPaths`；命中关系会打印出来，未覆盖路径直接失败。产品 smoke 可指定独立 `scenePath`，用 `checkpoints` 在一个进程报告累计流程，并通过 `ProductSmokeProbe`/`statePolicy` 断言资源、UI、Feature、音频、输入、动作与产品池 gauge 回到基线；代表场景还可用 `performanceChecks` 和 `ProductSmokeProbe.Performance` 在同一进程验证 host work、样本数和内存预算。报告记录耗时、日志大小、失败阶段和有界日志尾部。`validate` 是提交前的完整验证。公开 API 有意改变时，先审查差异，再运行 `.\lx.ps1 api update` 更新版本化基线。
 

@@ -21,3 +21,16 @@
 ## 提交
 
 提交应聚焦一个可验证结果，并更新 `CHANGELOG.md`。不要提交 `.godot/`、`.tools/`、`.lx/`、`bin/`、`obj/` 或本地导出产物。
+
+## Codex 工作流维护
+
+模型与档位目录在 `.agents/skills/lx-model-eval/evals/evals.json`，项目默认配置必须与其一致。`AGENTS.md` 维护稳定工程边界，Skill 维护独立领域规则；说明文档不再复制一套强制指令。修改使用方式时同步检查 `README.md`、`Books/AI-Development-Workflow.md` 和 `CHANGELOG.md`。
+
+修改 Skill 后运行结构校验和工作流检查；修改 eval schema 或 runner 后先运行以下离线检查，再按需要申请真实模型评测额度：
+
+```powershell
+.\.agents\skills\lx-model-eval\scripts\test-eval-contract.ps1
+.\.agents\skills\lx-model-eval\scripts\run-model-evals.ps1 -PreflightOnly
+```
+
+不要把真实模型调用加入未获授权的提交或 CI 流程。提交版本化的精简验收基线，原始日志和隔离副本保留在 `.lx/model-evals/`；报告必须区分配置支持、路由、实现/行为通过与效率告警，不用部分用例、旧模型报告或模型自述冒充完整验收。提交前仍运行完整 `.\lx.ps1 validate`。

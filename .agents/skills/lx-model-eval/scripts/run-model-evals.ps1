@@ -1,76 +1,57 @@
 param(
-    [ValidateSet("smoke", "full")]
-    [string]$Suite = "full",
-
+    [ValidateSet("smoke", "foundation", "complex", "full")]
+    [string]$Suite = "foundation",
+    [string]$Profile = "astra-light",
     [string[]]$CaseId = @(),
-
     [int]$TimeoutMinutes = 20,
-
+    [ValidateRange(1,24)][int]$StopAfterFailures = 3,
+    [string]$CodexPath = "",
+    [string]$PreflightReport = "",
+    [switch]$AllowModelCalls,
+    [switch]$PrintPlan,
     [switch]$PreflightOnly
 )
-
 $ErrorActionPreference = "Stop"
-$repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\..\..\.."))
+$repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../../../.."))
 $projectDirectory = "godot_project"
-$evalPath = Join-Path $repoRoot ".agents\skills\lx-model-eval\evals\evals.json"
+$evalPath = Join-Path $PSScriptRoot "../evals/evals.json"
 $utf8 = [System.Text.UTF8Encoding]::new($false)
-$evals = $utf8.GetString([System.IO.File]::ReadAllBytes($evalPath)) | ConvertFrom-Json
-$profiles = @($evals.profiles)
-if ($profiles.Count -ne 1 -or
-    $profiles[0].id -ne "sol-high" -or
-    $profiles[0].model -ne "gpt-5.6-sol" -or
-    $profiles[0].reasoning -ne "high" -or
-    $profiles[0].required -ne $true) {
-    throw "Evaluation schema must contain only the required sol-high profile."
+. (Join-Path $PSScriptRoot "eval-contract.ps1")
+$evals = Read-EvalContract $evalPath
+$selectedProfile = @($evals.profiles | Where-Object id -eq $Profile)
+if ($selectedProfile.Count -ne 1) { throw "Unknown model profile '$Profile'." }
+$selectedProfile = $selectedProfile[0]
+if ($selectedProfile.model -ne "gpt-6-astra" -or $selectedProfile.reasoning -notin @("low","medium","high","xhigh","max")) { throw "Resolved model profile is invalid; refusing to call a model." }
+$cases = @(Select-EvalCases $evals $Suite $CaseId)
+if ($PrintPlan) {
+    [pscustomobject]@{profile=$selectedProfile.id;model=$selectedProfile.model;reasoning=$selectedProfile.reasoning;suite=$Suite;cases=@($cases.id)} | ConvertTo-Json -Depth 3
+    exit 0
 }
-$profile = $profiles[0]
-$cases = if ($Suite -eq "smoke") {
-    @($evals.cases | Where-Object { $_.suite -eq "smoke" })
+if (-not $PreflightOnly -and -not $AllowModelCalls) {
+    throw "Real model calls require user authorization and -AllowModelCalls. Use -PreflightOnly for offline checks."
 }
-else {
-    @($evals.cases)
+$codexExecutable = Resolve-EvalCodex $CodexPath
+$codexVersion = (& $codexExecutable --version) -join ""
+# Fingerprint actual working-tree inputs, not just HEAD: dirty workflow revisions must invalidate preflight reuse.
+Push-Location $repoRoot
+try { $sourceFiles = @(& rg --files --hidden | Sort-Object) } finally { Pop-Location }
+$inputHashes = @{}
+$fingerprints = foreach ($relative in $sourceFiles) {
+    if ($relative -match '(^|[\\/])(\.git|\.godot|\.lx|\.tools|bin|obj|artifacts|TestResults)([\\/]|$)') { continue }
+    $inputHashes[$relative] = (Get-FileHash -LiteralPath (Join-Path $repoRoot $relative) -Algorithm SHA256).Hash
+    "$relative=$($inputHashes[$relative])"
 }
-if ($CaseId.Count -gt 0) {
-    $cases = @($cases | Where-Object { $_.id -in $CaseId })
-    foreach ($requestedCase in $CaseId) {
-        if ($requestedCase -notin @($cases.id)) {
-            throw "Unknown case '$requestedCase' for suite '$Suite'."
-        }
-    }
-}
-if ($cases.Count -eq 0) {
-    throw "No cases selected."
-}
-
-$codexCandidates = @(Get-Command codex -All -ErrorAction Stop | Where-Object {
-    $_.CommandType -eq [System.Management.Automation.CommandTypes]::Application
-})
-# PowerShell can resolve an npm .ps1 shim before the native Codex executable.
-# ProcessStartInfo intentionally bypasses shell execution, so select a native
-# Windows executable when one is available instead of weakening that boundary.
-$isWindowsHost = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
-    [System.Runtime.InteropServices.OSPlatform]::Windows)
-$codexCommand = if ($isWindowsHost) {
-    $codexCandidates | Where-Object {
-        [string]$_.Source -like "*.exe"
-    } | Select-Object -First 1
-}
-else {
-    $codexCandidates | Select-Object -First 1
-}
-$codexExecutable = [string]$codexCommand.Source
-if ($null -eq $codexCommand -or
-    $codexCommand.CommandType -ne [System.Management.Automation.CommandTypes]::Application -or
-    [string]::IsNullOrWhiteSpace($codexExecutable) -or
-    -not (Test-Path -LiteralPath $codexExecutable -PathType Leaf)) {
-    throw "Codex CLI must resolve to an executable application, got '$($codexCommand.CommandType)' at '$codexExecutable'."
-}
+$hasher = [System.Security.Cryptography.SHA256]::Create()
+try { $sourceHash = [BitConverter]::ToString($hasher.ComputeHash($utf8.GetBytes(($fingerprints -join "`n")))).Replace("-","") }
+finally { $hasher.Dispose() }
+$schemaHash = (Get-FileHash -LiteralPath $evalPath -Algorithm SHA256).Hash
 $hostExe = (Get-Process -Id $PID).Path
-$runId = (Get-Date).ToUniversalTime().ToString("yyyyMMdd-HHmmss")
+$runId = (Get-Date).ToUniversalTime().ToString("yyyyMMdd-HHmmss-fff")
 $outputRoot = Join-Path $repoRoot ".lx\model-evals"
 $runRoot = Join-Path $outputRoot $runId
 $fixtureRoot = Join-Path $runRoot "fixtures"
 $artifactRoot = Join-Path $runRoot "artifacts"
+$inputRoot = Join-Path $runRoot "inputs"
 New-Item -ItemType Directory -Path $fixtureRoot, $artifactRoot -Force | Out-Null
 
 function Write-Utf8([string]$path, [string]$content) {
@@ -81,30 +62,22 @@ function Write-Utf8([string]$path, [string]$content) {
     [System.IO.File]::WriteAllText($path, $content, $utf8)
 }
 
+# Freeze inputs once. Model tasks never read a moving checkout as their fixture baseline.
+New-Item -ItemType Directory -Path $inputRoot -Force | Out-Null
+foreach ($relative in $inputHashes.Keys) {
+    $target = Join-Path $inputRoot $relative
+    New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $repoRoot $relative) -Destination $target
+    if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne $inputHashes[$relative]) {
+        throw "Source changed while snapshotting '$relative'; restart evaluation."
+    }
+}
+Write-Utf8 (Join-Path $runRoot "source-manifest.json") ($inputHashes | ConvertTo-Json)
 function Copy-EvalRepository([string]$destination) {
-    New-Item -ItemType Directory -Path $destination -Force | Out-Null
-    Push-Location $repoRoot
-    try {
-        $relativeFiles = @(& rg --files --hidden)
-        if ($LASTEXITCODE -ne 0) {
-            throw "rg failed while enumerating the evaluation fixture."
-        }
-    }
-    finally {
-        Pop-Location
-    }
-    foreach ($relative in $relativeFiles) {
-        $normalized = $relative.Replace('\', '/')
-        $segments = @($normalized.Split('/'))
-        if (@($segments | Where-Object {
-            $_ -in @(".git", ".godot", ".lx", ".tools", "bin", "obj", "artifacts", "TestResults")
-        }).Count -gt 0) {
-            continue
-        }
-        $source = Join-Path $repoRoot $relative
+    foreach ($relative in $inputHashes.Keys) {
         $target = Join-Path $destination $relative
         New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
-        Copy-Item -LiteralPath $source -Destination $target
+        Copy-Item -LiteralPath (Join-Path $inputRoot $relative) -Destination $target
     }
 }
 
@@ -480,6 +453,16 @@ if ([string]::IsNullOrWhiteSpace($lubanPath) -or -not (Test-Path -LiteralPath $l
 }
 $env:LX_LUBAN_DLL = $lubanPath
 
+$reusePreflight = $false
+if ($PreflightReport) {
+    $previous = Get-Content -LiteralPath $PreflightReport -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($previous.passed -ne $true -or $previous.source_hash -ne $sourceHash -or $previous.codex_cli -ne $codexVersion) {
+        throw "Preflight report does not match this source tree and CLI. Run a fresh preflight."
+    }
+    $reusePreflight = $true
+    Write-Host "Reusing matching preflight: $PreflightReport"
+}
+if (-not $reusePreflight) {
 $preflightFixture = Join-Path $fixtureRoot "_preflight"
 $preflightMigrationFixture = Join-Path $fixtureRoot "_preflight_source"
 try {
@@ -647,6 +630,9 @@ finally {
     Remove-EvalFixture $preflightFixture
     Remove-EvalFixture $preflightMigrationFixture
 }
+} # fresh preflight
+$preflightResult = [ordered]@{ passed=$true; source_hash=$sourceHash; schema_hash=$schemaHash; codex_cli=$codexVersion; generated_at_utc=(Get-Date).ToUniversalTime().ToString("o"); reused_from=$PreflightReport }
+Write-Utf8 (Join-Path $runRoot "preflight.json") ($preflightResult | ConvertTo-Json)
 if ($PreflightOnly) {
     Write-Host "Evaluation preflight passed: JSON contract, syntax-tree boundary, game, migration plan, product coverage/smoke/visual, scaffolds, and validate."
     exit 0
@@ -657,11 +643,11 @@ $totalRuns = $cases.Count
 $runNumber = 0
 foreach ($case in $cases) {
         $runNumber++
-        $caseKey = "$($profile.id)-$($case.id)"
+        $caseKey = "$($selectedProfile.id)-$($case.id)"
         $fixture = Join-Path $fixtureRoot $caseKey
         $artifacts = Join-Path $artifactRoot $caseKey
         New-Item -ItemType Directory -Path $artifacts -Force | Out-Null
-        Write-Host "[$runNumber/$totalRuns] $($profile.model)/$($profile.reasoning) :: $($case.id)"
+        Write-Host "[$runNumber/$totalRuns] $($selectedProfile.model)/$($selectedProfile.reasoning) :: $($case.id)"
         try {
         $started = Get-Date
         $failures = [System.Collections.Generic.List[string]]::new()
@@ -692,6 +678,8 @@ foreach ($case in $cases) {
 
             & git -C $fixture init --quiet
             if ($LASTEXITCODE -ne 0) { throw "git init failed for fixture." }
+            & git -C $fixture config core.autocrlf false
+            & git -C $fixture config core.quotepath false
             & git -C $fixture config user.name "LX Eval"
             & git -C $fixture config user.email "lx-eval@invalid.local"
             Write-Utf8 (Join-Path $fixture ".git\info\exclude") ".eval-output/`n"
@@ -723,8 +711,9 @@ foreach ($case in $cases) {
                 "--color", "never",
                 "--sandbox", "danger-full-access",
                 "--cd", $fixture,
-                "--model", [string]$profile.model,
-                "--config", "model_reasoning_effort=$($profile.reasoning)",
+                "--model", [string]$selectedProfile.model,
+                "--config", "model_reasoning_effort=$($selectedProfile.reasoning)",
+                "--config", "plan_mode_reasoning_effort=$($selectedProfile.reasoning)",
                 "--config", "approval_policy='never'",
                 "--output-last-message", $lastMessagePath,
                 "-"
@@ -754,7 +743,7 @@ foreach ($case in $cases) {
             $process.StandardInput.BaseStream.Write($promptBytes, 0, $promptBytes.Length)
             $process.StandardInput.Close()
             if (-not $process.WaitForExit($TimeoutMinutes * 60 * 1000)) {
-                $process.Kill()
+                & taskkill.exe /PID $process.Id /T /F | Out-Null
                 $process.WaitForExit()
                 $failures.Add("Codex timed out after $TimeoutMinutes minutes.")
             }
@@ -778,6 +767,16 @@ foreach ($case in $cases) {
             }
             $events = @(Read-JsonEvents $eventsPath)
             $changedFiles = @(& git -C $fixture status --porcelain=v1)
+            Write-Utf8 (Join-Path $artifacts "changes.patch") ((& git -C $fixture diff --binary HEAD) -join "`n")
+            $artifactFiles = @(& git -C $fixture ls-files --modified --others --exclude-standard)
+            foreach ($relative in $artifactFiles) {
+                $source = Join-Path $fixture $relative
+                if (Test-Path -LiteralPath $source -PathType Leaf) {
+                    $target = Join-Path $artifacts "changed-files/$relative"
+                    New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
+                    Copy-Item -LiteralPath $source -Destination $target -Force
+                }
+            }
             $readSkills = @(Get-ReadSkillNames $events)
 
             foreach ($skillName in @($case.expected_skills | Where-Object {
@@ -801,23 +800,7 @@ foreach ($case in $cases) {
             if ($case.expected_write -eq $true -and $changedFiles.Count -eq 0) {
                 $failures.Add("Write case produced no repository changes.")
             }
-            foreach ($term in @($case.expected_terms | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })) {
-                if ($finalMessage.IndexOf([string]$term, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
-                    $failures.Add("Final response is missing expected term '$term'.")
-                }
-            }
-            foreach ($group in @($case.expected_term_groups)) {
-                $groupMatched = $false
-                foreach ($term in @($group.any)) {
-                    if ($finalMessage.IndexOf([string]$term, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
-                        $groupMatched = $true
-                        break
-                    }
-                }
-                if (-not $groupMatched) {
-                    $failures.Add("Final response is missing every term in semantic group: $(@($group.any) -join ', ').")
-                }
-            }
+            foreach ($message in @(Get-EvalResponseFailures $case $finalMessage)) { $failures.Add($message) }
             $completedCommandText = @($events | Where-Object {
                 $_.type -eq "item.completed" -and $_.item.type -eq "command_execution"
             } | ForEach-Object { [string]$_.item.command }) -join "`n"
@@ -857,6 +840,21 @@ foreach ($case in $cases) {
                     $failures.Add("Expected $($case.question_count.min)-$($case.question_count.max) questions, got $questionCount.")
                 }
             }
+            if ($case.outcome) {
+                $outcomeExit = Invoke-ChildPowerShell @(
+                    "-File", (Join-Path $inputRoot ".agents/skills/lx-model-eval/scripts/test-outcome.ps1"),
+                    "-Outcome", [string]$case.outcome, "-Fixture", $fixture,
+                    "-OutputDirectory", (Join-Path $artifacts "oracle")
+                ) (Join-Path $artifacts "outcome.log")
+                if ($outcomeExit -ne 0) { $failures.Add("Independent outcome '$($case.outcome)' failed (exit $outcomeExit).") }
+            }
+            if ($case.expected_write -eq $true) {
+                $checkPaths = @(Get-EvalCheckPaths $artifactFiles)
+                if ($checkPaths.Count -gt 0) {
+                    $checkExit = Invoke-ChildPowerShell (@("-File", (Join-Path $fixture "lx.ps1"), "check") + $checkPaths) (Join-Path $artifacts "changed-path-check.log")
+                    if ($checkExit -ne 0) { $failures.Add("Independent changed-path check failed (exit $checkExit); validate cannot override it.") }
+                }
+            }
             if ($case.validate -eq $true) {
                 $validationLog = Join-Path $artifacts "validation.log"
                 $validateExitCode = Invoke-ChildPowerShell @(
@@ -871,8 +869,15 @@ foreach ($case in $cases) {
             $failures.Add($_.Exception.Message)
         }
 
-        $usageEvent = @($events | Where-Object { $_.type -eq "turn.completed" } | Select-Object -Last 1)
-        $usage = if ($usageEvent.Count -gt 0) { $usageEvent[0].usage } else { $null }
+        $usageEvents = @($events | Where-Object { $_.type -eq "turn.completed" -and $null -ne $_.usage })
+        $usage = if ($usageEvents.Count -gt 0) {
+            [pscustomobject]@{
+                input_tokens=($usageEvents.usage | Measure-Object input_tokens -Sum).Sum
+                cached_input_tokens=($usageEvents.usage | Measure-Object cached_input_tokens -Sum).Sum
+                output_tokens=($usageEvents.usage | Measure-Object output_tokens -Sum).Sum
+            }
+        } else { $null }
+        if ($null -eq $usage) { $failures.Add("Missing completed model usage; cost and completion are unverified.") }
         $toolCalls = @($events | Where-Object {
             $_.type -eq "item.completed" -and
             $_.item.type -in @("command_execution", "mcp_tool_call", "file_change", "web_search")
@@ -884,14 +889,15 @@ foreach ($case in $cases) {
                 $_.item.status -eq "failed" -and
                 -not ($_.item.exit_code -eq 1 -and $_.item.command -match '(?i)\brg(?:\.exe)?\s'))
         }).Count
-        $inputTokens = if ($null -ne $usage) { [long]$usage.input_tokens } else { 0 }
-        $cachedInputTokens = if ($null -ne $usage) { [long]$usage.cached_input_tokens } else { 0 }
-        $uncachedInputTokens = $inputTokens - $cachedInputTokens
-        $outputTokens = if ($null -ne $usage) { [long]$usage.output_tokens } else { 0 }
+        $inputTokens = if ($null -ne $usage) { [long]$usage.input_tokens } else { $null }
+        $cachedInputTokens = if ($null -ne $usage) { [long]$usage.cached_input_tokens } else { $null }
+        $uncachedInputTokens = if ($null -ne $usage) { $inputTokens - $cachedInputTokens } else { $null }
+        $outputTokens = if ($null -ne $usage) { [long]$usage.output_tokens } else { $null }
+        $efficiencyWarnings = [System.Collections.Generic.List[string]]::new()
         if ($null -ne $case.budgets) {
             foreach ($budget in @(
                 @{ Name = "tool_calls"; Actual = $toolCalls },
-                @{ Name = "retries"; Actual = $retries },
+                @{ Name = "failed_events"; Actual = $retries },
                 @{ Name = "input_tokens"; Actual = $inputTokens },
                 @{ Name = "uncached_input_tokens"; Actual = $uncachedInputTokens },
                 @{ Name = "output_tokens"; Actual = $outputTokens }
@@ -899,25 +905,28 @@ foreach ($case in $cases) {
                 $limit = $case.budgets.($budget.Name)
                 if ($null -ne $limit -and [long]$budget.Actual -gt [long]$limit) {
                     $budgetMessage = "$($budget.Name) budget exceeded: $($budget.Actual) > $limit."
-                    $failures.Add($budgetMessage)
+                    $efficiencyWarnings.Add($budgetMessage)
                 }
             }
         }
         $durationSeconds = [math]::Round(((Get-Date) - $started).TotalSeconds, 2)
         $result = [pscustomobject][ordered]@{
-            profile = [string]$profile.id
-            model = [string]$profile.model
-            reasoning = [string]$profile.reasoning
+            profile = [string]$selectedProfile.id
+            model = [string]$selectedProfile.model
+            reasoning = [string]$selectedProfile.reasoning
             case = [string]$case.id
             passed = ($failures.Count -eq 0)
             failures = @($failures)
-            efficiency_budget_passed = (-not @($failures | Where-Object { $_ -like "* budget exceeded:*" }).Count)
-            efficiency_warnings = @()
+            kind = [string]$case.kind
+            usage_available = ($null -ne $usage)
+            efficiency_budget_passed = ($null -ne $usage -and $efficiencyWarnings.Count -eq 0)
+            efficiency_warnings = @($efficiencyWarnings)
+            read_skills = @($readSkills)
             exit_code = $exitCode
             validation_exit_code = $validateExitCode
             changed_file_count = $changedFiles.Count
             tool_calls = $toolCalls
-            retries = $retries
+            failed_events = $retries
             input_tokens = $inputTokens
             cached_input_tokens = $cachedInputTokens
             uncached_input_tokens = $uncachedInputTokens
@@ -926,6 +935,7 @@ foreach ($case in $cases) {
             artifact_path = ".lx/model-evals/$runId/artifacts/$caseKey"
         }
         $results.Add($result)
+        Write-Utf8 (Join-Path $artifacts "result.json") ($result | ConvertTo-Json -Depth 10)
         $status = if ($result.passed) { "PASS" } else { "FAIL" }
         Write-Host "  $status | tokens=$($result.input_tokens + $result.output_tokens) | tools=$toolCalls | seconds=$durationSeconds"
         if (-not $result.passed) {
@@ -937,13 +947,17 @@ foreach ($case in $cases) {
         finally {
             Remove-EvalFixture $fixture
         }
+        if (@($results | Where-Object { -not $_.passed }).Count -ge $StopAfterFailures) {
+            Write-Warning "Stopped after $StopAfterFailures failures; remaining cases are explicitly missing, not passed."
+            break
+        }
 }
 
 $profileResults = @($results)
 $profileSummary = [pscustomobject][ordered]@{
-        profile = [string]$profile.id
-        model = [string]$profile.model
-        reasoning = [string]$profile.reasoning
+        profile = [string]$selectedProfile.id
+        model = [string]$selectedProfile.model
+        reasoning = [string]$selectedProfile.reasoning
         passed = @($profileResults | Where-Object { $_.passed }).Count
         total = $profileResults.Count
         pass_rate = if ($profileResults.Count -gt 0) {
@@ -954,16 +968,25 @@ $profileSummary = [pscustomobject][ordered]@{
         uncached_input_tokens = ($profileResults | Measure-Object uncached_input_tokens -Sum).Sum
         output_tokens = ($profileResults | Measure-Object output_tokens -Sum).Sum
         tool_calls = ($profileResults | Measure-Object tool_calls -Sum).Sum
-        retries = ($profileResults | Measure-Object retries -Sum).Sum
+        failed_events = ($profileResults | Measure-Object failed_events -Sum).Sum
         duration_seconds = [math]::Round(($profileResults | Measure-Object duration_seconds -Sum).Sum, 2)
     }
 $summary = [pscustomobject][ordered]@{
-    schema_version = 1
+    schema_version = 2
+    source_hash = $sourceHash
+    input_snapshot = ".lx/model-evals/$runId/inputs"
+    eval_schema_hash = $schemaHash
+    codex_executable = $codexExecutable
+    environment = "isolated CLI; user config/rules and optional apps/plugins disabled; repository skills enabled"
+    selected_case_ids = @($cases.id)
+    coverage = Get-EvalCoverage $evals $Suite @($results)
+    full_coverage = Get-EvalCoverage $evals "full" @($results)
+    efficiency_budget_passed = (@($results | Where-Object { -not $_.efficiency_budget_passed }).Count -eq 0)
     run_id = $runId
     generated_at_utc = (Get-Date).ToUniversalTime().ToString("o")
-    codex_cli = (& $codexExecutable --version)
+    codex_cli = $codexVersion
     suite = $Suite
-    all_passed = (@($results | Where-Object { -not $_.passed }).Count -eq 0)
+    all_passed = ($results.Count -eq $cases.Count -and @($results | Where-Object { -not $_.passed }).Count -eq 0)
     profiles = @($profileSummary)
     results = @($results)
 }
@@ -971,6 +994,10 @@ $summaryJson = $summary | ConvertTo-Json -Depth 10
 $summaryPath = Join-Path $runRoot "summary.json"
 Write-Utf8 $summaryPath $summaryJson
 Write-Utf8 (Join-Path $outputRoot "latest.json") $summaryJson
+Write-Utf8 (Join-Path $outputRoot "latest-$($selectedProfile.id).json") $summaryJson
+if ($summary.coverage.complete) {
+    Write-Utf8 (Join-Path $outputRoot "latest-$($selectedProfile.id)-$Suite.json") $summaryJson
+}
 Write-Host "Summary: $summaryPath"
 Write-Host "  $($profileSummary.profile): $($profileSummary.passed)/$($profileSummary.total), tokens=$($profileSummary.input_tokens + $profileSummary.output_tokens), tools=$($profileSummary.tool_calls), seconds=$($profileSummary.duration_seconds)"
 if (-not $summary.all_passed) {

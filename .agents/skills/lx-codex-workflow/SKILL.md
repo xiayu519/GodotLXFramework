@@ -14,4 +14,4 @@ description: 维护 AGENTS、Skill 语义边界和提示上下文预算；不处
 - 每条规则只维护一个来源；保留授权、硬约束、成功与证据，删除同义重复。
 - 产品内容登记、Capability 目录、运行时观测、doctor/upgrade 事务、模型 eval 和 `.codex/memory` 分别使用 `$lx-content`、`$lx-capabilities`、`$lx-runtime-observe`、`$lx-maintenance`、`$lx-model-eval`、`$lx-project-knowledge`。
 
-修改后对全部 Skill 运行 `quick_validate.py`，再运行 `scripts/check-workflow.ps1`。路由变化必须在 `$lx-model-eval` 增加正向和负向用例。
+修改后用 `python -X utf8` 调用系统 skill-creator 的 `quick_validate.py` 校验全部 Skill，再运行 `scripts/check-workflow.ps1`。路由变化必须在 `$lx-model-eval` 增加正向和负向用例。
