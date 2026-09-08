@@ -120,6 +120,8 @@ internal static class UIContractSmoke
             Require(!fresh.IsClosed && ui.IsOpen(fresh.UIId), "Stale cached handle closed a newer activation.");
             await fresh.CloseAsync();
 
+            await UIBackContractSmoke.RunAsync(ui);
+
             var transient = new UIContractProbeState { WaitInShow = true };
             var singleton = new UIContractProbeState { WaitInEnter = true };
             var a = ui.OpenAsync(new UIId("contract.popup"), transient).AsTask();

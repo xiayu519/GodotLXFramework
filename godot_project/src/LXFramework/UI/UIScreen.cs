@@ -67,8 +67,9 @@ public abstract partial class UIScreen : Control, ILXContextReceiver
         CancellationToken cancellationToken) => ValueTask.CompletedTask;
 
     /// <summary>
-    /// 语义 Cancel 动作触发时，由最上层弹窗或页面调用。
-    /// 返回 true 允许 UIService 关闭当前页面。
+    /// Handles semantic Cancel for the topmost popup or page.
+    /// Return true to accept Back, including when this callback requests closure itself.
+    /// UIService awaits this activation's cleanup and never closes a replacement activation.
     /// </summary>
     protected internal virtual ValueTask<bool> OnBackRequestedAsync(CancellationToken cancellationToken) =>
         ValueTask.FromResult(true);

@@ -43,6 +43,10 @@ $ui=Get-LxCheckPlan $projectRoot @('scene/ui/Example.tscn')
 Assert-Check ($ui.needs.generate -and $ui.needs.productSmoke -and -not $ui.needs.frameworkVisual) 'Product UI selected unrelated framework visuals.'
 $frameworkUi=Get-LxCheckPlan $projectRoot @('src/LXFramework/UI/UIScreen.cs')
 Assert-Check ($frameworkUi.needs.frameworkVisual -and $frameworkUi.needs.frameworkSmoke) 'Framework UI lost smoke/visual coverage.'
+foreach ($runtimeProbePath in @('tests/Runtime', 'tests/Runtime/framework_bootstrap_probe.gd', 'tools/LXFramework.Tools/GodotSmoke.cs')) {
+    $runtimeProbe=Get-LxCheckPlan $projectRoot @($runtimeProbePath)
+    Assert-Check ($runtimeProbe.needs.frameworkSmoke -and -not $runtimeProbe.needs.frameworkVisual -and -not $runtimeProbe.needs.tests) 'Bootstrap probe lost runtime coverage or selected unrelated visual/Core tests.'
+}
 $data=Get-LxCheckPlan $projectRoot @('game_design/data/design_probe.json')
 Assert-Check $data.needs.data 'Luban source change skipped generation.'
 $tool=Get-LxCheckPlan $projectRoot @('tools/LXFramework.Tools/Validator.cs')

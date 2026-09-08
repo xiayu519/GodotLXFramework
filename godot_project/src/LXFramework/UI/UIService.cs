@@ -26,6 +26,7 @@ public sealed class UIService : IAsyncDisposable
         public long OpenSequence { get; set; }
         public UIVisualState State { get; set; }
         public TaskCompletionSource<UICompletion>? Completion { get; set; }
+        public TaskCompletionSource CloseCompletion { get; set; } = null!;
         public CancellationTokenSource? OpeningCancellation { get; set; }
         public TaskCompletionSource? OpeningCallbacks { get; set; }
         public Control? ModalBlocker { get; set; }
@@ -236,6 +237,7 @@ public sealed class UIService : IAsyncDisposable
             var completion = new TaskCompletionSource<UICompletion>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             instance.Completion = completion;
+            instance.CloseCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             instance.Activation = activation;
             instance.Screen.SetActivation(activation);
             Action<UICompletion> closeHandler = result =>
@@ -507,16 +509,16 @@ public sealed class UIService : IAsyncDisposable
         }
         var activation = instance.Activation;
         var activationId = instance.InstanceId;
+        // The callback may close and reopen the same cached node, even synchronously.
+        // Keep the old activation's outcome after it leaves both active and closing tables.
+        var closeTask = instance.CloseCompletion.Task;
         if (!await instance.Screen.OnBackRequestedAsync(activation.Token))
         {
             return false;
         }
 
-        if (!ReferenceEquals(instance.Activation, activation) || !_active.ContainsKey(activationId))
-        {
-            return false;
-        }
         await CloseAsync(activationId);
+        await closeTask;
         return true;
     }
 
@@ -534,7 +536,7 @@ public sealed class UIService : IAsyncDisposable
         {
             return ValueTask.CompletedTask;
         }
-        var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finished = instance.CloseCompletion;
         _closing.Add(instanceId, (instance, finished.Task));
         _ = FinishCloseAsync(instance, completion, finished);
         return new ValueTask(finished.Task);

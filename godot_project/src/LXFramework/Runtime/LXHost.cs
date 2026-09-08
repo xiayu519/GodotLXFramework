@@ -266,11 +266,15 @@ public partial class LXHost : Node
 
     private async Task BootFrameworkAsync(CancellationToken cancellationToken)
     {
+        var userArguments = OS.GetCmdlineUserArgs();
+        var visualMode = GetArgument(userArguments, "--lx-visual-mode=");
+        var isFrameworkSmoke =
+            userArguments.Contains("--lx-framework-smoke", StringComparer.Ordinal) ||
+            userArguments.Contains("--lx-export-smoke", StringComparer.Ordinal);
+        var failureMarker = visualMode is not null ? "LX_VISUAL" : isFrameworkSmoke ? "LX_FRAMEWORK_SMOKE" : null;
         try
         {
             UIHandle? frameworkStatus = null;
-            var userArguments = OS.GetCmdlineUserArgs();
-            var visualMode = GetArgument(userArguments, "--lx-visual-mode=");
             if (visualMode is not null)
             {
                 var visualCaptureMode = RequireArgument(userArguments, "--lx-visual-capture-mode=");
@@ -333,25 +337,26 @@ public partial class LXHost : Node
                 return;
             }
 
-            var isFrameworkSmoke =
-                userArguments.Contains("--lx-framework-smoke", StringComparer.Ordinal) ||
-                userArguments.Contains("--lx-export-smoke", StringComparer.Ordinal);
             var settings = await LX.Settings.InitializeAsync(cancellationToken);
             if (settings.IsFailure)
             {
                 GD.PushWarning($"LXFramework settings fallback was used: {settings.Error}");
             }
 
-            var initialWorldId = string.IsNullOrWhiteSpace(InitialWorldId)
-                ? GameCatalog.InitialWorldId
-                : InitialWorldId;
-            if (!string.IsNullOrWhiteSpace(initialWorldId))
+            // Framework probes own their worlds. Product startup is verified by product smoke.
+            if (!isFrameworkSmoke)
             {
-                await LX.Scenes.ChangeAsync(new WorldId(initialWorldId), cancellationToken);
-            }
-            else if (!string.IsNullOrWhiteSpace(InitialWorldScene))
-            {
-                await LX.Scenes.ChangeAsync(InitialWorldScene, cancellationToken);
+                var initialWorldId = string.IsNullOrWhiteSpace(InitialWorldId)
+                    ? GameCatalog.InitialWorldId
+                    : InitialWorldId;
+                if (!string.IsNullOrWhiteSpace(initialWorldId))
+                {
+                    await LX.Scenes.ChangeAsync(new WorldId(initialWorldId), cancellationToken);
+                }
+                else if (!string.IsNullOrWhiteSpace(InitialWorldScene))
+                {
+                    await LX.Scenes.ChangeAsync(InitialWorldScene, cancellationToken);
+                }
             }
 
             if (ShowFrameworkStatus || isFrameworkSmoke)
@@ -384,7 +389,7 @@ public partial class LXHost : Node
                 GetTree().Quit();
             }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested && failureMarker is null)
         {
             IsBooted = false;
             BootError = "LXFramework bootstrap was cancelled.";
@@ -393,18 +398,30 @@ public partial class LXHost : Node
         {
             IsBooted = false;
             BootError = exception.ToString();
-            LX.Events.Publish(new FrameworkBootCompleted(false, BootError));
-            LX.Diagnostics.Log(
-                DiagnosticSeverity.Critical,
-                "runtime.bootstrap",
-                "LXFramework bootstrap failed.",
-                exception);
-            if (GetArgument(OS.GetCmdlineUserArgs(), "--lx-visual-mode=") is not null)
+            try
             {
-                GD.Print($"LX_VISUAL_FAIL: {exception}");
-                try { await ShutdownAsync(quit: false); }
-                catch (Exception cleanupFailure) { GD.Print($"LX_VISUAL_CLEANUP_FAIL: {cleanupFailure}"); }
-                GetTree().Quit(1);
+                if (_lifetime is { IsDisposed: false })
+                    LX.Events.Publish(new FrameworkBootCompleted(false, BootError));
+                LX.Diagnostics.Log(
+                    DiagnosticSeverity.Critical,
+                    "runtime.bootstrap",
+                    "LXFramework bootstrap failed.",
+                    exception);
+            }
+            finally
+            {
+                // Diagnostics and cleanup failures must never leave an automated bootstrap running.
+                if (failureMarker is not null)
+                {
+                    GD.Print($"{failureMarker}_FAIL: {exception}");
+                    try
+                    {
+                        await ShutdownAsync(quit: false);
+                        GD.Print($"{failureMarker}_FAILURE_CLEANUP_PASS");
+                    }
+                    catch (Exception cleanupFailure) { GD.Print($"{failureMarker}_CLEANUP_FAIL: {cleanupFailure}"); }
+                    finally { GetTree().Quit(1); }
+                }
             }
         }
     }

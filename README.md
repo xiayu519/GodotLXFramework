@@ -404,6 +404,8 @@ await handle.CloseAsync();
 
 Chrome 不随普通页面导航或 Back 被移除；模态页面提供全屏指针屏障，并禁用下方 UI 的键盘/手柄焦点，关闭后恢复可交互性。`RequestBackAsync` 优先关闭最新 Popup，然后是 Screen，不处理 Chrome/Overlay。普通 Chrome 场景仍须合理设置 `MouseFilter`，避免空白区域拦住页面。
 
+`OnBackRequestedAsync` 返回 `true` 表示接受本次 Back；即使回调通过 `RequestClose`、结果完成后的 `await using` 或其他关闭入口先关闭了自己，`RequestBackAsync` 仍等待该激活的清理，成功后返回 `true`，清理失败则传播异常。回调期间缓存页面重开不会被旧 Back 关闭。返回 `false` 表示拒绝；没有可处理页面时也返回 `false`。
+
 关闭 UI 会取消尚未结束的 `OnShowAsync`/Entering，并等待回调结束后执行 Exiting、`OnHideAsync`、激活期释放，再缓存或销毁实例。自定义异步钩子必须观察传入的取消令牌，不应在钩子内等待自己的关闭任务；忽略取消的回调不会被强制终止，框架会等待其结束，防止访问已释放或已复用的节点。缓存节点每次打开都有独立句柄标识，旧句柄与旧 owner 延迟回调不会关闭新激活。`await parentLifetime.DisposeAsync()` 也会等待所拥有 UI 的关闭，不只是发出取消请求。
 
 全屏黑幕过场由内置缓存 prefab 执行。`FadeOut` 会保持黑幕，后续 `FadeIn` 将其移除；
@@ -655,6 +657,8 @@ Godot Editor/Debug 正在运行时，Codex 可以读取当前会话而不修改�
 | 未知路径 / 共享验证工具 | 保守保留完整静态检查；验证门禁改动再执行完整 `validate` |
 
 局部静态报告为 `godot_project/.lx/validation-changed.json`，记录范围、路径和实际检查项，不覆盖完整静态报告 `validation.json`；文档路径不创建引擎报告。已有完整证据仅在相关输入未改变时复用，增量通过不代表全仓通过。
+
+框架 smoke（包括 `--lx-export-smoke`）只启动框架服务与框架探针，不加载产品初始世界；产品启动、Luban 使用和业务流程由 product smoke 验收，正常游戏启动不受影响。框架启动或 smoke 失败会等待有序清理后以非零码退出，不等待外部 130 秒兜底。`smoke` 还会用固定 `scene/main.tscn` 验证产品隔离，并以独立进程验证 framework/export 失败在 10 秒内退出；完整原始日志保存在 `godot_project/.lx/smoke/<check-name>.log`。连续截图清理不匹配时，日志列出轮次及清理次数、池归还、UI、租约和宿主子节点的实际/预期值，不直接将全局计数变化判定为产品泄漏。
 
 ## Godot 编辑器工具
 

@@ -15,6 +15,8 @@ internal sealed class UIContractProbeState
     internal bool IgnoreCancellation { get; init; }
     internal bool FailOnRelease { get; init; }
     internal bool WaitInHide { get; init; }
+    internal bool FailInHide { get; init; }
+    internal Func<ValueTask<bool>>? BackHandler { get; set; }
     internal UIContractProbeScreen Screen { get; set; } = null!;
     internal CancellationToken Token { get; set; }
     internal int EnterCount { get; set; }
@@ -25,6 +27,9 @@ internal sealed class UIContractProbeState
 internal partial class UIContractProbeScreen : UIScreen
 {
     private UIContractProbeState _state = null!;
+    internal void CloseFromProbe() => RequestClose();
+    protected internal override ValueTask<bool> OnBackRequestedAsync(CancellationToken cancellationToken) =>
+        _state.BackHandler?.Invoke() ?? ValueTask.FromResult(true);
     protected override void OnBindingsReady() => GetNode<Button>("Hit").Pressed += () => _state.ClickCount++;
     protected internal override async ValueTask OnShowAsync(object? payload, CancellationToken cancellationToken)
     {
@@ -55,5 +60,6 @@ internal partial class UIContractProbeScreen : UIScreen
         _state.HideCount++;
         _state.Hiding.SetResult();
         if (_state.WaitInHide) await _state.HideReleased.Task.WaitAsync(cancellationToken);
+        if (_state.FailInHide) throw new InvalidOperationException("probe-hide-failure");
     }
 }

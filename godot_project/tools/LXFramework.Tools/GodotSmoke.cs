@@ -27,6 +27,7 @@ internal static partial class GodotSmoke
 
         var expectedFrameworkMarkers = new List<string>
         {
+            "LX_FRAMEWORK_PRODUCT_ISOLATION_PASS",
             "LX_CONTEXT_INJECTION_PASS",
             "LX_CONTEXT_INJECTION_ORDER_PASS",
             "LX_RUNTIME_GUARDS_PASS",
@@ -50,6 +51,7 @@ internal static partial class GodotSmoke
             "LX_UI_COVER_POLICY_PASS",
             "LX_UI_CHROME_MODAL_PASS",
             "LX_UI_OPEN_CLOSE_RACES_PASS",
+            "LX_UI_BACK_REENTRANCY_PASS",
             "LX_VISUAL_ORDERED_CLEANUP_PASS",
             "LX_UI_RESULT_TRANSITION_PASS",
             "LX_UI_FADE_TRANSITION_PASS",
@@ -63,13 +65,6 @@ internal static partial class GodotSmoke
             "LX_FRAMEWORK_SMOKE_PASS",
             "LX_ASYNC_SHUTDOWN_PASS",
         };
-        var game = ToolFiles.ReadJson<GameManifest>(
-            Path.Combine(root, "content", "game", "game-manifest.json"));
-        if (!string.IsNullOrWhiteSpace(game.Name) && ProductEmitsLubanMarker(root, game))
-        {
-            expectedFrameworkMarkers.Add("LX_LUBAN_BINARY_TABLE_PASS");
-        }
-
         var importCheck = await RunCheckAsync(
             executable,
             root,
@@ -85,7 +80,7 @@ internal static partial class GodotSmoke
                 Errors = importCheck.Errors.Concat(assetBudget.Errors).ToArray(),
             };
         }
-        var checks = new[]
+        var checks = new List<SmokeCheck>
         {
             importCheck,
             await RunCheckAsync(
@@ -94,7 +89,34 @@ internal static partial class GodotSmoke
                 "framework-bootstrap",
                 ["--headless", "--quit-after", "0", "--", "--lx-framework-smoke"],
                 expectedFrameworkMarkers),
+            await RunCheckAsync(
+                executable,
+                root,
+                "export-product-isolation",
+                ["--headless", "--script", "res://tests/Runtime/framework_bootstrap_probe.gd",
+                    "--", "--lx-export-smoke"],
+                expectedFrameworkMarkers),
         };
+        foreach (var mode in new[] { "framework", "export" })
+        {
+            var failure = await RunCheckAsync(
+                executable, root, $"{mode}-bootstrap-failure",
+                ["--headless", "--script", "res://tests/Runtime/framework_bootstrap_probe.gd",
+                    "--", $"--lx-{mode}-smoke", "--lx-bootstrap-probe-failure"],
+                ["LX_BOOTSTRAP_FAILURE_PROBE_ARMED", "LX_FRAMEWORK_SMOKE_FAIL:",
+                    "LX_FRAMEWORK_SMOKE_FAILURE_CLEANUP_PASS",
+                    "must have a UIScreen-derived root, but produced Node"],
+                wallClockTimeout: TimeSpan.FromSeconds(10));
+            // Only the deliberately invalid status root may fail; a timeout is never an expected failure.
+            const string expectedError = "ERROR: [runtime.bootstrap] LXFramework bootstrap failed.";
+            var unexpectedErrors = failure.Errors.Where(error => error != expectedError).ToArray();
+            checks.Add(failure with
+            {
+                Success = failure.ExitCode == 1 && failure.Errors.Contains(expectedError, StringComparer.Ordinal) &&
+                    unexpectedErrors.Length == 0 && failure.Scenarios.All(scenario => scenario.Success),
+                Errors = unexpectedErrors,
+            });
+        }
         var report = new SmokeReport(
             DateTimeOffset.UtcNow,
             executable,
@@ -118,19 +140,8 @@ internal static partial class GodotSmoke
         Console.WriteLine("asset report          .lx/asset-budget.json");
 
         Console.WriteLine($"report               {ToolFiles.Relative(root, output)}");
+        Console.WriteLine("runtime logs         .lx/smoke/<check-name>.log");
         return report.Success ? 0 : 1;
-    }
-
-    private static bool ProductEmitsLubanMarker(string root, GameManifest game)
-    {
-        var sourceRoot = ProductLayout.GetSourceDirectory(root, game);
-        return Directory.Exists(sourceRoot) &&
-               Directory.EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
-                   .Where(path => !path.Split(Path.DirectorySeparatorChar)
-                       .Any(segment => segment is "bin" or "obj" or "Generated"))
-                   .Any(path => File.ReadAllText(path).Contains(
-                       "LX_LUBAN_BINARY_TABLE_PASS",
-                       StringComparison.Ordinal));
     }
 
     internal static async Task<SmokeCheck> RunCheckAsync(
@@ -138,7 +149,8 @@ internal static partial class GodotSmoke
         string root,
         string name,
         IReadOnlyList<string> arguments,
-        IReadOnlyList<string>? expectedMarkers = null)
+        IReadOnlyList<string>? expectedMarkers = null,
+        TimeSpan? wallClockTimeout = null)
     {
         var normalizedArguments = arguments.ToList();
         if (!normalizedArguments.Contains("--headless", StringComparer.Ordinal))
@@ -175,7 +187,8 @@ internal static partial class GodotSmoke
             throw new InvalidOperationException("Failed to start Godot for smoke validation.");
         var stdoutTask = process.StandardOutput.ReadToEndAsync();
         var stderrTask = process.StandardError.ReadToEndAsync();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(130));
+        var deadline = wallClockTimeout ?? TimeSpan.FromSeconds(130);
+        using var timeout = new CancellationTokenSource(deadline);
         var timedOut = false;
         try { await process.WaitForExitAsync(timeout.Token); }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested)
@@ -185,13 +198,14 @@ internal static partial class GodotSmoke
             await process.WaitForExitAsync();
         }
         var combined = string.Join('\n', await stdoutTask, await stderrTask);
+        ToolFiles.WriteText(Path.Combine(root, ".lx", "smoke", name + ".log"), combined);
         var errors = combined
             .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(line => AnsiEscapeRegex().Replace(line, string.Empty))
             .Where(IsEngineError)
             .Distinct(StringComparer.Ordinal)
             .ToList();
-        if (timedOut) errors.Add("Godot smoke exceeded its 130-second wall-clock deadline.");
+        if (timedOut) errors.Add($"Godot smoke exceeded its {deadline.TotalSeconds:g}-second wall-clock deadline.");
         var scenarios = (expectedMarkers ?? [])
             .Select(marker => new SmokeScenario(marker, combined.Contains(marker, StringComparison.Ordinal)))
             .ToArray();

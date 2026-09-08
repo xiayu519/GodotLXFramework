@@ -97,6 +97,9 @@ function Get-LxCheckPlan([string]$ProjectRoot, [string[]]$Paths) {
     $needsFrameworkSmoke = [bool]($changedPaths | Where-Object {
         $_ -in @("src", "src/LXFramework", "content", "content/res") -or
         ($_ -like "src/LXFramework/*" -and $_ -notlike "*.md") -or
+        $_ -eq "tests/Runtime" -or
+        ($_ -like "tests/Runtime/*" -and $_ -notlike "*.md") -or
+        $_ -eq "tools/LXFramework.Tools/GodotSmoke.cs" -or
         ($_ -like "content/res/*" -and $_ -notlike "*.md") -or
         $_ -eq "scene/main.tscn" -or
         $_ -eq "project.godot"

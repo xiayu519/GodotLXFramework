@@ -31,6 +31,9 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
     public async Task RunAsync(UIHandle? frameworkStatus, CancellationToken cancellationToken)
     {
         var LX = context;
+        if (LX.Scenes.ActiveNode is not null)
+            throw new InvalidOperationException("Framework smoke must not start the product initial world.");
+        GD.Print("LX_FRAMEWORK_PRODUCT_ISOLATION_PASS");
         var probeLifetime = LX.Lifetime.CreateChild("Validation:ContextInjection");
         var initializationOrder = new List<string>();
         var rootProbe = new ContextProbeNode { Name = "RootProbe", InitializationOrder = initializationOrder };
