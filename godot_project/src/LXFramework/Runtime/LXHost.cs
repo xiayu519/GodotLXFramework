@@ -305,6 +305,13 @@ public partial class LXHost : Node
                 var baselinePath = GetArgument(userArguments, "--lx-visual-baseline=");
                 var diffPath = GetArgument(userArguments, "--lx-visual-diff=");
                 var reportPath = RequireArgument(userArguments, "--lx-visual-report=");
+                var timeoutSeconds = double.Parse(
+                    GetArgument(userArguments, "--lx-visual-timeout-seconds=") ?? "120",
+                    System.Globalization.CultureInfo.InvariantCulture);
+                if (!double.IsFinite(timeoutSeconds) || timeoutSeconds <= 0 || timeoutSeconds > 120)
+                    throw new InvalidDataException("Visual timeout must be in (0, 120] seconds.");
+                using var visualOperation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                visualOperation.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
                 var report = await new VisualCaptureRunner(this, LX).RunAsync(
                     visualMode,
                     visualCaptureMode,
@@ -318,10 +325,10 @@ public partial class LXHost : Node
                     actualPath,
                     baselinePath,
                     diffPath,
-                    cancellationToken);
+                    visualOperation.Token);
                 VisualCaptureRunner.WriteReport(reportPath, report);
-                GD.Print(report.Success ? "LX_VISUAL_PASS" : "LX_VISUAL_MISMATCH");
                 await ShutdownAsync(quit: false);
+                GD.Print(report.Success ? "LX_VISUAL_PASS" : "LX_VISUAL_MISMATCH");
                 GetTree().Quit(report.Success || visualMode == "capture" ? 0 : 1);
                 return;
             }
@@ -392,6 +399,13 @@ public partial class LXHost : Node
                 "runtime.bootstrap",
                 "LXFramework bootstrap failed.",
                 exception);
+            if (GetArgument(OS.GetCmdlineUserArgs(), "--lx-visual-mode=") is not null)
+            {
+                GD.Print($"LX_VISUAL_FAIL: {exception}");
+                try { await ShutdownAsync(quit: false); }
+                catch (Exception cleanupFailure) { GD.Print($"LX_VISUAL_CLEANUP_FAIL: {cleanupFailure}"); }
+                GetTree().Quit(1);
+            }
         }
     }
 

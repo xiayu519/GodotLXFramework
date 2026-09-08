@@ -51,6 +51,10 @@ internal static class Validator
             {
                 errors.Add(resPartitionError);
             }
+            if (UIGenerator.ValidateLayerContract() is { } uiLayerError)
+            {
+                errors.Add(uiLayerError);
+            }
             if (ProductSmokeRunner.ValidateProtocol() is { } smokeProtocolError)
             {
                 errors.Add(smokeProtocolError);

@@ -9,6 +9,8 @@ public enum UILayer
     Popup,
     /// <summary>全局覆盖层，适合 Toast、加载提示和调试信息。</summary>
     Overlay,
+    /// <summary>Persistent navigation or HUD above Screen and below Popup; excluded from Back navigation. Existing serialized layer values remain unchanged.</summary>
+    Chrome,
 }
 
 /// <summary>页面关闭后的实例缓存策略。</summary>
@@ -36,7 +38,7 @@ public enum UIInputPolicy
 {
     /// <summary>使用页面节点自身的 MouseFilter 设置。</summary>
     Normal,
-    /// <summary>页面根节点拦截指针输入，适合必须先处理的对话框。</summary>
+    /// <summary>Blocks pointer input across the viewport and disables keyboard/gamepad focus in lower UI layers while visible.</summary>
     Modal,
 }
 

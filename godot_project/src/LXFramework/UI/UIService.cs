@@ -9,9 +9,15 @@ namespace LX.UI;
 
 public sealed class UIService : IAsyncDisposable
 {
+    private sealed class ActivationOwner(Func<ValueTask> close) : IAsyncDisposable
+    {
+        public bool Detaching { get; set; }
+        public ValueTask DisposeAsync() => Detaching ? ValueTask.CompletedTask : close();
+    }
+
     private sealed class UIInstance
     {
-        public required Guid InstanceId { get; init; }
+        public required Guid InstanceId { get; set; }
         public required UIDescriptor Descriptor { get; init; }
         public required UIScreen Screen { get; init; }
         public required AssetLease<PackedScene> SceneLease { get; init; }
@@ -20,6 +26,14 @@ public sealed class UIService : IAsyncDisposable
         public long OpenSequence { get; set; }
         public UIVisualState State { get; set; }
         public TaskCompletionSource<UICompletion>? Completion { get; set; }
+        public CancellationTokenSource? OpeningCancellation { get; set; }
+        public TaskCompletionSource? OpeningCallbacks { get; set; }
+        public Control? ModalBlocker { get; set; }
+        public Control.FocusBehaviorRecursiveEnum OriginalFocusBehavior { get; set; }
+        public bool InputBlocked { get; set; }
+        public Guid OpeningOperationId { get; set; }
+        public LifetimeScope? OwnerLink { get; set; }
+        public ActivationOwner? OwnerCleanup { get; set; }
     }
 
     private readonly AssetRegistry _assets;
@@ -32,7 +46,9 @@ public sealed class UIService : IAsyncDisposable
     private readonly Dictionary<UIId, UIDescriptor> _catalog = [];
     private readonly Dictionary<Guid, UIInstance> _active = [];
     private readonly Dictionary<UIId, UIInstance> _cache = [];
-    private readonly HashSet<UIId> _openingSingletons = [];
+    private readonly Dictionary<UIId, Guid> _openingSingletons = [];
+    private readonly Dictionary<Guid, (UIInstance Instance, Task Task)> _closing = [];
+    private readonly HashSet<Task> _openingOperations = [];
     private readonly CancellationTokenSource _shutdown = new();
     private readonly SemaphoreSlim _fadeGate = new(1, 1);
     private UIHandle? _fadeHandle;
@@ -63,6 +79,7 @@ public sealed class UIService : IAsyncDisposable
         };
         host.AddChild(_canvas);
         _roots.Add(UILayer.Screen, CreateLayerRoot("Screens", 0));
+        _roots.Add(UILayer.Chrome, CreateLayerRoot("Chrome", 50));
         _roots.Add(UILayer.Popup, CreateLayerRoot("Popups", 100));
         _roots.Add(UILayer.Overlay, CreateLayerRoot("Overlays", 200));
         UpdateMetrics();
@@ -124,13 +141,19 @@ public sealed class UIService : IAsyncDisposable
             _shutdown.Token,
             _serviceLifetime.Token);
         var isSingleton = descriptor.CachePolicy == UICachePolicy.CachedSingleton;
+        var operationId = Guid.NewGuid();
         if (isSingleton &&
-            (_active.Values.Any(instance => instance.Descriptor.Id == uiId) || !_openingSingletons.Add(uiId)))
+            (_active.Values.Any(instance => instance.Descriptor.Id == uiId) ||
+             _closing.Values.Any(item => item.Instance.Descriptor.Id == uiId) ||
+             !_openingSingletons.TryAdd(uiId, operationId)))
         {
             throw new InvalidOperationException($"Cached singleton UI '{uiId}' is already open or opening.");
         }
 
         UIInstance? openingInstance = null;
+        LifetimeScope? openingActivation = null;
+        var operationFinished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _openingOperations.Add(operationFinished.Task);
         var registered = false;
         try
         {
@@ -189,6 +212,9 @@ public sealed class UIService : IAsyncDisposable
                 }
             }
             openingInstance = instance;
+            // A cached node is reusable, but its previous handles and deferred callbacks are not.
+            instance.InstanceId = Guid.NewGuid();
+            instance.OpeningOperationId = operationId;
 
             if (descriptor.CoverPolicy == UICoverPolicy.ClosePrevious)
             {
@@ -202,26 +228,43 @@ public sealed class UIService : IAsyncDisposable
                 }
             }
 
+            operation.Token.ThrowIfCancellationRequested();
+            ObjectDisposedException.ThrowIf(_disposed, this);
             var activation = instance.Lifetime.CreateChild($"Activation:{uiId.Value}:{instance.InstanceId:N}");
+            openingActivation = activation;
+            var activationId = instance.InstanceId;
             var completion = new TaskCompletionSource<UICompletion>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             instance.Completion = completion;
             instance.Activation = activation;
             instance.Screen.SetActivation(activation);
             Action<UICompletion> closeHandler = result =>
-                _ = CloseSafelyAsync(instance.InstanceId, result);
+                _ = CloseSafelyAsync(activationId, result);
             instance.Screen.CloseRequested += closeHandler;
             activation.Defer(() => instance.Screen.CloseRequested -= closeHandler);
             var closeOnParentCancellation = parent.Token.Register(() =>
                 Callable.From((Action)(() =>
-                    _ = CloseSafelyAsync(instance.InstanceId, UICompletion.Cancelled))).CallDeferred());
+                    _ = CloseSafelyAsync(activationId, UICompletion.Cancelled))).CallDeferred());
             activation.Own(closeOnParentCancellation);
 
             var root = _roots[descriptor.Layer];
+            if (descriptor.InputPolicy == UIInputPolicy.Modal)
+            {
+                instance.ModalBlocker = new Control
+                {
+                    Name = "ModalInputBlocker",
+                    MouseFilter = Control.MouseFilterEnum.Stop,
+                    MouseForcePassScrollEvents = false,
+                };
+                root.AddChild(instance.ModalBlocker);
+                instance.ModalBlocker.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+            }
             if (instance.Screen.GetParent() is null)
             {
                 root.AddChild(instance.Screen);
             }
+            // Child order, not merely ZIndex, determines GUI hit testing. Cached screens must move forward too.
+            root.MoveChild(instance.Screen, -1);
 
             instance.Screen.ProcessMode = Node.ProcessModeEnum.Inherit;
             if (descriptor.InputPolicy == UIInputPolicy.Modal)
@@ -229,21 +272,38 @@ public sealed class UIService : IAsyncDisposable
                 instance.Screen.MouseFilter = Control.MouseFilterEnum.Stop;
             }
             instance.Screen.Show();
+            instance.OriginalFocusBehavior = instance.Screen.FocusBehaviorRecursive;
             instance.OpenSequence = ++_openSequence;
             _active.Add(instance.InstanceId, instance);
             registered = true;
+            instance.OwnerLink = parent.CreateChild($"UIOwner:{activationId:N}");
+            instance.OwnerCleanup = instance.OwnerLink.Own(new ActivationOwner(() => CloseAsync(activationId)));
             RefreshLayerPresentation(descriptor.Layer);
             UpdateMetrics();
-            await instance.Screen.OnShowAsync(payload, operation.Token);
-            await instance.Screen.OnTransitionAsync(UITransitionPhase.Entering, operation.Token);
+            using var openingCancellation = CancellationTokenSource.CreateLinkedTokenSource(operation.Token);
+            instance.OpeningCancellation = openingCancellation;
+            var callbacksFinished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            instance.OpeningCallbacks = callbacksFinished;
+            try
+            {
+                await instance.Screen.OnShowAsync(payload, openingCancellation.Token);
+                EnsureOpeningActivation(instance, activation, openingCancellation.Token);
+                await instance.Screen.OnTransitionAsync(UITransitionPhase.Entering, openingCancellation.Token);
+                EnsureOpeningActivation(instance, activation, openingCancellation.Token);
+            }
+            finally
+            {
+                instance.OpeningCancellation = null;
+                callbacksFinished.TrySetResult();
+            }
             ApplyFocus(instance);
-            return new UIHandle(this, instance.InstanceId, uiId, completion.Task);
+            return new UIHandle(this, activationId, uiId, completion.Task);
         }
         catch
         {
             if (openingInstance is not null)
             {
-                if (registered && _active.ContainsKey(openingInstance.InstanceId))
+                if (registered && ReferenceEquals(openingInstance.Activation, openingActivation))
                 {
                     await CloseAsync(openingInstance.InstanceId);
                 }
@@ -256,10 +316,12 @@ public sealed class UIService : IAsyncDisposable
         }
         finally
         {
-            if (isSingleton)
+            if (isSingleton && _openingSingletons.GetValueOrDefault(uiId) == operationId)
             {
                 _openingSingletons.Remove(uiId);
             }
+            _openingOperations.Remove(operationFinished.Task);
+            operationFinished.TrySetResult();
         }
     }
 
@@ -443,27 +505,87 @@ public sealed class UIService : IAsyncDisposable
         {
             return false;
         }
-        if (!await instance.Screen.OnBackRequestedAsync(instance.Activation.Token))
+        var activation = instance.Activation;
+        var activationId = instance.InstanceId;
+        if (!await instance.Screen.OnBackRequestedAsync(activation.Token))
         {
             return false;
         }
 
-        await CloseAsync(instance.InstanceId);
+        if (!ReferenceEquals(instance.Activation, activation) || !_active.ContainsKey(activationId))
+        {
+            return false;
+        }
+        await CloseAsync(activationId);
         return true;
     }
 
     public ValueTask CloseAsync(Guid instanceId) =>
         CloseAsync(instanceId, UICompletion.Cancelled);
 
-    private async ValueTask CloseAsync(Guid instanceId, UICompletion completion)
+    private ValueTask CloseAsync(Guid instanceId, UICompletion completion)
     {
         EnsureMainThread();
+        if (_closing.TryGetValue(instanceId, out var closing))
+        {
+            return new ValueTask(closing.Task);
+        }
         if (!_active.Remove(instanceId, out var instance))
         {
-            return;
+            return ValueTask.CompletedTask;
         }
+        var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _closing.Add(instanceId, (instance, finished.Task));
+        _ = FinishCloseAsync(instance, completion, finished);
+        return new ValueTask(finished.Task);
+    }
 
+    private async Task FinishCloseAsync(UIInstance instance, UICompletion completion, TaskCompletionSource finished)
+    {
+        var activationId = instance.InstanceId;
+        Exception? failure = null;
+        try
+        {
+            await CloseInstanceAsync(instance, completion);
+        }
+        catch (Exception exception)
+        {
+            failure = exception;
+        }
+        finally
+        {
+            _closing.Remove(activationId);
+            if (_openingSingletons.GetValueOrDefault(instance.Descriptor.Id) == instance.OpeningOperationId)
+            {
+                _openingSingletons.Remove(instance.Descriptor.Id);
+            }
+            try { RefreshInputBarriers(); }
+            catch (Exception exception)
+            {
+                failure = failure is null ? exception : new AggregateException(failure, exception);
+            }
+        }
+        if (failure is null) finished.TrySetResult();
+        else finished.TrySetException(failure);
+    }
+
+    private async Task CloseInstanceAsync(UIInstance instance, UICompletion completion)
+    {
         List<Exception>? errors = null;
+        try
+        {
+            instance.OpeningCancellation?.Cancel();
+        }
+        catch (Exception exception)
+        {
+            (errors ??= []).Add(exception);
+        }
+        // Never recycle or free a node while an older show/enter callback can still touch it.
+        if (instance.OpeningCallbacks is { } callbacks)
+        {
+            await callbacks.Task;
+            instance.OpeningCallbacks = null;
+        }
         if (instance.Activation is not null)
         {
             try
@@ -495,8 +617,22 @@ public sealed class UIService : IAsyncDisposable
             instance.Activation = null;
             instance.Screen.SetActivation(null);
         }
+        if (instance.OwnerLink is { } ownerLink)
+        {
+            // Only suppress recursion while detaching the link. Earlier owner disposal must join the close task.
+            if (instance.OwnerCleanup is { } ownerCleanup) ownerCleanup.Detaching = true;
+            try { await ownerLink.DisposeAsync(); }
+            catch (Exception exception) { (errors ??= []).Add(exception); }
+            instance.OwnerLink = null;
+            instance.OwnerCleanup = null;
+        }
 
         var cached = false;
+        instance.ModalBlocker?.QueueFree();
+        instance.ModalBlocker?.Hide();
+        instance.ModalBlocker = null;
+        instance.Screen.FocusBehaviorRecursive = instance.OriginalFocusBehavior;
+        instance.InputBlocked = false;
         if (instance.Descriptor.CachePolicy == UICachePolicy.CachedSingleton && !_disposed)
         {
             try
@@ -588,6 +724,13 @@ public sealed class UIService : IAsyncDisposable
                     (errors ??= []).Add(exception);
                 }
             }
+            foreach (var closing in _closing.Values.Select(item => item.Task).ToArray())
+            {
+                try { await closing; }
+                catch (Exception exception) { (errors ??= []).Add(exception); }
+            }
+            // Includes loads cancelled before an instance was registered in the active map.
+            await Task.WhenAll(_openingOperations.ToArray());
             foreach (var instance in _cache.Values)
             {
                 try
@@ -645,6 +788,8 @@ public sealed class UIService : IAsyncDisposable
     private async ValueTask DisposeUnopenedInstanceAsync(UIInstance instance)
     {
         List<Exception>? errors = null;
+        instance.ModalBlocker?.QueueFree();
+        instance.ModalBlocker = null;
         if (instance.Activation is not null)
         {
             try
@@ -804,7 +949,8 @@ public sealed class UIService : IAsyncDisposable
 
     private static void ApplyFocus(UIInstance instance)
     {
-        if (instance.Descriptor.FocusPolicy != UIFocusPolicy.GrabFirst)
+        if (instance.InputBlocked || instance.State != UIVisualState.Visible ||
+            instance.Descriptor.FocusPolicy != UIFocusPolicy.GrabFirst)
         {
             return;
         }
@@ -815,8 +961,8 @@ public sealed class UIService : IAsyncDisposable
         {
             var node = pending.Dequeue();
             if (node is Control control &&
-                control.Visible &&
-                control.FocusMode != Control.FocusModeEnum.None)
+                control.IsVisibleInTree() &&
+                control.GetFocusModeWithOverride() != Control.FocusModeEnum.None)
             {
                 control.GrabFocus();
                 return;
@@ -863,6 +1009,48 @@ public sealed class UIService : IAsyncDisposable
             {
                 covered = true;
             }
+        }
+        RefreshInputBarriers();
+    }
+
+    private void EnsureOpeningActivation(UIInstance instance, LifetimeScope activation, CancellationToken token)
+    {
+        EnsureMainThread();
+        token.ThrowIfCancellationRequested();
+        if (_disposed || !ReferenceEquals(instance.Activation, activation) ||
+            !_active.TryGetValue(instance.InstanceId, out var active) || !ReferenceEquals(instance, active))
+        {
+            throw new OperationCanceledException("The UI activation was closed while opening.", token);
+        }
+    }
+
+    private static int LayerOrder(UILayer layer) => layer switch
+    {
+        UILayer.Screen => 0,
+        UILayer.Chrome => 1,
+        UILayer.Popup => 2,
+        UILayer.Overlay => 3,
+        _ => throw new ArgumentOutOfRangeException(nameof(layer)),
+    };
+
+    private void RefreshInputBarriers()
+    {
+        var presented = _active.Values.Concat(_closing.Values.Select(item => item.Instance)).ToArray();
+        var modal = presented.Where(item => item.ModalBlocker is not null && item.State == UIVisualState.Visible)
+            .OrderByDescending(item => LayerOrder(item.Descriptor.Layer))
+            .ThenByDescending(item => item.OpenSequence).FirstOrDefault();
+        foreach (var instance in presented)
+        {
+            if (!GodotObject.IsInstanceValid(instance.Screen)) continue;
+            var blocked = modal is not null &&
+                (LayerOrder(instance.Descriptor.Layer) < LayerOrder(modal.Descriptor.Layer) ||
+                 (instance.Descriptor.Layer == modal.Descriptor.Layer && instance.OpenSequence < modal.OpenSequence));
+            instance.InputBlocked = blocked;
+            instance.Screen.FocusBehaviorRecursive = blocked
+                ? Control.FocusBehaviorRecursiveEnum.Disabled : instance.OriginalFocusBehavior;
+            if (blocked && instance.Screen.GetViewport().GuiGetFocusOwner() is { } focus &&
+                (focus == instance.Screen || instance.Screen.IsAncestorOf(focus))) focus.ReleaseFocus();
+            if (instance.ModalBlocker is { } blocker) blocker.Visible = instance.State == UIVisualState.Visible;
         }
     }
 

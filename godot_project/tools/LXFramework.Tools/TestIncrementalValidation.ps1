@@ -91,7 +91,36 @@ try {
     Assert-Incremental ($documentation.code -ne 0 -and $documentation.log -match 'LX_DOC_001') 'Changed public API documentation violation was accepted.'
     Write-Fixture 'src/LXFramework/ScopeEnum.cs' 'namespace LX; internal enum ScopeEnum { Internal }'
 
-    $generated=Get-ChildItem -LiteralPath (Join-Path $fixtureProject 'src/LXFramework/Generated') -Filter '*.g.cs' -Recurse | Select-Object -First 1
+    # Exercise the real scaffold/manifest/generator path without modifying the user's product.
+    Push-Location $fixtureProject
+    try {
+        $fixtureGame=Get-Content -LiteralPath 'content/game/game-manifest.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+        if([string]::IsNullOrWhiteSpace($fixtureGame.name)) {
+            $creation=@(& dotnet $toolDll create game ChromeFixture 2>&1)
+            Assert-Incremental ($LASTEXITCODE -eq 0) "Fixture product creation failed: $creation"
+        }
+        $creation=@(& dotnet $toolDll create screen ChromeContractScreen chrome_contract 2>&1)
+        Assert-Incremental ($LASTEXITCODE -eq 0) "Chrome screen scaffold failed: $creation"
+        $creation=@(& dotnet $toolDll create popup ChromeContractPopup chrome_contract_popup 2>&1)
+        Assert-Incremental ($LASTEXITCODE -eq 0) "Modal popup scaffold failed: $creation"
+        $uiManifest=Get-Content -LiteralPath 'content/ui/ui-manifest.json' -Raw -Encoding UTF8 | ConvertFrom-Json
+        $chromeEntry=@($uiManifest.screens | Where-Object id -eq 'chrome_contract')[0]
+        $chromeEntry.layer='Chrome'
+        $chromeEntry.cachePolicy='CachedSingleton'
+        Write-Fixture 'content/ui/ui-manifest.json' ($uiManifest | ConvertTo-Json -Depth 30)
+        $generation=@(& dotnet $toolDll generate 2>&1)
+        Assert-Incremental ($LASTEXITCODE -eq 0) "Chrome catalog generation failed: $generation"
+        $catalogText=Get-Content -LiteralPath 'src/LXFramework/Generated/UICatalog.g.cs' -Raw -Encoding UTF8
+        Assert-Incremental ($catalogText.Contains('UILayer.Chrome')) 'Generated catalog lost the Chrome layer.'
+        $firstCatalogHash=(Get-FileHash -LiteralPath 'src/LXFramework/Generated/UICatalog.g.cs').Hash
+        $generation=@(& dotnet $toolDll generate 2>&1)
+        Assert-Incremental ($LASTEXITCODE -eq 0 -and (Get-FileHash -LiteralPath 'src/LXFramework/Generated/UICatalog.g.cs').Hash -eq $firstCatalogHash) 'Repeated Chrome generation changed output.'
+    }
+    finally { Pop-Location }
+    $chromeValidation=Invoke-FixtureValidation @('content/ui/ui-manifest.json')
+    Assert-Incremental ($chromeValidation.code -eq 0) "Generated Chrome/popup scaffolds failed validation: $($chromeValidation.log)"
+
+    $generated=Get-Item -LiteralPath (Join-Path $fixtureProject 'src/LXFramework/Generated/UICatalog.g.cs')
     if($null -eq $generated){throw 'Fixture has no generated catalog.'}
     [System.IO.File]::AppendAllText($generated.FullName,"`n// injected drift`n",$utf8)
     $generatedRelative=$generated.FullName.Substring($fixtureProject.Length+1).Replace('\','/')

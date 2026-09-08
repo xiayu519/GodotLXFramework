@@ -2,6 +2,8 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json;
+using System.Security.Cryptography;
 
 namespace LXFramework.Tools;
 
@@ -9,6 +11,7 @@ internal static class VisualRunner
 {
     private const string HiddenWindowArgument = "--lx-visual-hidden-window";
     private const string HiddenWindowMarker = "LX_VISUAL_HIDDEN_WINDOW_PASS";
+    private const int ProcessTimeoutSeconds = 130;
 
     public static async Task<int> RunAsync(string root, IReadOnlyList<string> arguments)
     {
@@ -76,9 +79,9 @@ internal static class VisualRunner
         var log = Path.Combine(visualRoot, target.Id + ".log");
         var baseline = Path.GetFullPath(Path.Combine(root, target.BaselinePath.Replace('/', Path.DirectorySeparatorChar)));
         Directory.CreateDirectory(Path.GetDirectoryName(actual)!);
-        if (File.Exists(log))
+        foreach (var previous in new[] { log, actual, diff, report })
         {
-            File.Delete(log);
+            if (File.Exists(previous)) File.Delete(previous);
         }
 
         var runtimeMode = mode == "compare" ? "compare" : "capture";
@@ -92,13 +95,33 @@ internal static class VisualRunner
             diff,
             report,
             log);
-        var processResult = await RunVisualProcessAsync(
-            start,
-            processArguments,
-            log,
-            target.CaptureMode == "RenderedViewport");
+        VisualProcessResult processResult;
+        try
+        {
+            processResult = await RunVisualProcessAsync(
+                start, processArguments, log, target.CaptureMode == "RenderedViewport");
+        }
+        catch (Exception exception)
+        {
+            processResult = new VisualProcessResult(-1,
+                (File.Exists(log) ? await File.ReadAllTextAsync(log) : string.Empty) + Environment.NewLine + exception);
+        }
         var output = processResult.Output;
-        if (mode == "approve" && processResult.ExitCode == 0 && File.Exists(actual))
+        var hiddenWindowVerified = target.CaptureMode != "RenderedViewport" ||
+                                   output.Contains(HiddenWindowMarker, StringComparison.Ordinal);
+        var evidence = ValidateCaptureEvidence(actual, report, target.Id);
+        var success = HasSuccessEvidence(processResult.ExitCode,
+            output.Contains("LX_VISUAL_PASS", StringComparison.Ordinal), hiddenWindowVerified, evidence is null);
+        var processReportPath = Path.Combine(visualRoot, target.Id + ".process.json");
+        await File.WriteAllTextAsync(processReportPath, JsonSerializer.Serialize(new
+        {
+            schema = "lx.visual-process-report", success, target = target.Id,
+            exitCode = processResult.ExitCode, timeoutSeconds = ProcessTimeoutSeconds,
+            timedOut = processResult.ExitCode == 124, hiddenWindowVerified,
+            evidenceError = evidence, actualPath = actual, reportPath = report, logPath = log,
+            outputTail = output.Length > 8192 ? output[^8192..] : output,
+        }, new JsonSerializerOptions { WriteIndented = true }));
+        if (mode == "approve" && success)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(baseline)!);
             File.Copy(actual, baseline, overwrite: true);
@@ -106,11 +129,6 @@ internal static class VisualRunner
             return true;
         }
 
-        var hiddenWindowVerified = target.CaptureMode != "RenderedViewport" ||
-                                   output.Contains(HiddenWindowMarker, StringComparison.Ordinal);
-        var success = processResult.ExitCode == 0 &&
-                      output.Contains("LX_VISUAL_PASS", StringComparison.Ordinal) &&
-                      hiddenWindowVerified;
         Console.WriteLine($"visual {mode,-12} {(success ? "passed" : "failed")}");
         Console.WriteLine($"target               {target.Id}");
         Console.WriteLine($"actual               {ToolFiles.Relative(root, actual)}");
@@ -123,6 +141,7 @@ internal static class VisualRunner
                     "visual: rendered capture did not prove that its native window stayed hidden.");
             }
             Console.Error.WriteLine(output.Trim());
+            if (evidence is not null) Console.Error.WriteLine(evidence);
         }
         return success;
     }
@@ -167,6 +186,39 @@ internal static class VisualRunner
         {
             return "Rendered visual validation is not configured for hidden deterministic capture.";
         }
+        foreach (var arguments in new[] { semantic, rendered })
+        {
+            var quitIndex = arguments.IndexOf("--quit-after");
+            if (quitIndex < 0 || arguments[quitIndex + 1] != "0" ||
+                !arguments.Contains("--lx-visual-timeout-seconds=120", StringComparer.Ordinal))
+                return "Visual capture must use a wall-clock deadline, not an iteration-count deadline.";
+        }
+        if (HasSuccessEvidence(0, true, true, false) || HasSuccessEvidence(0, false, true, true) ||
+            HasSuccessEvidence(124, true, true, true) || HasSuccessEvidence(0, true, false, true) ||
+            !HasSuccessEvidence(0, true, true, true))
+            return "Visual result evidence accepts a missing artifact, marker, hidden-window proof or timeout.";
+        return null;
+    }
+
+    private static bool HasSuccessEvidence(int exitCode, bool passMarker, bool hiddenWindow, bool artifacts) =>
+        exitCode == 0 && passMarker && hiddenWindow && artifacts;
+
+    private static string? ValidateCaptureEvidence(string actual, string report, string target)
+    {
+        if (!File.Exists(actual) || new FileInfo(actual).Length == 0 || !File.Exists(report))
+            return "Visual capture did not produce a fresh image and runtime report.";
+        try
+        {
+            using var json = JsonDocument.Parse(File.ReadAllText(report));
+            var data = json.RootElement;
+            if (!data.GetProperty("success").GetBoolean() || data.GetProperty("target").GetString() != target ||
+                data.GetProperty("actualSha256").GetString() != Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(actual))))
+                return "Visual runtime report failed or does not match the fresh capture.";
+        }
+        catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException)
+        {
+            return "Invalid visual runtime report: " + exception.Message;
+        }
         return null;
     }
 
@@ -203,7 +255,8 @@ internal static class VisualRunner
             "--audio-driver", "Dummy",
             "--disable-vsync",
             "--fixed-fps", "60",
-            "--quit-after", "120",
+            // Fixed FPS controls simulation delta, not wall-clock speed. The supervisor owns the hard deadline.
+            "--quit-after", "0",
             "--log-file", log,
             "--",
         ]);
@@ -227,6 +280,7 @@ internal static class VisualRunner
             $"--lx-visual-baseline={baseline}",
             $"--lx-visual-diff={diff}",
             $"--lx-visual-report={report}",
+            $"--lx-visual-timeout-seconds={target.TimeoutSeconds}",
         ]);
         if (target.Pointer is { } pointer)
         {
@@ -245,10 +299,10 @@ internal static class VisualRunner
     {
         if (OperatingSystem.IsWindows() && isolateNativeWindow)
         {
-            var exitCode = HiddenDesktopProcess.Run(
+            var exitCode = await Task.Run(() => HiddenDesktopProcess.Run(
                 start.FileName,
                 start.WorkingDirectory,
-                arguments);
+                arguments));
             var output = File.Exists(logPath)
                 ? await File.ReadAllTextAsync(logPath)
                 : string.Empty;
@@ -269,9 +323,17 @@ internal static class VisualRunner
             throw new InvalidOperationException("Failed to start Godot visual runner.");
         var stdoutTask = process.StandardOutput.ReadToEndAsync();
         var stderrTask = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(ProcessTimeoutSeconds));
+        var timedOut = false;
+        try { await process.WaitForExitAsync(timeout.Token); }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+        {
+            timedOut = true;
+            process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync();
+        }
         return new VisualProcessResult(
-            process.ExitCode,
+            timedOut ? 124 : process.ExitCode,
             string.Join(Environment.NewLine, await stdoutTask, await stderrTask));
     }
 
@@ -292,6 +354,13 @@ internal static class VisualRunner
         string requested,
         IReadOnlyList<string> changedPaths)
     {
+        if (requested is "delayed_capture_probe" or "never_ready_probe")
+        {
+            var never = requested == "never_ready_probe";
+            return [new ResolvedVisualTarget(requested,
+                $"res://scene/validation/{requested}.tscn", $"tests/Visual/Baselines/{requested}.png",
+                320, 180, "RenderedViewport", 2, 0, 0, null, never ? 2 : 120)];
+        }
         if (string.Equals(requested, "ui_components", StringComparison.Ordinal))
         {
             return
@@ -361,7 +430,7 @@ internal static class VisualRunner
         }
 
         Console.Error.WriteLine(
-            $"visual: unknown target '{requested}'. Available: ui_components, rendered_probe, product" +
+            $"visual: unknown target '{requested}'. Available: ui_components, rendered_probe, delayed_capture_probe, never_ready_probe, product" +
             (productTargets.Length == 0 ? string.Empty : ", " + string.Join(", ", productTargets.Select(target => target.Id))));
         return null;
     }
@@ -376,7 +445,8 @@ internal static class VisualRunner
         int ReadyFrames,
         float PixelTolerance,
         float MaxChangedPixelRatio,
-        VisualPointerManifestEntry? Pointer);
+        VisualPointerManifestEntry? Pointer,
+        int TimeoutSeconds = 120);
 
     private sealed record VisualProcessResult(int ExitCode, string Output);
 
@@ -385,7 +455,7 @@ internal static class VisualRunner
         private const uint GenericAll = 0x10000000;
         private const uint StartfUseShowWindow = 0x00000001;
         private const ushort SwHide = 0;
-        private const uint VisualProcessTimeoutMilliseconds = 130_000;
+        private const uint VisualProcessTimeoutMilliseconds = ProcessTimeoutSeconds * 1000;
         private const uint WaitTimeout = 0x00000102;
         private const uint WaitFailed = 0xFFFFFFFF;
 
@@ -444,8 +514,7 @@ internal static class VisualRunner
                     {
                         _ = TerminateProcess(process.Process, 1);
                         _ = WaitForSingleObject(process.Process, 5_000);
-                        throw new TimeoutException(
-                            "The isolated Godot visual-validation process exceeded 130 seconds.");
+                        return 124;
                     }
                     if (waitResult == WaitFailed)
                     {

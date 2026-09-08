@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/LXFramework/Validation/VisualLifetimeProbe.cs" id="1"]
+
+[node name="NeverReadyProbe" type="ColorRect"]
+offset_right = 320.0
+offset_bottom = 180.0
+mouse_filter = 2
+script = ExtResource("1")
+WaitFrames = -1

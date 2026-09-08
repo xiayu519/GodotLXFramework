@@ -60,6 +60,7 @@ enum LX.UI.UIFocusPolicy.GrabFirst
 enum LX.UI.UIFocusPolicy.Preserve
 enum LX.UI.UIInputPolicy.Modal
 enum LX.UI.UIInputPolicy.Normal
+enum LX.UI.UILayer.Chrome
 enum LX.UI.UILayer.Overlay
 enum LX.UI.UILayer.Popup
 enum LX.UI.UILayer.Screen

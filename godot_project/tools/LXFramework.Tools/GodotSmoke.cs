@@ -48,6 +48,9 @@ internal static partial class GodotSmoke
             "LX_WORLD_CHUNK_STREAMING_PROGRESS_PASS",
             "LX_WORLD_EVENT_TRIGGER_PASS",
             "LX_UI_COVER_POLICY_PASS",
+            "LX_UI_CHROME_MODAL_PASS",
+            "LX_UI_OPEN_CLOSE_RACES_PASS",
+            "LX_VISUAL_ORDERED_CLEANUP_PASS",
             "LX_UI_RESULT_TRANSITION_PASS",
             "LX_UI_FADE_TRANSITION_PASS",
             "LX_UI_COMPONENT_LIFECYCLE_PASS",
@@ -89,7 +92,7 @@ internal static partial class GodotSmoke
                 executable,
                 root,
                 "framework-bootstrap",
-                ["--headless", "--quit-after", "120", "--", "--lx-framework-smoke"],
+                ["--headless", "--quit-after", "0", "--", "--lx-framework-smoke"],
                 expectedFrameworkMarkers),
         };
         var report = new SmokeReport(
@@ -172,7 +175,15 @@ internal static partial class GodotSmoke
             throw new InvalidOperationException("Failed to start Godot for smoke validation.");
         var stdoutTask = process.StandardOutput.ReadToEndAsync();
         var stderrTask = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(130));
+        var timedOut = false;
+        try { await process.WaitForExitAsync(timeout.Token); }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested)
+        {
+            timedOut = true;
+            process.Kill(entireProcessTree: true);
+            await process.WaitForExitAsync();
+        }
         var combined = string.Join('\n', await stdoutTask, await stderrTask);
         var errors = combined
             .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -180,6 +191,7 @@ internal static partial class GodotSmoke
             .Where(IsEngineError)
             .Distinct(StringComparer.Ordinal)
             .ToList();
+        if (timedOut) errors.Add("Godot smoke exceeded its 130-second wall-clock deadline.");
         var scenarios = (expectedMarkers ?? [])
             .Select(marker => new SmokeScenario(marker, combined.Contains(marker, StringComparison.Ordinal)))
             .ToArray();
@@ -193,8 +205,8 @@ internal static partial class GodotSmoke
 
         return new SmokeCheck(
             name,
-            process.ExitCode,
-            process.ExitCode == 0 && errors.Count == 0,
+            timedOut ? 124 : process.ExitCode,
+            !timedOut && process.ExitCode == 0 && errors.Count == 0,
             errors,
             scenarios);
     }

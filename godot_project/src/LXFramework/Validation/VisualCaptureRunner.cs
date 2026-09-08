@@ -54,37 +54,39 @@ internal sealed class VisualCaptureRunner
             throw new ArgumentOutOfRangeException(nameof(readyFrames));
         }
         using var lease = _context.Res.Acquire<PackedScene>(scenePath, AssetCachePolicy.Cached);
-        using var visualLifetime = _context.Lifetime.CreateChild($"VisualCapture:{target}");
+        var visualLifetime = _context.Lifetime.CreateChild($"VisualCapture:{target}");
+        Node? instance = null;
+        Exception? captureFailure = null;
         SubViewport? semanticViewport = null;
-        Viewport captureViewport;
-        Node captureParent;
-        if (captureMode == "RenderedViewport")
-        {
-            var window = _host.GetWindow();
-            window.ContentScaleSize = captureSize;
-            window.Size = captureSize;
-            captureViewport = _host.GetViewport();
-            captureParent = _host;
-        }
-        else
-        {
-            semanticViewport = new SubViewport
-            {
-                Name = "LXVisualCapture",
-                Size = captureSize,
-                RenderTargetUpdateMode = SubViewport.UpdateMode.Always,
-                TransparentBg = false,
-            };
-            semanticViewport.World2D = new World2D();
-            _host.AddChild(semanticViewport);
-            captureViewport = semanticViewport;
-            captureParent = semanticViewport;
-        }
-        var instance = lease.Resource.Instantiate();
-        LXContextInjector.InitializeTree(instance, _context, visualLifetime);
-        captureParent.AddChild(instance);
         try
         {
+            Viewport captureViewport;
+            Node captureParent;
+            if (captureMode == "RenderedViewport")
+            {
+                var window = _host.GetWindow();
+                window.ContentScaleSize = captureSize;
+                window.Size = captureSize;
+                captureViewport = _host.GetViewport();
+                captureParent = _host;
+            }
+            else
+            {
+                semanticViewport = new SubViewport
+                {
+                    Name = "LXVisualCapture",
+                    Size = captureSize,
+                    RenderTargetUpdateMode = SubViewport.UpdateMode.Always,
+                    TransparentBg = false,
+                };
+                semanticViewport.World2D = new World2D();
+                _host.AddChild(semanticViewport);
+                captureViewport = semanticViewport;
+                captureParent = semanticViewport;
+            }
+            instance = lease.Resource.Instantiate();
+            LXContextInjector.InitializeTree(instance, _context, visualLifetime);
+            captureParent.AddChild(instance);
             cancellationToken.ThrowIfCancellationRequested();
             await _host.ToSignal(_host.GetTree(), SceneTree.SignalName.ProcessFrame);
             foreach (var readiness in FindReadinessBarriers(instance))
@@ -243,10 +245,30 @@ internal sealed class VisualCaptureRunner
                 diffPath,
                 CaptureEnvironment());
         }
+        catch (Exception exception)
+        {
+            captureFailure = exception;
+            throw;
+        }
         finally
         {
-            instance.QueueFree();
-            semanticViewport?.QueueFree();
+            try
+            {
+                // Cleanup can await future Godot frames. Keep nodes and scene lease alive until it completes.
+                await visualLifetime.DisposeAsync();
+            }
+            catch (Exception cleanupFailure) when (captureFailure is not null)
+            {
+                throw new AggregateException("Visual capture and ordered cleanup both failed.", captureFailure, cleanupFailure);
+            }
+            finally
+            {
+                if (GodotObject.IsInstanceValid(instance)) instance!.QueueFree();
+                if (GodotObject.IsInstanceValid(semanticViewport)) semanticViewport!.QueueFree();
+                // QueueFree is deferred; a completed capture must not retain its previous scene tree.
+                await _host.ToSignal(_host.GetTree(), SceneTree.SignalName.ProcessFrame);
+                await _host.ToSignal(_host.GetTree(), SceneTree.SignalName.ProcessFrame);
+            }
         }
     }
 

@@ -15,6 +15,8 @@
 
 ### Added
 
+- `UILayer.Chrome` 常驻导航/HUD 层及清单生成支持，保留旧枚举数值；页面、导航、弹窗和全局覆盖层采用明确的显示与输入顺序。
+- UI 真实点击/焦点、异步开关竞争、超过 120 帧就绪、永不就绪与连续截图资源闭合的回归探针。
 - 版本化公开 API 基线、手动 CI、可选多轮 Godot soak 与 Windows Release export。
 - 可恢复维护事务状态机与 `doctor|upgrade --recover`。
 - Astra 项目启动器、冻结评测输入和逐文件指纹、原始改动归档、无模型调用的确定性重放及跨批次验收汇总。
@@ -22,6 +24,9 @@
 
 ### Fixed
 
+- 模态 UI 的全屏指针屏障和下层焦点隔离；Back 保持弹窗优先且不移除常驻导航。
+- UI 关闭取消并等待显示/进入回调，缓存重开使用独立激活标识；旧句柄/owner 延迟回调不能关闭新激活，owner 异步释放会等待 UI 有序关闭。
+- 视觉捕获改为等待异步生命周期和节点收尾，清理失败传播至验证；截图退出改用实际时间预算，缺失本次图片、匹配报告、成功标记或隐藏窗口证据均不能通过。
 - 移除工作流检查对 `rg` 的隐式依赖，避免 GitHub runner 缺少搜索工具导致门禁失败；增加无外部 CLI 的文本/指令检查及隔离源文件增量正负向回归。
 - PackedScene 池、ActionRunner、GameFlow、LXHost 与 WorldChunkStreamer 的关闭、清理和所有权边界。
 - AssetRegistry 共享 inflight 进度观察者隔离、RuntimeBridge I/O 容错、诊断分区按需采集和设置按键默认值恢复。

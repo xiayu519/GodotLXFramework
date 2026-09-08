@@ -400,6 +400,12 @@ await handle.CloseAsync();
 - 异步进入/退出过渡。
 - Toast、确认框、Loading、Tooltip 和虚拟列表等基础组件。
 
+常驻导航/HUD 使用 `UILayer.Chrome`：先创建普通 Screen 场景，再把 `content/ui/ui-manifest.json` 对应条目的 `layer` 改为 `Chrome`，按需要设置 `cachePolicy: CachedSingleton`，运行 `generate`。实际显示和 GUI 输入顺序是 `Screen → Chrome → Popup → Overlay`；旧层的枚举数值保持不变，不应按枚举数值推算显示顺序。导航栏的按钮、尺寸和路由继续属于产品，不进入框架。
+
+Chrome 不随普通页面导航或 Back 被移除；模态页面提供全屏指针屏障，并禁用下方 UI 的键盘/手柄焦点，关闭后恢复可交互性。`RequestBackAsync` 优先关闭最新 Popup，然后是 Screen，不处理 Chrome/Overlay。普通 Chrome 场景仍须合理设置 `MouseFilter`，避免空白区域拦住页面。
+
+关闭 UI 会取消尚未结束的 `OnShowAsync`/Entering，并等待回调结束后执行 Exiting、`OnHideAsync`、激活期释放，再缓存或销毁实例。自定义异步钩子必须观察传入的取消令牌，不应在钩子内等待自己的关闭任务；忽略取消的回调不会被强制终止，框架会等待其结束，防止访问已释放或已复用的节点。缓存节点每次打开都有独立句柄标识，旧句柄与旧 owner 延迟回调不会关闭新激活。`await parentLifetime.DisposeAsync()` 也会等待所拥有 UI 的关闭，不只是发出取消请求。
+
 全屏黑幕过场由内置缓存 prefab 执行。`FadeOut` 会保持黑幕，后续 `FadeIn` 将其移除；
 `FadeOutIn` 自动完成透明、黑色、透明的完整流程：
 
@@ -672,6 +678,12 @@ Godot Editor/Debug 正在运行时，Codex 可以读取当前会话而不修改�
 ```
 
 产品目标需在 `game-manifest.json` 明确选择模式：`SemanticControl` 以 headless 提供快速、确定性的 Control 语义图；`RenderedViewport` 保留真实渲染器但隐藏且禁止聚焦根窗口，只绘制声明所需的帧并捕获 Godot Viewport，可覆盖 `Sprite2D`、shader、真实字体、hover 和 `VideoStream`。后者可用 `IVisualCaptureReady` 固定异步状态，并声明 pointer、像素容差和最大变化比例；两种证据不会互相冒充。自动验收不会显示 GUI，只有显式 `run` 的人工试玩才显示游戏窗口。
+
+视觉进程使用真实时间预算：运行时默认 120 秒取消，外部进程监督在 130 秒兜底终止；`--quit-after 0` 关闭帧数退出，不把固定 60 FPS 或 120 帧当成 120 秒。正常截图必须等待异步生命周期清理和延迟节点释放，再报告成功；引擎紧急退出不等价于完整清理通过。强制终止会保留日志和进程报告，但不承诺完成业务清理。
+
+通过条件同时要求退出码 0、`LX_VISUAL_PASS`、本次生成的图片与匹配 SHA-256 的成功报告，以及渲染模式的隐藏窗口证据。旧 actual/diff/报告会在启动前清除，缺图、缺标记、清理异常或超时均不得通过，也不得批准基准。进程诊断写入 Godot 根下 `.lx/visual/<target>.process.json`。
+
+框架回归包含 UI 异步开关竞争、真实 GUI 点击与焦点、连续三次截图的 UI/租约/池借出/节点闭合，以及清理异常传播。可单独运行两项隐藏渲染探针：`./lx.ps1 visual capture delayed_capture_probe` 等待 180 帧后应通过；`./lx.ps1 visual capture never_ready_probe` 使用 2 秒运行时预算，应以非零退出码失败且不生成成功证据。后者是负向测试，不是正常产品目标。
 
 只有人工确认差异符合设计时才更新基准：
 

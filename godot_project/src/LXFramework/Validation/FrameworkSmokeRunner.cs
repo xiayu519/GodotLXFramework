@@ -938,6 +938,8 @@ internal sealed class FrameworkSmokeRunner(Node host, LXContext context)
                 "UI parent cancellation disposed activation before OnHideAsync completed.");
         }
         GD.Print("LX_UI_ACTIVATION_OWNERSHIP_PASS");
+        await UIContractSmoke.RunAsync(host, LX);
+        await VisualContractSmoke.RunAsync(host, LX, cancellationToken);
 
         var instantFade = new UIFadeOptions
         {

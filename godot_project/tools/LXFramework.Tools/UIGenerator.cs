@@ -83,6 +83,25 @@ internal static partial class UIGenerator
         return outputs;
     }
 
+    internal static string? ValidateLayerContract()
+    {
+        var entry = new UIManifestEntry
+        {
+            Scope = ManifestScopes.Framework, Id = "chrome_contract", ClassName = "ChromeContractScreen",
+            Namespace = "LX.Validation", ScenePath = "res://scene/validation/ui_contract_probe.tscn",
+            Layer = "Chrome", CachePolicy = "CachedSingleton",
+        };
+        ValidateEntry(entry, new GameManifest());
+        var manifest = new UIManifest { Screens = [entry] };
+        var catalog = BuildCatalog(manifest);
+        if (!catalog.Contains("UILayer.Chrome", StringComparison.Ordinal) || catalog != BuildCatalog(manifest))
+            return "Chrome UI catalog generation must preserve the layer deterministically.";
+        entry.Layer = "UnknownLayer";
+        try { ValidateEntry(entry, new GameManifest()); }
+        catch (InvalidDataException) { return null; }
+        return "UI generation must reject unsupported layers.";
+    }
+
     private static string BuildBindings(UIManifestEntry entry, IReadOnlyList<TscnNode> nodes)
     {
         var builder = new StringBuilder();
@@ -173,7 +192,7 @@ internal static partial class UIGenerator
                 $"UI '{entry.Id}' namespace '{entry.Namespace}' does not match its {entry.Scope} scope.");
         }
 
-        if (entry.Layer is not ("Screen" or "Popup" or "Overlay"))
+        if (entry.Layer is not ("Screen" or "Chrome" or "Popup" or "Overlay"))
         {
             throw new InvalidDataException($"UI '{entry.Id}' has unsupported layer '{entry.Layer}'.");
         }
