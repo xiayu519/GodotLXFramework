@@ -9,7 +9,7 @@
 - `.codex/config.toml` 只设置项目模型和普通推理默认值。未设置 Plan effort 时客户端使用内置 Plan 预设，不会自动继承普通任务档位。
 - `.codex/start-codex.ps1 -Effort low|medium|high|xhigh|max` 显式设置普通与 Plan effort；`-PrintOnly` 查看原生命令、版本与配置而不消耗模型额度。桌面/IDE 已有会话仍以实际选择为准，改文件不会切换当前对话。
 - 不把用户级 named profile、API 的 token/采样参数或网页 API 上下文窗口数字塞进项目 TOML；CLI 负责实际传输与上下文管理。Ultra 不是本仓库的 API effort。
-- 本项目不自动切换档位。明确范围的小改先 Light；跨生命周期、异步竞争、公共 API、迁移架构适合更高档。用户选择的档位不改变授权边界和验收标准。
+- 本项目不自动切换主会话档位；明确启用子代理时可为子任务单独配置，不修改项目默认 profile。明确范围的小改先 Light；跨生命周期、异步竞争、公共 API、迁移架构适合更高档。用户选择的档位不改变授权边界和验收标准。
 
 ## 指令分层
 

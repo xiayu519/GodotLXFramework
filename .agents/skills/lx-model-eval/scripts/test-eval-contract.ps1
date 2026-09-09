@@ -15,8 +15,13 @@ Assert (-not (Get-EvalCoverage $schema full @()).passed) 'Empty suite passed.'
 Assert (-not (Get-EvalCoverage $schema full (@($full)+@($full[0]))).passed) 'Duplicate result passed.'
 $failed=@($full | ForEach-Object {[pscustomobject]@{case=$_.case;passed=$false}})
 Assert (-not (Get-EvalCoverage $schema full $failed).passed) 'Failed result passed.'
-Assert (@(Select-EvalCases $schema foundation @()).Count -eq 25) 'Foundation coverage changed; review acceptance scope.'
-Assert (@(Select-EvalCases $schema full @()).Count -eq 26) 'Full coverage changed; review acceptance scope.'
+Assert (@(Select-EvalCases $schema foundation @()).Count -eq 27) 'Foundation coverage changed; review acceptance scope.'
+Assert (@(Select-EvalCases $schema full @()).Count -eq 28) 'Full coverage changed; review acceptance scope.'
+# Delegation routing must remain a read-only plan in the isolated model runner.
+$subagentRoutes = @(Select-EvalCases $schema foundation @('readonly-subagent-dispatch','readonly-subagent-simple'))
+Assert ($subagentRoutes.Count -eq 2 -and @($subagentRoutes | Where-Object { $_.expected_write -or 'lx-subagent' -notin $_.expected_skills }).Count -eq 0) 'Delegation routing lost its read-only positive cases.'
+$ordinaryRoutes = @(Select-EvalCases $schema foundation @('readonly-res-audit','readonly-model-eval-contract','readonly-skill-isolation'))
+Assert (@($ordinaryRoutes | Where-Object { 'lx-subagent' -notin $_.forbidden_skills }).Count -eq 0) 'Ordinary source/configuration queries and conceptual discussion must not trigger delegation.'
 # Prebuilt-resource registration remains a read-only content route.
 $registrationRoute = @(Select-EvalCases $schema foundation @('readonly-prebuilt-map-registration'))[0]
 Assert (-not $registrationRoute.expected_write -and 'lx-content' -in $registrationRoute.expected_skills) 'Static registration must preserve its read-only content route.'

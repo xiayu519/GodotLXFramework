@@ -36,6 +36,104 @@
   ],
   "cases": [
     {
+      "id": "readonly-subagent-dispatch",
+      "suite": "full",
+      "setup": "clean",
+      "prompt": "这个任务要启动 subagent。现在只预演分工与创建参数，不实际启动代理、模型请求或修改文件。任务：从一份长日志抽取已定义错误码和对应行号；独立审查另一份日志中的异步取消、重开代际与资源释放竞态；主代理同时整理已有变更的交付说明。按以下模拟运行时元数据作决策：最多还可开 2 个子代理；gpt-5.6-luna 是轻量抽取模型，支持 low/medium；gpt-6-astra 适合复杂推理，支持 low/medium/high；spawn_agent 接受 model、reasoning_effort、fork_turns，覆盖模型时禁止全历史继承。给出数量、职责、具体模型/档位、精简上下文和将使用的参数，说明实际执行时如何交接；不要读取业务源码、浏览模型价格或修改项目默认配置。",
+      "expected_write": false,
+      "expected_skills": [
+        "lx-subagent"
+      ],
+      "forbidden_skills": [
+        "lx-model-eval",
+        "lx-codex-workflow",
+        "lx-game",
+        "lx-framework"
+      ],
+      "expected_terms": [
+        "gpt-5.6-luna",
+        "gpt-6-astra",
+        "low",
+        "high",
+        "reasoning_effort",
+        "fork_turns"
+      ],
+      "expected_term_groups": [
+        {
+          "any": [
+            "2 个",
+            "2个",
+            "两个"
+          ]
+        },
+        {
+          "any": [
+            "none",
+            "部分继承"
+          ]
+        },
+        {
+          "any": [
+            "未决",
+            "证据",
+            "检查"
+          ]
+        }
+      ],
+      "budgets": {
+        "tool_calls": 8,
+        "input_tokens": 250000,
+        "uncached_input_tokens": 45000,
+        "output_tokens": 3000,
+        "failed_events": 1
+      },
+      "kind": "routing",
+      "minimum_effort": "low"
+    },
+    {
+      "id": "readonly-subagent-simple",
+      "suite": "full",
+      "setup": "clean",
+      "prompt": "本任务使用 subagent，但先判断是否值得。实际任务仅是把 README 一处已定位的拼写错误从 Framwork 改为 Framework；没有独立调查、长输出或其他并行工作，也没有强制人数要求。现在只预演是否委派及理由，不实际修改文件或启动代理，不读取整个仓库或查询模型价格。给出任务执行时的做法，不超过 5 行。",
+      "expected_write": false,
+      "expected_skills": [
+        "lx-subagent"
+      ],
+      "forbidden_skills": [
+        "lx-model-eval",
+        "lx-codex-workflow"
+      ],
+      "expected_term_groups": [
+        {
+          "any": [
+            "0 个",
+            "0个",
+            "不开子代理",
+            "不启动子代理",
+            "无需子代理",
+            "不委派"
+          ]
+        },
+        {
+          "any": [
+            "交接",
+            "开销",
+            "成本",
+            "简单"
+          ]
+        }
+      ],
+      "budgets": {
+        "tool_calls": 8,
+        "input_tokens": 250000,
+        "uncached_input_tokens": 45000,
+        "output_tokens": 3000,
+        "failed_events": 1
+      },
+      "kind": "routing",
+      "minimum_effort": "low"
+    },
+    {
       "id": "readonly-prebuilt-map-registration",
       "suite": "full",
       "setup": "clean",
@@ -76,7 +174,8 @@
         "lx-game",
         "lx-ui",
         "lx-framework",
-        "lx-project-knowledge"
+        "lx-project-knowledge",
+        "lx-subagent"
       ],
       "expected_terms": [
         "AssetLease"
@@ -812,14 +911,15 @@
       "id": "readonly-skill-isolation",
       "suite": "full",
       "setup": "clean",
-      "prompt": "只读依据 lx-codex-workflow 已归纳的规则，说明 description、SKILL.md 正文和 reference 三阶段应如何控制语义激活与无关上下文。不要枚举或读取其他领域 Skill 正文，不讨论模型基线或 Project Knowledge，不得修改文件。",
+      "prompt": "只读依据 lx-codex-workflow 已归纳的规则，说明 description、SKILL.md 正文和 reference 三阶段应如何控制语义激活与无关上下文。不要枚举或读取其他领域 Skill 正文，不讨论模型基线或 Project Knowledge，不得修改文件。另解释为何不必给所有任务强制启用 subagent；这只是概念讨论，不执行委派。",
       "expected_write": false,
       "expected_skills": [
         "lx-codex-workflow"
       ],
       "forbidden_skills": [
         "lx-model-eval",
-        "lx-project-knowledge"
+        "lx-project-knowledge",
+        "lx-subagent"
       ],
       "expected_terms": [
         "description",
@@ -847,7 +947,8 @@
         "lx-model-eval"
       ],
       "forbidden_skills": [
-        "lx-codex-workflow"
+        "lx-codex-workflow",
+        "lx-subagent"
       ],
       "expected_terms": [
         "gpt-6-astra",

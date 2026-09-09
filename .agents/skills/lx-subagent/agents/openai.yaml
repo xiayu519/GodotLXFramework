@@ -1,0 +1,6 @@
+interface:
+  display_name: "LX 子代理分工"
+  short_description: "明确要求 subagent 时判断收益、数量并配置模型与推理档位"
+  default_prompt: "使用 $lx-subagent 判断本任务是否值得委派，按需设置子代理数量、模型与 reasoning 并完成任务。"
+policy:
+  allow_implicit_invocation: true
