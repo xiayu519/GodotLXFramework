@@ -15,13 +15,11 @@ Assert (-not (Get-EvalCoverage $schema full @()).passed) 'Empty suite passed.'
 Assert (-not (Get-EvalCoverage $schema full (@($full)+@($full[0]))).passed) 'Duplicate result passed.'
 $failed=@($full | ForEach-Object {[pscustomobject]@{case=$_.case;passed=$false}})
 Assert (-not (Get-EvalCoverage $schema full $failed).passed) 'Failed result passed.'
-Assert (@(Select-EvalCases $schema foundation @()).Count -eq 26) 'Foundation coverage changed; review acceptance scope.'
-Assert (@(Select-EvalCases $schema full @()).Count -eq 27) 'Full coverage changed; review acceptance scope.'
-# Map production and prebuilt-resource registration must remain distinct routes.
-$mapRoute = @(Select-EvalCases $schema foundation @('readonly-tiled-map-production'))[0]
+Assert (@(Select-EvalCases $schema foundation @()).Count -eq 25) 'Foundation coverage changed; review acceptance scope.'
+Assert (@(Select-EvalCases $schema full @()).Count -eq 26) 'Full coverage changed; review acceptance scope.'
+# Prebuilt-resource registration remains a read-only content route.
 $registrationRoute = @(Select-EvalCases $schema foundation @('readonly-prebuilt-map-registration'))[0]
-Assert (-not $mapRoute.expected_write -and 'tiled-map-production' -in $mapRoute.expected_skills) 'Map analysis must use its read-only production route.'
-Assert (-not $registrationRoute.expected_write -and 'tiled-map-production' -in $registrationRoute.forbidden_skills -and 'lx-content' -in $registrationRoute.expected_skills) 'Static registration must not invoke map production.'
+Assert (-not $registrationRoute.expected_write -and 'lx-content' -in $registrationRoute.expected_skills) 'Static registration must preserve its read-only content route.'
 # Historical recall is opt-in by relevance, not a prerequisite for source inspection.
 $knowledgeRecall = @(Select-EvalCases $schema foundation @('readonly-project-knowledge-recall'))[0]
 $sourceAudit = @(Select-EvalCases $schema foundation @('readonly-res-audit'))[0]

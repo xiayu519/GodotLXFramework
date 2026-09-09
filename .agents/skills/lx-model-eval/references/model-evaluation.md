@@ -4,9 +4,9 @@
 
 `evals/evals.json` 是唯一模型/档位/用例目录。默认 `astra-light = gpt-6-astra/low`；`astra-xhigh = gpt-6-astra/xhigh`。medium/high/max 可配置但未实测前不得宣称兼容验收通过。
 
-27 项分为 19 项路由题、6 项实施题、2 项可执行行为题。基础 foundation 为 26 项（Light），复杂 complex 为 vertical-slice、stateful-round、async-reward-restart 三项（xhigh）。full 是全部 27 项；smoke 仅两项。名称、选择范围和覆盖以 schema 为准。
+26 项分为 18 项路由题、6 项实施题、2 项可执行行为题。基础 foundation 为 25 项（Light），复杂 complex 为 vertical-slice、stateful-round、async-reward-restart 三项（xhigh）。full 是全部 26 项；smoke 仅两项。名称、选择范围和覆盖以 schema 为准。
 
-新增地图制作正向题、现成地图图片登记负向题和项目历史召回题；项目知识规则题改为仅保留有效条目、维护授权后删除冲突记忆，纯源码查询增加不读记忆的负向边界。这些变化仅做离线契约和用例选择检查，不触发完整引擎 preflight。原 24 项历史报告不覆盖新增或修改后的路由，也不证明当前 Skill 已完成真实模型验收。
+地图制作 Skill 及其专属路由题已移除；保留现成图片的静态资源登记题和项目历史召回题。项目知识规则题仅保留有效条目、维护授权后删除冲突记忆，纯源码查询保留不读记忆的负向边界。这些变化仅做离线契约和用例选择检查，不触发完整引擎 preflight。原 24 项历史报告不覆盖新增或修改后的路由，也不证明当前 Skill 已完成真实模型验收。
 
 - 路由题检查 Skill 正负路由、只读边界和关键语义，不代表玩法实现正确。
 - 原实施题检查脚手架、注册、上下文注入、生成纪律与最终 validate。
@@ -42,7 +42,7 @@
 
 每次先冻结 `inputs/` 并保存逐文件哈希，全部用例使用该快照。写入题由父验收器再次对实际改动运行 `check`，不能用 `validate` 成功覆盖路径级失败；生成的 `.uid` 仍保留在 diff 并由 Godot import 验证，不把未修改脚本的新 sidecar 当成额外玩法变化。Skill 访问和自然语言术语采用日志启发式，只是路由回归信号，不冒充完整语义证明。
 
-`all_passed` 只表示所选用例全通过；`coverage.passed` 才表示指定套件完整通过；`full_coverage.passed` 才是全部 27 项通过。部分运行不会覆盖带套件名的完整报告。缺少 usage 不计为零成本成功；tool 的失败事件不是“模型自动重试次数”。
+`all_passed` 只表示所选用例全通过；`coverage.passed` 才表示指定套件完整通过；`full_coverage.passed` 才是全部 26 项通过。部分运行不会覆盖带套件名的完整报告。缺少 usage 不计为零成本成功；tool 的失败事件不是“模型自动重试次数”。
 
 旧预算作为独立效率告警报告，不混入功能正确率，也不为消掉告警自动增大阈值；标注告警后复审重复读取/失败命令。必须同时关注质量和成本，不能为了 token 省略必要验证。不同模型的节省比例需同提示、同源码、同验收器、相近缓存条件的对照；本次授权只做 Astra 验收，不默认额外跑 Sol A/B。
 

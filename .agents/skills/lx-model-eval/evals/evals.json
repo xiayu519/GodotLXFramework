@@ -36,46 +36,6 @@
   ],
   "cases": [
     {
-      "id": "readonly-tiled-map-production",
-      "suite": "full",
-      "setup": "clean",
-      "prompt": "只读分析一张准备交付的等距 TMX 地图：菜地里重复的蔬菜与泥土地块烘成整图，桥的近侧栏杆和侧梁烘在桥面，担心角色腿部遮挡错误。请说明素材如何复用、桥怎样拆分以及 Tiled 静态展示与实际人物遮挡各能证明什么。不要生成图片、修改地图或实现引擎导入器；只给本次需要的检查，不跑全项目验证，最多 10 行。",
-      "expected_write": false,
-      "expected_skills": [
-        "tiled-map-production"
-      ],
-      "forbidden_skills": [
-        "lx-game",
-        "lx-ui",
-        "lx-framework",
-        "lx-resources"
-      ],
-      "expected_terms": [
-        "TMX",
-        "alpha"
-      ],
-      "expected_term_groups": [
-        {
-          "any": ["原型", "复用", "实例"]
-        },
-        {
-          "any": ["运行时", "引擎"]
-        },
-        {
-          "any": ["透明", "空隙"]
-        }
-      ],
-      "budgets": {
-        "tool_calls": 8,
-        "input_tokens": 250000,
-        "uncached_input_tokens": 45000,
-        "output_tokens": 3000,
-        "failed_events": 1
-      },
-      "kind": "routing",
-      "minimum_effort": "low"
-    },
-    {
       "id": "readonly-prebuilt-map-registration",
       "suite": "full",
       "setup": "clean",
@@ -85,7 +45,6 @@
         "lx-content"
       ],
       "forbidden_skills": [
-        "tiled-map-production",
         "lx-game",
         "lx-ui",
         "lx-resources"

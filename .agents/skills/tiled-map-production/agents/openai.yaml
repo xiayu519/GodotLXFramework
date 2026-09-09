@@ -1,6 +1,0 @@
-interface:
-  display_name: "Tiled 地图制作与验收"
-  short_description: "制作可复用的正交与等距 TMX 地图，检查布局、素材清洁和人物遮挡"
-  default_prompt: "使用 $tiled-map-production 制作或修正 TMX 地图，优先素材复用，并按改动风险验证布局与遮挡。"
-policy:
-  allow_implicit_invocation: true
