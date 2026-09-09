@@ -1,14 +1,13 @@
 ---
-title: 外层工作区与 godot_project 工程边界
+title: 同构目录的同步取舍
 kind: decision
 status: active
-verified: 2026-08-27
+scope: LXFramework 工作区布局与下游同步
+verified: 2026-09-09
 sources:
-  - https://docs.godotengine.org/en/stable/tutorials/best_practices/project_organization.html
-  - https://learn.chatgpt.com/docs/agent-configuration/agents-md
   - AGENTS.md
 ---
 
-仓库采用外层工作区与 `godot_project/` 内层 Godot 工程的固定布局。外层保存 Git、Codex 工作流、Project Knowledge、公开文档和未来 Luban 等外部工具；`project.godot`、`res://`、框架源码、产品源码及内容清单只存在于 `godot_project/`。
+选择外层工作区与内层 Godot 工程的原因，是把 Git、工作流和上游生成工具隔离出资源导入树，同时让干净框架与下游工作区保持同构相对路径，降低同步时的路径改写成本。
 
-内层名称使用 Godot 官方建议的 `snake_case`。根 `lx.ps1` 是稳定包装入口，保证从外层工作；内层保留同名入口，保证直接在 Godot 工程目录工作。Peachwind 与干净 LXFramework 基线维持相同相对结构，以便框架和工作流按对应路径同步。
+这解释既有布局的动机，不冻结未来目录调整；当前路径、生成位置与入口以 AGENTS 和实际工程为准。

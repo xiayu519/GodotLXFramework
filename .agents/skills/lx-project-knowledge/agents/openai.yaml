@@ -1,6 +1,6 @@
 interface:
   display_name: "LX Project Knowledge"
-  short_description: "维护版本化项目知识、失效状态和精简索引"
-  default_prompt: "使用 $lx-project-knowledge 审查这条 LXFramework 项目知识。"
+  short_description: "按需检索项目决策与稳定反馈，维护精简索引并清理冲突或失效条目"
+  default_prompt: "使用 $lx-project-knowledge 检索与本次任务有关的项目决策；仅在明确要求维护时修改知识库。"
 policy:
   allow_implicit_invocation: true

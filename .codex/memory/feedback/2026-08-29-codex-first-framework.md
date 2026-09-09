@@ -1,15 +1,14 @@
 ---
-title: Codex 是 LXFramework 第一开发者
+title: Codex 优先的框架取舍
 kind: feedback
 status: active
-verified: 2026-08-29
+scope: LXFramework 框架设计与人工接管入口
+verified: 2026-09-09
 sources:
   - README.md
   - Books/AI-Development-Workflow.md
-  - .agents/skills/lx-capabilities/references/capability-catalog.md
-  - .agents/skills/lx-runtime-observe/references/runtime-observation.md
 ---
 
-LXFramework 的首要用户是 Codex，人工开发是兼容和接管入口。后续取舍优先减少模型决策分支、隐藏状态、重复事实源和无法机器验收的步骤；模块数量与人工可视化工具不能凌驾于机器发现、运行时可观测、确定性生成、生命周期闭环、结构化证据和安全恢复。
+用户把 Codex 视为第一开发者，人工编程是兼容与接管入口。因此设计取舍优先减少隐式状态、模型决策分支和重复事实源；增加面板或模块的价值要体现在机器可发现、可验证和人工可接管，而非数量本身。
 
-AI Control Plane 保持按需和有界：能力目录与运行时 snapshot 不进入 `AGENTS.md` 常驻提示；只读观察先于运行时 mutation；事务化维护只能操作当前 checkout 可证明的派生文件，外部安装仍服从授权边界。新增游戏模块只有在真实产品需求或重复模式证明收益后才进入默认框架。
+具体能力查询、运行时观察和维护事务各由负责的 Skill 定义，本条不重复它们的执行步骤或授权规则。

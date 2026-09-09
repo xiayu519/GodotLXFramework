@@ -1,13 +1,13 @@
 ---
-title: 用真实游戏迁移反哺主干工作流
+title: 真实产品反哺通用能力
 kind: feedback
 status: active
-verified: 2026-08-30
+scope: LXFramework 下游迁移缺口的归属判断
+verified: 2026-09-09
 sources:
   - .agents/skills/lx-migrate/references/migration-workflow.md
-  - godot_project/tools/LXFramework.Tools/MigrationPlanner.cs
 ---
 
-LXFramework 的 Codex 工作流不能只优化单个 sample；新游戏、旧 LX 游戏升级、其他 Godot 项目移植和跨引擎/行为复刻都应成为主干可重复能力。真实产品迁移暴露的分类、API 适配、产品 smoke、运行时可观测和视觉验收缺口，应优先反哺主干工具、Skill 与 outcome eval，再由后续产品分支消费。
+用户希望用真实下游项目暴露可复现的通用缺口，让后续项目也受益，而不是只修好一个示例。判断缺口归属时，应区分可复用的框架契约/工具能力与产品专属内容，避免把一次游戏需求硬编码进主干。
 
-迁移工具默认只读来源并生成有界计划，不自动执行 Git 改写或机械翻译跨引擎代码。框架、工具和 Codex 工作流以最新目标 checkout 为权威；产品事实、源码、场景和获授权资产可迁移，生成物与构建产物重建。完成以纵向切片、Debug 产品 smoke、状态型任务的当前会话快照、产品视觉、重开闭合和最终验证为证据。
+这是选择通用修复方向的背景，不自动授权修改上游、迁移产品或扩展验证范围；实际实现边界按当前请求和对应 Skill 判断。

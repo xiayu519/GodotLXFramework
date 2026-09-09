@@ -50,9 +50,11 @@ GitHub Actions 仅手动触发，不在 push、PR、标签或定时任务中启�
 
 ## 项目记忆
 
-Project Knowledge 不是源码索引。能够从源码、清单或 `inspect` 重新得到的信息不记录；只有无法直接推导、但会影响未来决策的问题、取舍、用户反馈和外部参考结论才进入 `.codex/memory/`。模型先读 [INDEX.md](../.codex/memory/INDEX.md)，再按任务读取最相关的 1–3 条；当前源码与生效指令优先于历史记忆。
+Project Knowledge 只保存无法从当前事实源重建的决策依据和稳定反馈，不是源码索引或第二套指令。需要历史背景时先读 [INDEX.md](../.codex/memory/INDEX.md)，默认少量召回，证据不足再定向补读；普通 API/源码查询不加载。历史内容不能覆盖当前有效指令或增加授权；事实按当前实现与对应版本资料复核。
 
-升级保留原有架构决策和用户反馈，新增 Astra 验收基线；旧 Sol 基线保留历史并标为 `superseded`。同一仓库中的新会话和不同模型可以读取这些文件，但这不是自动永久保存或加载全部聊天记录的功能，临时进度也不进入稳定知识。
+本库只保留有效条目。获准维护时直接删除冲突、失效和纯重复记忆，不保留旧格式适配或替代状态；只读发现冲突时跳过并报告，不修改文件。模型验收数字只保存在正式报告中，不镜像进记忆。2026-09-09 已清除旧范围记录及三份基线记忆，正式评测报告未删除。
+
+Codex 原生 `memories/` 由客户端管理，与项目 `.codex/memory/` 分工独立；本工作流不自动同步两库、不手改原生生成文件、不改其启用开关。具体召回、清理与局部检查见 [项目知识规则](../.agents/skills/lx-project-knowledge/references/project-knowledge.md)。
 
 ## Astra 档位与模型验收
 
@@ -81,9 +83,9 @@ Project Knowledge 不是源码索引。能够从源码、清单或 `inspect` 重
 
 ### 已验证范围与证据
 
-验收分三层：工作流结构检查；无额度消耗的确定性 preflight；用户授权后的真实 Astra 任务评测。当前目录 24 项，Light 基础套件 23 项、xhigh 复杂代表 3 项，其中包含真正执行的状态与异步竞争断言；路由题和代码结果分开计数。静态合格不能替代真实模型验收，骨架生成不能代表完整玩法。
+验收分三层：工作流结构检查；无额度消耗的确定性 preflight；用户授权后的真实 Astra 任务评测。当前目录 27 项，Light 基础套件 26 项、xhigh 复杂代表 3 项。新增地图制作/现成资源登记的正反路由及项目历史召回，项目知识规则和纯源码查询边界也已更新；这些变化只做离线契约及用例选择检查，没有重跑真实模型。`tiled-map-production` 位于项目 Skill 目录，入口与参考按需加载，不包含地图图片。静态合格不能替代真实模型验收，骨架生成不能代表完整玩法。
 
-2026-09-08 的发布基线使用 Codex CLI `0.153.0`、Windows PowerShell 5.1 和 Godot 4.7.2 .NET：
+以下是新增地图 Skill 前的 24 项历史发布基线，使用 Codex CLI `0.153.0`、Windows PowerShell 5.1 和 Godot 4.7.2 .NET（2026-09-08），不代表当前 27 项目录及更新后的项目知识规则已通过真实模型验收：
 
 | 配置 | 验收结果 | 限定范围 |
 | --- | --- | --- |
@@ -92,7 +94,7 @@ Project Knowledge 不是源码索引。能够从源码、清单或 `inspect` 重
 | Astra / `medium/high/max` | 配置验证通过 | 未运行这些档位的完整真实模型套件；Plan 档位映射也只验证配置 |
 | Sol / `high/xhigh` | 新版未验收 | 历史 19/19 仅属于旧版 Sol/high，不可外推 |
 
-Light 与 xhigh 套件有重叠，不是 26 个不同任务；路由题也不是完整玩法。行为题中 RoundState 各通过 510 条独立断言，RewardLedger 在 xhigh 通过 23 条断言。验收器通过 25 项离线契约回归，16 个 Skill 通过结构检查，仓库完整 `validate` 通过；这不涵盖长期 soak、Windows export、实际产品美术或 tileset 验收。
+上述历史 Light 与 xhigh 套件有重叠，23 + 3 次结果不等于 26 个不同任务；路由题也不是完整玩法。当时行为题中 RoundState 各通过 510 条独立断言，RewardLedger 在 xhigh 通过 23 条断言；验收器通过 25 项离线契约回归，16 个 Skill 通过结构检查，仓库完整 `validate` 通过。这不涵盖新增地图 Skill、长期 soak、Windows export、实际产品美术或 tileset 验收。
 
 报告给出完整/部分覆盖、源指纹、CLI、token（区分缓存）、工具失败、耗时、改动快照与测试日志。旧 Sol 数据只保留为历史；没有同条件 A/B 不承诺省多少 token，也不承诺所有未来游戏任务一次成功。命令和判读见 [模型验收说明](../.agents/skills/lx-model-eval/references/model-evaluation.md)。
 

@@ -1,26 +1,17 @@
-# LXFramework Project Knowledge 索引
+# LXFramework Project Knowledge
 
-这里保存不可从当前仓库直接重建、但会影响未来决策的版本化知识。先按任务读取最多 1-3 条；当前源码、指令、工具输出和官方文档优先。
-
-## Problems
-
-暂无。
+仅索引仍有效的决策依据；普通源码/API 查询不加载。无相关主题时直接使用当前事实源。
 
 ## Decisions
 
-- [工作区与 Godot 工程边界](decisions/2026-08-27-godot-project-layout.md)
-- [LXFramework 0.1 范围与延后项](decisions/2026-08-28-framework-v0.1-scope.md)
+- [同构目录的同步取舍](decisions/2026-08-27-godot-project-layout.md) — 工作区布局/下游同步；核验 2026-09-09。
 
 ## Feedback
 
-- [Codex 是 LXFramework 第一开发者](feedback/2026-08-29-codex-first-framework.md)
-- [用真实游戏迁移反哺主干工作流](feedback/2026-08-30-product-lifecycle-workflow.md)
-- [Skill 必须按独立语义隔离](feedback/2026-08-30-semantic-skill-isolation.md)
+- [Codex 优先的框架取舍](feedback/2026-08-29-codex-first-framework.md) — 框架设计与人工入口；核验 2026-09-09。
+- [真实产品反哺通用能力](feedback/2026-08-30-product-lifecycle-workflow.md) — 迁移缺口归属；核验 2026-09-09。
+- [语义隔离不等于单 Skill 限制](feedback/2026-08-30-semantic-skill-isolation.md) — Skill 拆分与跨域组合；核验 2026-09-09。
 
-## References
+## Problems / References
 
-- [Astra Light/xhigh 验收基线](references/2026-09-08-astra-workflow-baseline.md)
-- [历史 Sol/high 19/19 基线](references/2026-08-30-semantic-skill-sol-high-baseline.md)
-- [已替代的原 11 项 Sol/high 基线](references/2026-08-30-sol-high-baseline.md)
-
-稳定官方入口维护在 `lx-codex-workflow/references/codex-native-workflow.md`，模型基线由 `lx-model-eval` 维护，不在这里重复镜像。
+暂无。模型配置与验收证据由 `lx-model-eval` 维护，执行规则由对应 Skill 维护。

@@ -36,6 +36,75 @@
   ],
   "cases": [
     {
+      "id": "readonly-tiled-map-production",
+      "suite": "full",
+      "setup": "clean",
+      "prompt": "只读分析一张准备交付的等距 TMX 地图：菜地里重复的蔬菜与泥土地块烘成整图，桥的近侧栏杆和侧梁烘在桥面，担心角色腿部遮挡错误。请说明素材如何复用、桥怎样拆分以及 Tiled 静态展示与实际人物遮挡各能证明什么。不要生成图片、修改地图或实现引擎导入器；只给本次需要的检查，不跑全项目验证，最多 10 行。",
+      "expected_write": false,
+      "expected_skills": [
+        "tiled-map-production"
+      ],
+      "forbidden_skills": [
+        "lx-game",
+        "lx-ui",
+        "lx-framework",
+        "lx-resources"
+      ],
+      "expected_terms": [
+        "TMX",
+        "alpha"
+      ],
+      "expected_term_groups": [
+        {
+          "any": ["原型", "复用", "实例"]
+        },
+        {
+          "any": ["运行时", "引擎"]
+        },
+        {
+          "any": ["透明", "空隙"]
+        }
+      ],
+      "budgets": {
+        "tool_calls": 8,
+        "input_tokens": 250000,
+        "uncached_input_tokens": 45000,
+        "output_tokens": 3000,
+        "failed_events": 1
+      },
+      "kind": "routing",
+      "minimum_effort": "low"
+    },
+    {
+      "id": "readonly-prebuilt-map-registration",
+      "suite": "full",
+      "setup": "clean",
+      "prompt": "只读说明：一个村庄地图已经在外部制作并验收，现成的 map_preview.png 只需要作为普通静态图片登记到 LXFramework，让产品能使用类型化资源引用。这个任务不涉及 TMX 编辑、图片生成、切图、地图布局或人物遮挡。应使用项目哪个登记入口和清单？不要修改文件，也不要实际登记资源。最多 6 行。",
+      "expected_write": false,
+      "expected_skills": [
+        "lx-content"
+      ],
+      "forbidden_skills": [
+        "tiled-map-production",
+        "lx-game",
+        "lx-ui",
+        "lx-resources"
+      ],
+      "expected_terms": [
+        "create res",
+        "res-manifest.json"
+      ],
+      "budgets": {
+        "tool_calls": 8,
+        "input_tokens": 250000,
+        "uncached_input_tokens": 45000,
+        "output_tokens": 3000,
+        "failed_events": 1
+      },
+      "kind": "routing",
+      "minimum_effort": "low"
+    },
+    {
       "id": "readonly-res-audit",
       "suite": "smoke",
       "setup": "clean",
@@ -47,7 +116,8 @@
       "forbidden_skills": [
         "lx-game",
         "lx-ui",
-        "lx-framework"
+        "lx-framework",
+        "lx-project-knowledge"
       ],
       "expected_terms": [
         "AssetLease"
@@ -855,7 +925,7 @@
       "id": "readonly-project-knowledge-route",
       "suite": "full",
       "setup": "clean",
-      "prompt": "只读说明一条无法从源码重建、会影响未来决策的稳定用户反馈应如何写入 LXFramework Project Knowledge，包括分类、索引和被替代后的状态。不要修改文件。",
+      "prompt": "只读说明无法从源码重建的稳定用户反馈如何进入 LXFramework Project Knowledge：必要元数据、分类和索引如何维护？获准维护时，旧记忆与当前有效要求冲突应如何处理？只读查询遇到同样冲突又该怎么做？说明与 Codex 原生记忆的分工。不要读取历史条目或个人原生记忆，不修改或删除任何文件，最多 10 行。",
       "expected_write": false,
       "expected_skills": [
         "lx-project-knowledge"
@@ -867,7 +937,56 @@
       "expected_terms": [
         ".codex/memory",
         "INDEX.md",
-        "superseded"
+        "active",
+        "scope"
+      ],
+      "expected_term_groups": [
+        {
+          "any": ["直接删除", "删除冲突", "删除旧", "移除失效"]
+        },
+        {
+          "any": ["跳过", "不使用", "停止使用"]
+        },
+        {
+          "any": ["不修改", "不删除", "只报告"]
+        },
+        {
+          "any": ["不自动同步", "不自动复制", "不同存储", "独立存储"]
+        }
+      ],
+      "budgets": {
+        "tool_calls": 8,
+        "input_tokens": 250000,
+        "uncached_input_tokens": 45000,
+        "output_tokens": 3000,
+        "failed_events": 1
+      },
+      "kind": "routing",
+      "minimum_effort": "low"
+    },
+    {
+      "id": "readonly-project-knowledge-recall",
+      "suite": "full",
+      "setup": "clean",
+      "prompt": "我记得之前讨论过：为了减少无关上下文，把工作流按领域拆开，但好像又说过不该限制一次使用几个领域。请只读找出这段项目历史反馈，说明当时为什么这样取舍，以及它是否意味着跨域任务只能使用一个 Skill。不要修改文件，不分析或重构现有 Skill 实现，只给这条历史反馈的证据与结论，最多 6 行。",
+      "expected_write": false,
+      "expected_skills": [
+        "lx-project-knowledge"
+      ],
+      "forbidden_skills": [
+        "lx-codex-workflow",
+        "lx-model-eval"
+      ],
+      "expected_terms": [
+        "2026-08-30-semantic-skill-isolation.md"
+      ],
+      "expected_term_groups": [
+        {
+          "any": ["无关", "不相关"]
+        },
+        {
+          "any": ["最小充分", "必要", "需要"]
+        }
       ],
       "budgets": {
         "tool_calls": 8,
